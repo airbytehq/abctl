@@ -35,7 +35,11 @@ func main() {
 		}
 
 		if os.Args[2] == cmdLocalUninstall {
-			fmt.Println("TODO")
+			if err := lc.Uninstall(); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			fmt.Println("success")
 			return
 		}
 	}
