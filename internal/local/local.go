@@ -90,117 +90,14 @@ func (lc *Command) Install() error {
 		return err
 	}
 
-	//g := errgroup.Group{}
-	//g.Go(func() error {
 	if err := lc.handleChart("airbyte", airbyteRepoName, airbyteRepoURL, airbyteChartName, airbyteChartRelease, airbyteNamespace); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)
 	}
-	//})
-	//g.Go(func() error {
+
 	if err := lc.handleChart("nginx", nginxRepoName, nginxRepoURL, nginxChartName, nginxChartRelease, nginxNamespace); err != nil {
 		return fmt.Errorf("could not install nginx chart: %w", err)
 	}
-	//})
-	//if _, err := multi.Start(); err != nil {
-	//	return fmt.Errorf("could not start multi output: %w", err)
-	//}
-	//if err := g.Wait(); err != nil {
-	//	return fmt.Errorf("chart failed: %w", err)
-	//}
-	//spinnerHelmAb, err := pterm.DefaultSpinner.WithWriter(multi.NewWriter()).Start("helm - adding " + pterm.LightBlue("airbyte") + " repository")
-	//if err != nil {
-	//	return fmt.Errorf("could not start spinner: %w", err)
-	//}
-	//spinnerHelmNginx, err := pterm.DefaultSpinner.WithWriter(multi.NewWriter()).Start("helm - adding nginx repository")
-	//if err != nil {
-	//	return fmt.Errorf("could not start spinner: %w", err)
-	//}
-	//
-	//if _, err := multi.Start(); err != nil {
-	//	return fmt.Errorf("could not start multi output: %w", err)
-	//}
-	//
-	//if err := lc.helm.AddOrUpdateChartRepo(repo.Entry{
-	//	Name: airbyteRepoName,
-	//	URL:  airbyteRepoURL,
-	//}); err != nil {
-	//	return errors.Wrap(err, "could not add airbyte chart repo")
-	//}
-	//
-	//if err := lc.helm.AddOrUpdateChartRepo(repo.Entry{
-	//	Name: nginxRepoName,
-	//	URL:  nginxRepoURL,
-	//}); err != nil {
-	//	return errors.Wrap(err, "could not add nginx chart repo")
-	//}
-	//
-	//spinnerHelmAb.UpdateText("helm - fetching chart " + pterm.LightBlue(airbyteChartName))
-	////fmt.Printf("fetching chart %s... ", airbyteChartName)
-	//airbyteChart, _, err := lc.helm.GetChart(airbyteChartName, &action.ChartPathOptions{})
-	//if err != nil {
-	//	return errors.Wrap(err, fmt.Sprintf("could not fetch chart %s", airbyteChartName))
-	//}
-	//fmt.Printf("successfully fetched chart %s\n", airbyteChartName)
-	//fmt.Printf(" version: %s\n", airbyteChart.Metadata.Version)
-	//fmt.Printf(" app-version: %s\n", airbyteChart.Metadata.AppVersion)
-	//
-	//spinnerHelmNginx.UpdateText("helm - fetching chart " + pterm.LightBlue(nginxNamespace))
-	////fmt.Printf("fetching chart %s... ", nginxChartName)
-	//nginxChart, _, err := lc.helm.GetChart(nginxChartName, &action.ChartPathOptions{})
-	//if err != nil {
-	//	return errors.Wrap(err, fmt.Sprintf("could not fetch chart %s", nginxChartName))
-	//}
-	//fmt.Printf("successfully fetched chart %s\n", nginxChartName)
-	//fmt.Printf(" version: %s\n", nginxChart.Metadata.Version)
-	//fmt.Printf(" app-version: %s\n", nginxChart.Metadata.AppVersion)
-	//
-	////fmt.Printf("starting k3d cluster... ")
-	////if err := k3d.ClusterRun(context.Background(), runtimes.SelectedRuntime, cluster); err != nil {
-	////	return errors.Wrap(err, fmt.Sprintf("could not create k3d cluster %s", clusterName))
-	////}
-	////if err != nil {
-	////	return errors.Wrap(err, "could not communicate with k3d")
-	////}
-	////fmt.Println("k3d cluster successfully created")
-	//
-	//fmt.Printf("installing chart %s (%s)... ", airbyteChartName, airbyteChart.Metadata.Version)
-	//airbyteRelease, err := lc.helm.InstallOrUpgradeChart(context.Background(), &helmclient.ChartSpec{
-	//	ReleaseName:     airbyteChartRelease,
-	//	ChartName:       airbyteChartName,
-	//	CreateNamespace: true,
-	//	Namespace:       airbyteNamespace,
-	//	Wait:            true,
-	//	Timeout:         10 * time.Minute,
-	//},
-	//	&helmclient.GenericHelmOptions{},
-	//)
-	//if err != nil {
-	//	return errors.Wrap(err, "could not install helm")
-	//}
-	//fmt.Printf("successfully installed chart %s\n", airbyteChartName)
-	//fmt.Printf(" name: %s\n", airbyteRelease.Name)
-	//fmt.Printf(" namespace: %s\n", airbyteRelease.Namespace)
-	//fmt.Printf(" version: %d\n", airbyteRelease.Version)
-	//
-	//fmt.Printf("installing chart %s (%s)... ", nginxChartName, nginxChart.Metadata.Version)
-	//nginxRelease, err := lc.helm.InstallOrUpgradeChart(context.Background(), &helmclient.ChartSpec{
-	//	ReleaseName:     nginxChartRelease,
-	//	ChartName:       nginxChartName,
-	//	CreateNamespace: true,
-	//	Namespace:       nginxNamespace,
-	//	Wait:            true,
-	//	Timeout:         10 * time.Minute,
-	//},
-	//	&helmclient.GenericHelmOptions{},
-	//)
-	//if err != nil {
-	//	return errors.Wrap(err, "could not install helm")
-	//}
-	//fmt.Printf("successfully installed chart %s\n", nginxChartName)
-	//fmt.Printf(" name: %s\n", nginxRelease.Name)
-	//fmt.Printf(" namespace: %s\n", nginxRelease.Namespace)
-	//fmt.Printf(" version: %d\n", nginxRelease.Version)
-	//
+
 	spinnerIngress, err := pterm.DefaultSpinner.Start("ingress - installing")
 	if err != nil {
 		return fmt.Errorf("could not start ingress spinner: %w", err)
@@ -391,27 +288,3 @@ func openBrowser(url string) error {
 
 	return cmd.Run()
 }
-
-//var (
-//	cluster, _ = config.TransformSimpleToClusterConfig(
-//		context.Background(),
-//		runtimes.SelectedRuntime,
-//		v1alpha5.SimpleConfig{
-//			TypeMeta: k3dTypes.TypeMeta{
-//				Kind:       "Simple",
-//				APIVersion: config.DefaultConfigApiVersion,
-//			},
-//			ObjectMeta: k3dTypes.ObjectMeta{
-//				Name: clusterName,
-//			},
-//			ExposeAPI: v1alpha5.SimpleExposureOpts{},
-//			Ports: []v1alpha5.PortWithNodeFilters{
-//				{
-//					Port:        fmt.Sprintf("%d:80", clusterPort),
-//					NodeFilters: []string{"loadbalancer"},
-//				},
-//			},
-//			Servers: 1,
-//		},
-//	)
-//)
