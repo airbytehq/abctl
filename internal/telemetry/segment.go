@@ -3,10 +3,9 @@ package telemetry
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
 	"k8s.io/apimachinery/pkg/util/json"
 	"net/http"
-	"path/filepath"
 	"runtime"
 	"time"
 )
@@ -33,18 +32,17 @@ const (
 	url         = "https://api.segment.io/v1/track"
 )
 
-// TODO: complete analytics file support
-var analyticsFile = filepath.Join(".airbyte", "analytics.yml")
-
 type Client struct {
-	h  http.Client
-	id uuid.UUID
+	h         http.Client
+	sessionID ulid.ULID
+	userID    ulid.ULID
 }
 
-func New(id uuid.UUID) *Client {
+func New(userID ulid.ULID) *Client {
 	return &Client{
-		h:  http.Client{Timeout: 10 * time.Second},
-		id: id,
+		h:         http.Client{Timeout: 10 * time.Second},
+		userID:    userID,
+		sessionID: ulid.Make(),
 	}
 }
 
@@ -62,10 +60,10 @@ func (c *Client) Failure(err error) error {
 
 func (c *Client) send(es EventState, et EventType, ee error) error {
 	body := body{
-		ID:    "",
+		ID:    c.userID.String(),
 		Event: string(et),
 		Properties: map[string]string{
-			"session_id": c.id.String(),
+			"session_id": c.sessionID.String(),
 			"state":      string(es),
 			"os":         runtime.GOOS,
 			// TODO: add k8s version, docker version, other?
