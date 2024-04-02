@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/oklog/ulid/v2"
@@ -23,7 +24,7 @@ anonymous_user_id: ` + id.String()); err != nil {
 		t.Fatal("could not write to temp file", err)
 	}
 
-	cnf, err := LoadFromFile(f.Name())
+	cnf, err := LoadConfigFromFile(f.Name())
 	if d := cmp.Diff(nil, err); d != "" {
 		t.Error("failed to load file", d)
 	}
@@ -32,12 +33,23 @@ anonymous_user_id: ` + id.String()); err != nil {
 	}
 }
 
+func TestLoadFromFile_NoFileReturnsErrNotExist(t *testing.T) {
+	_, err := LoadConfigFromFile(filepath.Join(t.TempDir(), "dne.yml"))
+	if err == nil {
+		t.Error("expected an error to be returned")
+	}
+	// should return a os.ErrNotExist if no file was found
+	if d := cmp.Diff(true, errors.Is(err, os.ErrNotExist)); d != "" {
+		t.Error("expected os.ErrNotExist", err)
+	}
+}
+
 func TestWriteToFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "nested", "deeply", analyticsFile)
+	path := filepath.Join(t.TempDir(), "nested", "deeply", ConfigFile)
 
 	c := Config{UserID: ULID(id)}
 
-	if err := WriteToFile(path, c); err != nil {
+	if err := WriteConfigToFile(path, c); err != nil {
 		t.Error("failed to create file", err)
 	}
 

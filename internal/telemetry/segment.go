@@ -10,63 +10,55 @@ import (
 	"time"
 )
 
-type EventState string
-
-const (
-	Start   EventState = "started"
-	Failed  EventState = "failed"
-	Success EventState = "succeeded"
-)
-
-type EventType string
-
-const (
-	Install  EventType = "install"
-	Sync     EventType = "sync"
-	Validate EventType = "validate"
-	Check    EventType = "check"
-)
-
 const (
 	trackingKey = "kpYsVGLgxEqD5OuSZAQ9zWmdgBlyiaej"
 	url         = "https://api.segment.io/v1/track"
 )
 
-type Client struct {
+// SegmentClient client, all methods communicate with segment.
+type SegmentClient struct {
 	h         http.Client
 	sessionID ulid.ULID
-	userID    ulid.ULID
+	cfg       Config
+	attrs     map[string]string
 }
 
-func New(userID ulid.ULID) *Client {
-	return &Client{
+func NewSegmentClient(cfg Config) *SegmentClient {
+	return &SegmentClient{
 		h:         http.Client{Timeout: 10 * time.Second},
-		userID:    userID,
+		cfg:       cfg,
 		sessionID: ulid.Make(),
+		attrs:     map[string]string{},
 	}
 }
 
-func (c *Client) Start() error {
-	return c.send(Start, Install, nil)
+func (s *SegmentClient) Start(et EventType) error {
+	return s.send(Start, et, nil)
 }
 
-func (c *Client) Success() error {
-	return c.send(Success, Install, nil)
+func (s *SegmentClient) Success(et EventType) error {
+	return s.send(Success, et, nil)
 }
 
-func (c *Client) Failure(err error) error {
-	return c.send(Failed, Install, err)
+func (s *SegmentClient) Failure(et EventType, err error) error {
+	return s.send(Failed, et, err)
 }
 
-func (c *Client) send(es EventState, et EventType, ee error) error {
+func (s *SegmentClient) Attr(key, val string) {
+	s.attrs[key] = val
+}
+
+func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
 	body := body{
-		ID:    c.userID.String(),
+		ID:    s.cfg.UserID.String(),
 		Event: string(et),
 		Properties: map[string]string{
-			"session_id": c.sessionID.String(),
-			"state":      string(es),
-			"os":         runtime.GOOS,
-			// TODO: add k8s version, docker version, other?
+			"deployment_method": "quick_start",
+			"session_id":        s.sessionID.String(),
+			"state":             string(es),
+			"os":                runtime.GOOS,
+			// TODO: remove after manually testing
+			"testing": "true",
 		},
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		WriteKey:  trackingKey,
@@ -80,7 +72,7 @@ func (c *Client) send(es EventState, et EventType, ee error) error {
 		return fmt.Errorf("could not create request body: %w", err)
 	}
 
-	resp, err := c.h.Post(url, "application/json", bytes.NewBuffer(data))
+	resp, err := s.h.Post(url, "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		return fmt.Errorf("could not post: %w", err)
 	}

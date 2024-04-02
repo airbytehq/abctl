@@ -9,20 +9,31 @@ import (
 )
 
 const (
-	welcome = `Thanks you for using Airbyte!
+	// Welcome is displayed the first time the telemetry config is created.
+	Welcome = `Thanks you for using Airbyte!
 Anonymous usage reporting is currently enabled. For more information, please see https://docs.airbyte.com/telemetry`
 )
 
-var analyticsFile = filepath.Join(".airbyte", "analytics.yml")
+var ConfigFile = filepath.Join(".airbyte", "analytics.yml")
 
 // ULID is a wrapper around ulid.ULID so that we can implement the yaml interfaces.
 type ULID ulid.ULID
 
+// NewULID returns a new randomized ULID.
+func NewULID() ULID {
+	return ULID(ulid.Make())
+}
+
+// String returns a string representation of this ULID.
+//
+//goland:noinspection GoMixedReceiverTypes
 func (u ULID) String() string {
 	return ulid.ULID(u).String()
 }
 
 // UnmarshalYAML allows for converting a yaml field into a ULID.
+//
+//goland:noinspection GoMixedReceiverTypes
 func (u *ULID) UnmarshalYAML(node *yaml.Node) error {
 	var s string
 	if err := node.Decode(&s); err != nil {
@@ -39,32 +50,24 @@ func (u *ULID) UnmarshalYAML(node *yaml.Node) error {
 }
 
 // MarshalYAML allows for converting a ULID into a yaml field.
+//
+//goland:noinspection GoMixedReceiverTypes
 func (u ULID) MarshalYAML() (any, error) {
 	//panic("test")
 	return ulid.ULID(u).String(), nil
 }
 
+// Config represents the analytics.yaml file.
 type Config struct {
 	UserID ULID `yaml:"anonymous_user_id"`
 }
-
-//func Load() (*Config, error) {
-//	home, err := os.UserHomeDir()
-//	if err != nil {
-//		return nil, fmt.Errorf("could not locate home directory: %w", err)
-//	}
-//
-//	var fullPath = filepath.Join(home, analyticsFile)
-//
-//	return LoadFromFile(fullPath)
-//}
 
 // permissions sets the file and directory permission level for the telemetry files that may be created.
 // This is set as 0777 to match python's default mkdir behavior, as this file may be potentially shared
 // between this code and PyAirbyte
 const permissions = 0777
 
-func LoadFromFile(path string) (Config, error) {
+func LoadConfigFromFile(path string) (Config, error) {
 	if _, err := os.Stat(path); err != nil {
 		return Config{}, fmt.Errorf("could not location file %s: %w", path, err)
 	}
@@ -83,20 +86,23 @@ func LoadFromFile(path string) (Config, error) {
 	return c, nil
 }
 
+// header is written to the start of the configuration file
 const header = `# This file is used by Airbyte to track anonymous usage statistics.
 # For more information or to opt out, please see
 # - https://docs.airbyte.com/operator-guides/telemetry
 `
 
-func WriteToFile(path string, conf Config) error {
-	data, err := yaml.Marshal(conf)
+// WriteConfigToFile will write the cfg to the provided path.
+func WriteConfigToFile(path string, cfg Config) error {
+	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("could not marshal config: %w", err)
 	}
 
+	parent := filepath.Dir(path)
 	// create necessary directories
-	if err := os.MkdirAll(filepath.Dir(path), permissions); err != nil {
-		return fmt.Errorf("could not create directories %s: %w", filepath.Dir(path), err)
+	if err := os.MkdirAll(parent, permissions); err != nil {
+		return fmt.Errorf("could not create directories %s: %w", parent, err)
 	}
 
 	if err := os.WriteFile(path, append([]byte(header), data...), permissions); err != nil {
