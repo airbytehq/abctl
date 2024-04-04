@@ -1,5 +1,7 @@
 package telemetry
 
+var _ Client = (*NoopClient)(nil)
+
 // NoopClient client, all methods are no-ops.
 type NoopClient struct {
 }

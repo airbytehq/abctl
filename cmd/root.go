@@ -15,6 +15,11 @@ var (
 	rootCmd = &cobra.Command{
 		Use:   "abctl",
 		Short: pterm.LightBlue("Airbyte") + "'s proof-of-concept command-line tool",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if dnt {
+				pterm.Info.Println("telemetry disabled via --dnt flag")
+			}
+		},
 	}
 )
 
@@ -28,6 +33,9 @@ func Execute() {
 }
 
 func init() {
+	// configure cobra to chain Persistent*Run commands together
+	cobra.EnableTraverseRunHooks = true
+
 	rootCmd.AddCommand(local.Cmd)
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.PersistentFlags().BoolVar(&dnt, "dnt", false, "set to opt out of telemetry data")

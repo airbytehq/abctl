@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/oklog/ulid/v2"
 	"k8s.io/apimachinery/pkg/util/json"
+	"maps"
 	"net/http"
 	"runtime"
 	"time"
@@ -14,6 +15,8 @@ const (
 	trackingKey = "kpYsVGLgxEqD5OuSZAQ9zWmdgBlyiaej"
 	url         = "https://api.segment.io/v1/track"
 )
+
+var _ Client = (*SegmentClient)(nil)
 
 // SegmentClient client, all methods communicate with segment.
 type SegmentClient struct {
@@ -49,22 +52,27 @@ func (s *SegmentClient) Attr(key, val string) {
 }
 
 func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
-	body := body{
-		ID:    s.cfg.UserID.String(),
-		Event: string(et),
-		Properties: map[string]string{
-			"deployment_method": "quick_start",
-			"session_id":        s.sessionID.String(),
-			"state":             string(es),
-			"os":                runtime.GOOS,
-			// TODO: remove after manually testing
-			"testing": "true",
-		},
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		WriteKey:  trackingKey,
+	properties := map[string]string{
+		"deployment_method": "quick_start",
+		"session_id":        s.sessionID.String(),
+		"state":             string(es),
+		"os":                runtime.GOOS,
+		// TODO: remove after manually testing
+		"testing": "true",
 	}
+	// add all the attributes to the properties map before sending it
+	maps.Copy(properties, s.attrs)
+
 	if ee != nil {
-		body.Error = ee.Error()
+		properties["error"] = ee.Error()
+	}
+
+	body := body{
+		ID:         s.cfg.UserID.String(),
+		Event:      string(et),
+		Properties: properties,
+		Timestamp:  time.Now().UTC().Format(time.RFC3339),
+		WriteKey:   trackingKey,
 	}
 
 	data, err := json.Marshal(body)
@@ -83,7 +91,6 @@ func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
 
 type body struct {
 	ID         string            `json:"anonymousId"`
-	Error      string            `json:"error,omitempty"`
 	Event      string            `json:"event"`
 	Properties map[string]string `json:"properties"`
 	Timestamp  string            `json:"timestamp"`

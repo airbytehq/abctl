@@ -1,29 +1,33 @@
 package local
 
 import (
+	"airbyte.io/abctl/internal/telemetry"
 	"context"
 	"fmt"
 	"github.com/docker/docker/client"
 	helmclient "github.com/mittwald/go-helm-client"
-	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"time"
 )
 
 const (
 	airbyteChartName    = "airbyte/airbyte"
 	airbyteChartRelease = "airbyte-abctl"
+	airbyteIngress      = "ingress-abctl"
 	airbyteNamespace    = "abctl"
 	airbyteRepoName     = "airbyte"
 	airbyteRepoURL      = "https://airbytehq.github.io/helm-charts"
@@ -46,11 +50,13 @@ func (w *nilWriter) Write(p []byte) (int, error) {
 }
 
 type Command struct {
+	tel  telemetry.Client
+	h    http.Client
 	helm helmclient.Client
 	k8s  *kubernetes.Clientset
 }
 
-func New() (*Command, error) {
+func New(tel telemetry.Client) (*Command, error) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf(" could not determine user home directory: %w", err)
@@ -72,7 +78,20 @@ func New() (*Command, error) {
 	}
 	k8s, err := kubernetes.NewForConfig(restCfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not create k8s client")
+		return nil, fmt.Errorf("could not create k8s client: %w", err)
+	}
+
+	// fetch k8s version information
+	{
+		discClient, err := discovery.NewDiscoveryClientForConfig(restCfg)
+		if err != nil {
+			return nil, fmt.Errorf("could not create k8s discovery client: %w", err)
+		}
+		k8sVersion, err := discClient.ServerVersion()
+		if err != nil {
+			return nil, fmt.Errorf("could not fetch k8s server version: %w", err)
+		}
+		tel.Attr("k8s_version", k8sVersion.String())
 	}
 
 	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
@@ -82,19 +101,39 @@ func New() (*Command, error) {
 	if err != nil {
 		return nil, fmt.Errorf("coud not create helm client: %w", err)
 	}
-	return &Command{helm: helm, k8s: k8s}, nil
+
+	return &Command{
+		tel:  tel,
+		h:    http.Client{Timeout: 10 * time.Second},
+		helm: helm,
+		k8s:  k8s,
+	}, nil
 }
 
-func (lc *Command) Install() error {
-	if err := checkDocker(); err != nil {
+func (c *Command) Install(ctx context.Context) error {
+	if err := c.checkDocker(ctx); err != nil {
 		return err
 	}
 
-	if err := lc.handleChart("airbyte", airbyteRepoName, airbyteRepoURL, airbyteChartName, airbyteChartRelease, airbyteNamespace); err != nil {
+	if err := c.handleChart(ctx, chartRequest{
+		name:         "airbyte",
+		repoName:     airbyteRepoName,
+		repoURL:      airbyteRepoURL,
+		chartName:    airbyteChartName,
+		chartRelease: airbyteChartRelease,
+		namespace:    airbyteNamespace,
+	}); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)
 	}
 
-	if err := lc.handleChart("nginx", nginxRepoName, nginxRepoURL, nginxChartName, nginxChartRelease, nginxNamespace); err != nil {
+	if err := c.handleChart(ctx, chartRequest{
+		name:         "nginx",
+		repoName:     nginxRepoName,
+		repoURL:      nginxRepoURL,
+		chartName:    nginxChartName,
+		chartRelease: nginxChartRelease,
+		namespace:    nginxNamespace,
+	}); err != nil {
 		return fmt.Errorf("could not install nginx chart: %w", err)
 	}
 
@@ -102,28 +141,49 @@ func (lc *Command) Install() error {
 	if err != nil {
 		return fmt.Errorf("could not start ingress spinner: %w", err)
 	}
-	if _, err := lc.k8s.NetworkingV1().Ingresses(airbyteNamespace).Create(context.Background(), ingress(), v1.CreateOptions{}); err != nil {
-		spinnerIngress.Fail("ingress - failed to install")
-		return fmt.Errorf("could not create ingress: %w", err)
-	}
-	spinnerIngress.Success("ingress - installed")
 
-	return openBrowser("http://localhost")
+	_, err = c.k8s.NetworkingV1().Ingresses(airbyteNamespace).Get(ctx, airbyteIngress, v1.GetOptions{})
+	if k8serrors.IsNotFound(err) {
+		// the ingress does not exist, create it
+		if _, err := c.k8s.NetworkingV1().Ingresses(airbyteNamespace).Create(ctx, ingress(), v1.CreateOptions{}); err != nil {
+			spinnerIngress.Fail("ingress - failed to install")
+			return fmt.Errorf("could not create ingress: %w", err)
+		}
+		spinnerIngress.Success("ingress - installed")
+	} else if err != nil {
+		// some other error happened, return
+		spinnerIngress.Fail("ingress - unable to fetch existing")
+		return fmt.Errorf("could not fetch potential existing ingress: %w", err)
+	} else {
+		// ingress already exists, update it
+		if _, err := c.k8s.NetworkingV1().Ingresses(airbyteNamespace).Update(ctx, ingress(), v1.UpdateOptions{}); err != nil {
+			spinnerIngress.Fail("ingress - failed to update")
+			return fmt.Errorf("could not update existing ingress: %w", err)
+		}
+		spinnerIngress.Success("ingress - updated")
+	}
+
+	return c.openBrowser(ctx, "http://localhost")
 }
 
-func (lc *Command) Uninstall() error {
+// TODO: add helm version data to telemetry
+func (c *Command) Uninstall(ctx context.Context) error {
+	if err := c.checkDocker(ctx); err != nil {
+		return err
+	}
+
 	spinnerAb, err := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling airbyte chart %s", airbyteChartRelease))
 	if err != nil {
 		return fmt.Errorf("could not create spinner: %w", err)
 	}
-	if err := lc.helm.UninstallReleaseByName(airbyteChartRelease); err != nil {
+	if err := c.helm.UninstallReleaseByName(airbyteChartRelease); err != nil {
 		spinnerAb.Fail("helm - airbyte chart failed to uninstall")
 		return fmt.Errorf("could not uninstall airbyte chart: %w", err)
 	}
 	spinnerAb.Success()
 
 	spinnerNginx, err := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling nginx chart %s", nginxChartRelease))
-	if err := lc.helm.UninstallReleaseByName(nginxChartRelease); err != nil {
+	if err := c.helm.UninstallReleaseByName(nginxChartRelease); err != nil {
 		spinnerAb.Fail("helm - nginx chart failed to uninstall")
 		return fmt.Errorf("could not uninstall nginx chart: %w", err)
 	}
@@ -133,13 +193,15 @@ func (lc *Command) Uninstall() error {
 	if err != nil {
 		return fmt.Errorf("could not create spinner: %w", err)
 	}
-	if err := lc.k8s.CoreV1().Namespaces().Delete(context.Background(), airbyteNamespace, v1.DeleteOptions{}); err != nil {
+
+	if err := c.k8s.CoreV1().Namespaces().Delete(ctx, airbyteNamespace, v1.DeleteOptions{}); err != nil {
 		spinnerNamespace.Fail()
 		return fmt.Errorf("could not delete namespace: %w", err)
 	}
+
 	// there is no blocking delete namespace call, so lets do this the old-fashioned way
 	for {
-		_, err = lc.k8s.CoreV1().Namespaces().Get(context.Background(), airbyteNamespace, v1.GetOptions{})
+		_, err = c.k8s.CoreV1().Namespaces().Get(ctx, airbyteNamespace, v1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				break
@@ -157,7 +219,7 @@ func (lc *Command) Uninstall() error {
 	return nil
 }
 
-func checkDocker() error {
+func (c *Command) checkDocker(ctx context.Context) error {
 	spinner, err := pterm.DefaultSpinner.Start("docker - verifying")
 	if err != nil {
 		return fmt.Errorf("could not start spinner: %w", err)
@@ -176,65 +238,79 @@ func checkDocker() error {
 		return fmt.Errorf("could not create docker client: %w", err)
 	}
 
-	ping, err := docker.Ping(context.Background())
+	ver, err := docker.ServerVersion(ctx)
 	if err != nil {
 		spinner.Fail("docker is not running")
 		return fmt.Errorf("docker is not running: %w", err)
 	}
 
-	spinner.Success(fmt.Sprintf("docker - verified; api version: %s", ping.APIVersion))
+	c.tel.Attr("docker_version", ver.Version)
+	c.tel.Attr("docker_arch", ver.Arch)
+	c.tel.Attr("docker_platform", ver.Platform.Name)
+
+	spinner.Success(fmt.Sprintf("docker - verified; version: %s", ver.Version))
 
 	return nil
 }
 
-func (lc *Command) handleChart(
-	name string,
-	repoName string,
-	repoURL string,
-	chartName string,
-	chartRelease string,
-	namespace string,
+type chartRequest struct {
+	name         string
+	repoName     string
+	repoURL      string
+	chartName    string
+	chartRelease string
+	namespace    string
+}
+
+func (c *Command) handleChart(
+	ctx context.Context,
+	req chartRequest,
 ) error {
-	spinner, err := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - adding %s repository", name))
+	spinner, err := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - adding %s repository", req.name))
 	if err != nil {
 		return fmt.Errorf("could not start spinner: %w", err)
 	}
 
-	if err := lc.helm.AddOrUpdateChartRepo(repo.Entry{
-		Name: repoName,
-		URL:  repoURL,
+	if err := c.helm.AddOrUpdateChartRepo(repo.Entry{
+		Name: req.repoName,
+		URL:  req.repoURL,
 	}); err != nil {
-		spinner.Fail(fmt.Sprintf("helm - could not add repo %s", repoName))
-		return fmt.Errorf("could not add %s chart repo: %w", name, err)
+		spinner.Fail(fmt.Sprintf("helm - could not add repo %s", req.repoName))
+		return fmt.Errorf("could not add %s chart repo: %w", req.name, err)
 	}
 
-	spinner.UpdateText(fmt.Sprintf("helm - fetching chart %s", chartName))
-	chart, _, err := lc.helm.GetChart(chartName, &action.ChartPathOptions{})
+	spinner.UpdateText(fmt.Sprintf("helm - fetching chart %s", req.chartName))
+	chart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{})
 	if err != nil {
-		spinner.Fail(fmt.Sprintf("helm - could not fetch chart %s", chartName))
-		return fmt.Errorf("could not fetch chart %s: %w", chartName, err)
+		spinner.Fail(fmt.Sprintf("helm - could not fetch chart %s", req.chartName))
+		return fmt.Errorf("could not fetch chart %s: %w", req.chartName, err)
 	}
 
-	spinner.UpdateText(fmt.Sprintf("helm - installing chart %s (%s)", chartName, chart.Metadata.Version))
-	release, err := lc.helm.InstallOrUpgradeChart(context.Background(), &helmclient.ChartSpec{
-		ReleaseName:     chartRelease,
-		ChartName:       chartName,
+	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), chart.Metadata.Version)
+
+	spinner.UpdateText(fmt.Sprintf("helm - installing chart %s (%s)", req.chartName, chart.Metadata.Version))
+	release, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
+		ReleaseName:     req.chartRelease,
+		ChartName:       req.chartName,
 		CreateNamespace: true,
-		Namespace:       namespace,
+		Namespace:       req.namespace,
 		Wait:            true,
 		Timeout:         10 * time.Minute,
 	},
 		&helmclient.GenericHelmOptions{},
 	)
 	if err != nil {
-		spinner.Fail(fmt.Sprintf("helm - failed to install chart %s (%s)", chartName, chart.Metadata.Version))
-		return errors.Wrap(err, "could not install helm")
+		spinner.Fail(fmt.Sprintf("helm - failed to install chart %s (%s)", req.chartName, chart.Metadata.Version))
+		return fmt.Errorf("could not install helm: %w", err)
 	}
-	spinner.Success(fmt.Sprintf("helm - chart installed; name: %s, namespace: %s, version: %d", release.Name, release.Namespace, release.Version))
 
+	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(release.Version))
+
+	spinner.Success(fmt.Sprintf("helm - chart installed; name: %s, namespace: %s, version: %d", release.Name, release.Namespace, release.Version))
 	return nil
 }
 
+// ingress creates an ingress type for defining the webapp ingress rules.
 func ingress() *networkingv1.Ingress {
 	var pathType = networkingv1.PathType("Prefix")
 	var ingressClassName = "nginx"
@@ -242,7 +318,7 @@ func ingress() *networkingv1.Ingress {
 	return &networkingv1.Ingress{
 		TypeMeta: v1.TypeMeta{},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "ingress-airbyte-webapp",
+			Name:      airbyteIngress,
 			Namespace: airbyteNamespace,
 		},
 		Spec: networkingv1.IngressSpec{
@@ -274,8 +350,50 @@ func ingress() *networkingv1.Ingress {
 	}
 }
 
-func openBrowser(url string) error {
-	pterm.Println("opening browser")
+func (c *Command) openBrowser(ctx context.Context, url string) error {
+	spinner, err := pterm.DefaultSpinner.Start("browser - waiting for ingress")
+	if err != nil {
+		return fmt.Errorf("could not start browser spinner: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	alive := make(chan error)
+
+	go func() {
+		tick := time.Tick(1 * time.Second)
+		for {
+			select {
+			case <-ctx.Done():
+				alive <- fmt.Errorf("liveness check failed: %w", ctx.Err())
+			case <-tick:
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+				if err != nil {
+					alive <- fmt.Errorf("could not create request: %w", err)
+				}
+				res, _ := c.h.Do(req)
+				if res != nil && res.StatusCode == 200 {
+					alive <- nil
+				}
+			}
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		spinner.Fail("browser - timed out")
+		return fmt.Errorf("liveness check failed: %w", ctx.Err())
+	case err := <-alive:
+		if err != nil {
+			spinner.Fail("browser - failed liveness check")
+			return fmt.Errorf("failed liveness check: %w", err)
+		}
+	}
+	// if we're here, then no errors occurred
+
+	spinner.UpdateText("browser - launching")
+
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
@@ -286,5 +404,11 @@ func openBrowser(url string) error {
 		cmd = exec.Command("xdg-open", url)
 	}
 
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		spinner.Fail("browser - failed to launch browser; please access http://localhost directly")
+		return fmt.Errorf("could not launch browser: %w", err)
+	}
+
+	spinner.Success("browser - launched")
+	return nil
 }

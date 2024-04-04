@@ -3,6 +3,7 @@ package local
 import (
 	"airbyte.io/abctl/internal/local"
 	"airbyte.io/abctl/internal/telemetry"
+	"context"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
@@ -39,12 +40,12 @@ var InstallCmd = &cobra.Command{
 	Short: "Install Airbyte locally",
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		return telemetryWrapper(telemetry.Install, func() error {
-			lc, err := local.New()
+			lc, err := local.New(client)
 			if err != nil {
 				return fmt.Errorf("could not initialize local client: %w", err)
 			}
 
-			return lc.Install()
+			return lc.Install(context.Background())
 		})
 	},
 }
@@ -57,12 +58,12 @@ var UninstallCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return telemetryWrapper(telemetry.Uninstall, func() error {
-			lc, err := local.New()
+			lc, err := local.New(client)
 			if err != nil {
 				return fmt.Errorf("could not initialize local client: %w", err)
 			}
 
-			return lc.Uninstall()
+			return lc.Uninstall(context.Background())
 		})
 	},
 }
