@@ -351,6 +351,7 @@ func (c *Command) checkDocker(ctx context.Context) error {
 	return nil
 }
 
+// chartRequest exists to make all the parameters to handleChart somewhat manageable
 type chartRequest struct {
 	name         string
 	repoName     string
@@ -360,6 +361,7 @@ type chartRequest struct {
 	namespace    string
 }
 
+// handleChart will handle the installation of a chart
 func (c *Command) handleChart(
 	ctx context.Context,
 	req chartRequest,
@@ -448,6 +450,8 @@ func ingress() *networkingv1.Ingress {
 	}
 }
 
+// openBrowser will open the url in the user's browser but only if the url returns a 200 response code first
+// TODO: clean up this method
 func (c *Command) openBrowser(ctx context.Context, url string) error {
 	spinner, err := pterm.DefaultSpinner.Start("browser - waiting for ingress")
 	if err != nil {
@@ -503,7 +507,7 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 	}
 
 	if err := cmd.Run(); err != nil {
-		spinner.Fail("browser - failed to launch browser; please access http://localhost directly")
+		spinner.Fail(fmt.Sprintf("browser - failed to launch browser; please access %s directly", url))
 		return fmt.Errorf("could not launch browser: %w", err)
 	}
 
