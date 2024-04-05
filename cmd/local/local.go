@@ -13,8 +13,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// client is the telemetry client to use
-var client telemetry.Client
+// telClient is the telemetry telClient to use
+var telClient telemetry.Client
 
 // Cmd represents the local command
 var Cmd = &cobra.Command{
@@ -24,10 +24,10 @@ var Cmd = &cobra.Command{
 		dnt, _ := cmd.Flags().GetBool("dnt")
 
 		var err error
-		client, err = getTelemetryClient(dnt)
+		telClient, err = getTelemetryClient(dnt)
 		if err != nil {
-			// if the telemetry client fails to load, log a warning and continue
-			pterm.Warning.Println(fmt.Errorf("unable to create telemetry client: %w", err))
+			// if the telemetry telClient fails to load, log a warning and continue
+			pterm.Warning.Println(fmt.Errorf("unable to create telemetry telClient: %w", err))
 		}
 
 		return nil
@@ -40,9 +40,9 @@ var InstallCmd = &cobra.Command{
 	Short: "Install Airbyte locally",
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		return telemetryWrapper(telemetry.Install, func() error {
-			lc, err := local.New(client)
+			lc, err := local.New(local.WithTelemetryClient(telClient))
 			if err != nil {
-				return fmt.Errorf("could not initialize local client: %w", err)
+				return fmt.Errorf("could not initialize local telClient: %w", err)
 			}
 
 			return lc.Install(context.Background())
@@ -58,9 +58,9 @@ var UninstallCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return telemetryWrapper(telemetry.Uninstall, func() error {
-			lc, err := local.New(client)
+			lc, err := local.New(local.WithTelemetryClient(telClient))
 			if err != nil {
-				return fmt.Errorf("could not initialize local client: %w", err)
+				return fmt.Errorf("could not initialize local telClient: %w", err)
 			}
 
 			return lc.Uninstall(context.Background())
@@ -82,16 +82,16 @@ var DummyCmd = &cobra.Command{
 
 // telemetryWrapper wraps the function calls with the telemetry handlers
 func telemetryWrapper(et telemetry.EventType, f func() error) (err error) {
-	if err := client.Start(et); err != nil {
+	if err := telClient.Start(et); err != nil {
 		pterm.Warning.Println("unable to send telemetry start data: %w", err)
 	}
 	defer func() {
 		if err != nil {
-			if err := client.Failure(et, err); err != nil {
+			if err := telClient.Failure(et, err); err != nil {
 				pterm.Warning.Println("unable to send telemetry failure data: %w", err)
 			}
 		} else {
-			if err := client.Success(et); err != nil {
+			if err := telClient.Success(et); err != nil {
 				pterm.Warning.Println("unable to send telemetry success data: %w", err)
 			}
 		}
@@ -100,10 +100,10 @@ func telemetryWrapper(et telemetry.EventType, f func() error) (err error) {
 	return f()
 }
 
-// getTelemetryClient fetches the telemetry client to use.
+// getTelemetryClient fetches the telemetry telClient to use.
 // If dnt (do-not-track) is true, this method will return a telemetry.NoopClient and will not attempt to read or
 // write the telemetry.ConfigFile.
-// If dnt is false, this method will read or write the telemetry.ConfigFile and will utilize an actual telemetry client.
+// If dnt is false, this method will read or write the telemetry.ConfigFile and will utilize an actual telemetry telClient.
 func getTelemetryClient(dnt bool) (telemetry.Client, error) {
 	if dnt {
 		return telemetry.NoopClient{}, nil
