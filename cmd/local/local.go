@@ -68,18 +68,6 @@ var UninstallCmd = &cobra.Command{
 	},
 }
 
-var DummyCmd = &cobra.Command{
-	Use: "dummy",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var f = func() error {
-			println("dummy executed")
-			//return errors.New("something failed!")
-			return nil
-		}
-		return telemetryWrapper(telemetry.Install, f)
-	},
-}
-
 // telemetryWrapper wraps the function calls with the telemetry handlers
 func telemetryWrapper(et telemetry.EventType, f func() error) (err error) {
 	if err := telClient.Start(et); err != nil {
@@ -141,5 +129,4 @@ func getOrCreateCfg() (telemetry.Config, error) {
 func init() {
 	Cmd.AddCommand(InstallCmd)
 	Cmd.AddCommand(UninstallCmd)
-	Cmd.AddCommand(DummyCmd)
 }
