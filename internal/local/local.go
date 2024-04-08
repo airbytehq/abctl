@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync"
@@ -171,7 +172,7 @@ func New(opts ...Option) (*Command, error) {
 // k8sClientConfig returns a k8s client config using the ~/.kubc/config file and the k8sContext context.
 func k8sClientConfig(userHome string) (clientcmd.ClientConfig, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: fmt.Sprintf("%s/.kube/config", userHome)},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: filepath.Join(userHome, ".kube", "config")},
 		&clientcmd.ConfigOverrides{CurrentContext: k8sContext},
 	), nil
 }
