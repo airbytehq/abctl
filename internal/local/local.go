@@ -117,6 +117,9 @@ func New(opts ...Option) (*Command, error) {
 		}
 
 		restCfg, err := k8sCfg.ClientConfig()
+		if err != nil {
+			return nil, fmt.Errorf("could not create k8s config client: %w", err)
+		}
 		k8s, err := kubernetes.NewForConfig(restCfg)
 		if err != nil {
 			return nil, fmt.Errorf("could not create k8s client: %w", err)
