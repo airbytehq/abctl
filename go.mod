@@ -7,6 +7,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/mittwald/go-helm-client v0.12.9
 	github.com/oklog/ulid/v2 v2.1.0
+	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
 	github.com/pterm/pterm v0.12.79
 	github.com/spf13/cobra v1.8.0
