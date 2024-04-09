@@ -43,12 +43,13 @@ func (m *mockHelmClient) UninstallReleaseByName(s string) error {
 var _ K8sClient = (*mockK8sClient)(nil)
 
 type mockK8sClient struct {
-	createIngress    func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
-	existsIngress    func(ctx context.Context, namespace string, ingress string) bool
-	updateIngress    func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
-	existsNamespace  func(ctx context.Context, namespace string) bool
-	deleteNamespace  func(ctx context.Context, namespace string) error
-	getServerVersion func() (string, error)
+	createIngress        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
+	existsIngress        func(ctx context.Context, namespace string, ingress string) bool
+	updateIngress        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
+	existsNamespace      func(ctx context.Context, namespace string) bool
+	deleteNamespace      func(ctx context.Context, namespace string) error
+	createOrUpdateSecret func(ctx context.Context, namespace, name string, data map[string][]byte) error
+	getServerVersion     func() (string, error)
 }
 
 func (m *mockK8sClient) CreateIngress(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
@@ -69,6 +70,10 @@ func (m *mockK8sClient) ExistsNamespace(ctx context.Context, namespace string) b
 
 func (m *mockK8sClient) DeleteNamespace(ctx context.Context, namespace string) error {
 	return m.deleteNamespace(ctx, namespace)
+}
+
+func (m *mockK8sClient) CreateOrUpdateSecret(ctx context.Context, namespace, name string, data map[string][]byte) error {
+	return m.createOrUpdateSecret(ctx, namespace, name, data)
 }
 
 func (m *mockK8sClient) GetServerVersion() (string, error) {
