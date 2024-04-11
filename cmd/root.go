@@ -2,11 +2,17 @@ package cmd
 
 import (
 	"airbyte.io/abctl/cmd/local"
+	localcmd "airbyte.io/abctl/internal/local"
+	"errors"
 	"github.com/pterm/pterm"
 	"os"
 
 	"github.com/spf13/cobra"
 )
+
+// dockerHelp is displayed if ErrDocker is ever returned
+const dockerHelp = `An error occurred while communicating with the Docker daemon.
+Ensure that Docker is running and is accessible.  You may need to upgrade to a newer version of Docker.`
 
 var (
 	// flagDNT indicates if the do-not-track flag was specified
@@ -29,6 +35,11 @@ var (
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		pterm.Error.Println(err)
+
+		if errors.Is(err, localcmd.ErrDocker) {
+			pterm.Println()
+			pterm.Info.Println(dockerHelp)
+		}
 		os.Exit(1)
 	}
 }
@@ -36,6 +47,9 @@ func Execute() {
 func init() {
 	// configure cobra to chain Persistent*Run commands together
 	cobra.EnableTraverseRunHooks = true
+
+	rootCmd.SilenceUsage = true
+	rootCmd.SilenceErrors = true
 
 	rootCmd.AddCommand(local.Cmd)
 	rootCmd.CompletionOptions.DisableDefaultCmd = true

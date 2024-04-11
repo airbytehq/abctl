@@ -18,9 +18,6 @@ const (
 	envBasicAuthUser = "ABCTL_LOCAL_INSTALL_USERNAME"
 	// envBasicAuthPass is the env-var that can be specified to override the default basic-auth password.
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
-	// dockerHelp is displayed if ErrDocker is ever returned
-	dockerHelp = `An error occurred while connecting to the Docker daemon.
-Ensure that Docker is running and is accessible.  You may need to upgrade to a newer version of Docker.`
 )
 
 // telClient is the telemetry telClient to use
@@ -52,7 +49,7 @@ var InstallCmd = &cobra.Command{
 		return telemetryWrapper(telemetry.Install, func() error {
 			lc, err := local.New(local.WithTelemetryClient(telClient))
 			if err != nil {
-				return fmt.Errorf("could not initialize local telClient: %w", err)
+				return fmt.Errorf("could not initialize local command: %w", err)
 			}
 
 			user := flagUsername
@@ -79,7 +76,7 @@ var UninstallCmd = &cobra.Command{
 		return telemetryWrapper(telemetry.Uninstall, func() error {
 			lc, err := local.New(local.WithTelemetryClient(telClient))
 			if err != nil {
-				return fmt.Errorf("could not initialize local telClient: %w", err)
+				return fmt.Errorf("could not initialize local command: %w", err)
 			}
 
 			return lc.Uninstall(context.Background())
