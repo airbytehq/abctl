@@ -9,15 +9,15 @@ import (
 )
 
 var (
-	// dnt indicates if the do-not-track flag was specified
-	dnt bool
+	// flagDNT indicates if the do-not-track flag was specified
+	flagDNT bool
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
 		Use:   "abctl",
 		Short: pterm.LightBlue("Airbyte") + "'s proof-of-concept command-line tool",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if dnt {
+			if flagDNT {
 				pterm.Info.Println("--dnt flag defined, telemetry disabled")
 			}
 		},
@@ -39,5 +39,5 @@ func init() {
 
 	rootCmd.AddCommand(local.Cmd)
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
-	rootCmd.PersistentFlags().BoolVar(&dnt, "dnt", false, "opt out of telemetry data collection")
+	rootCmd.PersistentFlags().BoolVar(&flagDNT, "dnt", false, "opt out of telemetry data collection")
 }

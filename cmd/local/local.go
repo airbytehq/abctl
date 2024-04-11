@@ -13,6 +13,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	// envBasicAuthUser is the env-var that can be specified to override the default basic-auth username.
+	envBasicAuthUser = "ABCTL_LOCAL_INSTALL_USERNAME"
+	// envBasicAuthPass is the env-var that can be specified to override the default basic-auth password.
+	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
+)
+
 // telClient is the telemetry telClient to use
 var telClient telemetry.Client
 
@@ -45,7 +52,16 @@ var InstallCmd = &cobra.Command{
 				return fmt.Errorf("could not initialize local telClient: %w", err)
 			}
 
-			return lc.Install(context.Background())
+			user := flagUsername
+			if env := os.Getenv(envBasicAuthUser); env != "" {
+				user = env
+			}
+			pass := flagPassword
+			if env := os.Getenv(envBasicAuthPass); env != "" {
+				pass = env
+			}
+
+			return lc.Install(context.Background(), user, pass)
 		})
 	},
 }
@@ -126,7 +142,14 @@ func getOrCreateCfg() (telemetry.Config, error) {
 	return cfg, nil
 }
 
+var (
+	flagUsername string
+	flagPassword string
+)
+
 func init() {
 	Cmd.AddCommand(InstallCmd)
 	Cmd.AddCommand(UninstallCmd)
+	InstallCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via the env-var "+envBasicAuthUser)
+	InstallCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via the env-var "+envBasicAuthPass)
 }

@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/oklog/ulid/v2"
+	"github.com/pbnjay/memory"
 	"k8s.io/apimachinery/pkg/util/json"
 	"maps"
 	"net/http"
 	"runtime"
+	"strconv"
 	"time"
 )
 
@@ -57,6 +59,9 @@ func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
 		"session_id":        s.sessionID.String(),
 		"state":             string(es),
 		"os":                runtime.GOOS,
+		"cpu_count":         strconv.Itoa(runtime.NumCPU()),
+		"mem_total_bytes":   strconv.FormatUint(memory.TotalMemory(), 10),
+		"mem_free_bytes":    strconv.FormatUint(memory.FreeMemory(), 10),
 		// TODO: remove after manually testing
 		"testing": "true",
 	}

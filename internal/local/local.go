@@ -8,6 +8,7 @@ import (
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
+	"golang.org/x/crypto/bcrypt"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
@@ -24,6 +25,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -178,7 +180,7 @@ func k8sClientConfig(userHome string) (clientcmd.ClientConfig, error) {
 }
 
 // Install handles the installation of Airbyte
-func (c *Command) Install(ctx context.Context) error {
+func (c *Command) Install(ctx context.Context, user, pass string) error {
 	if err := c.checkDocker(ctx); err != nil {
 		return err
 	}
@@ -210,6 +212,11 @@ func (c *Command) Install(ctx context.Context) error {
 		return fmt.Errorf("could not start ingress spinner: %w", err)
 	}
 
+	// basic auth
+	if err := c.handleBasicAuthSecret(ctx, user, pass); err != nil {
+		return fmt.Errorf("could not create or update basic-auth secret: %w", err)
+	}
+
 	if c.k8s.ExistsIngress(ctx, airbyteNamespace, airbyteIngress) {
 		if err := c.k8s.UpdateIngress(ctx, airbyteNamespace, ingress()); err != nil {
 			spinnerIngress.Fail("ingress - failed to update")
@@ -225,6 +232,17 @@ func (c *Command) Install(ctx context.Context) error {
 	}
 
 	return c.openBrowser(ctx, "http://localhost")
+}
+
+// handleBasicAuthSecret creates or updates the appropriate basic auth credentials for ingress.
+func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) error {
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("could not hash basic auth password: %w", err)
+	}
+
+	data := map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))}
+	return c.k8s.CreateOrUpdateSecret(ctx, airbyteNamespace, "basic-auth", data)
 }
 
 // Uninstall handles the uninstallation of Airbyte.
@@ -431,6 +449,11 @@ func ingress() *networkingv1.Ingress {
 		ObjectMeta: v1.ObjectMeta{
 			Name:      airbyteIngress,
 			Namespace: airbyteNamespace,
+			Annotations: map[string]string{
+				"nginx.ingress.kubernetes.io/auth-type":   "basic",
+				"nginx.ingress.kubernetes.io/auth-secret": "basic-auth",
+				"nginx.ingress.kubernetes.io/auth-realm":  "Authentication Required - Airbyte (abctl)",
+			},
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &ingressClassName,
@@ -486,7 +509,12 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 					alive <- fmt.Errorf("could not create request: %w", err)
 				}
 				res, _ := c.h.Do(req)
+				// if no auth, we should get a 200
 				if res != nil && res.StatusCode == 200 {
+					alive <- nil
+				}
+				// if basic auth, we should get a 401 with a specific header that contains abctl
+				if res != nil && res.StatusCode == 401 && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
 					alive <- nil
 				}
 			}
