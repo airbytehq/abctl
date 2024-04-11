@@ -18,7 +18,7 @@ var (
 		Short: pterm.LightBlue("Airbyte") + "'s proof-of-concept command-line tool",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if flagDNT {
-				pterm.Info.Println("--dnt flag defined, telemetry disabled")
+				pterm.Info.Println("telemetry disabled (--dnt)")
 			}
 		},
 	}

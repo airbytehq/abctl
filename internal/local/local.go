@@ -3,10 +3,10 @@ package local
 import (
 	"airbyte.io/abctl/internal/telemetry"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/docker/docker/client"
 	helmclient "github.com/mittwald/go-helm-client"
-	"github.com/pkg/errors"
 	"github.com/pterm/pterm"
 	"golang.org/x/crypto/bcrypt"
 	"helm.sh/helm/v3/pkg/action"
@@ -350,14 +350,23 @@ func (c *Command) checkDocker(ctx context.Context) error {
 		return fmt.Errorf("could not start spinner: %w", err)
 	}
 
-	// TODO: remove this hack, docker-desktop on mac doesn't always correctly create the /var/run/docker.sock path,
-	// so instead search for the ~/.docker/run/docker.sock
 	var docker *client.Client
 	switch runtime.GOOS {
+	case "darwin":
+		// on mac, sometimes the host isn't set correctly, if it fails check the home directory
+		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
+		if err != nil {
+			// keep the original error, as we'll join with the the next error (if another error occurs)
+			outerErr := err
+			docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", c.userHome)))
+			if err != nil {
+				err = errors.Join(err, outerErr)
+			}
+		}
 	case "windows":
 		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("npipe:////./pipe/docker_engine"))
 	default:
-		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix://%s/.docker/run/docker.sock", c.userHome)))
+		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
 	}
 
 	if err != nil {
