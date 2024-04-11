@@ -18,6 +18,9 @@ const (
 	envBasicAuthUser = "ABCTL_LOCAL_INSTALL_USERNAME"
 	// envBasicAuthPass is the env-var that can be specified to override the default basic-auth password.
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
+	// dockerHelp is displayed if ErrDocker is ever returned
+	dockerHelp = `An error occurred while connecting to the Docker daemon.
+Ensure that Docker is running and is accessible.  You may need to upgrade to a newer version of Docker.`
 )
 
 // telClient is the telemetry telClient to use

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
@@ -56,9 +57,18 @@ type HelmClient interface {
 	UninstallReleaseByName(string) error
 }
 
+// ErrDocker is returned anytime an error specific to docker occurs.
+var ErrDocker = errors.New("error communicating with docker")
+
+// DockerClient primarily for testing purposes
+type DockerClient interface {
+	ServerVersion(context.Context) (types.Version, error)
+}
+
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
-	h        *http.Client
+	docker   DockerClient
+	http     *http.Client
 	helm     HelmClient
 	k8s      K8sClient
 	tel      telemetry.Client
@@ -77,7 +87,7 @@ func WithTelemetryClient(client telemetry.Client) Option {
 // WithHTTPClient define the http client for this command.
 func WithHTTPClient(client *http.Client) Option {
 	return func(c *Command) {
-		c.h = client
+		c.http = client
 	}
 }
 
@@ -95,6 +105,12 @@ func WithK8sClient(client K8sClient) Option {
 	}
 }
 
+func WithDockerClient(client DockerClient) Option {
+	return func(c *Command) {
+		c.docker = client
+	}
+}
+
 func New(opts ...Option) (*Command, error) {
 	c := &Command{}
 	for _, opt := range opts {
@@ -107,9 +123,33 @@ func New(opts ...Option) (*Command, error) {
 	}
 	c.userHome = userHome
 
+	// set docker client if not defined
+	if c.docker == nil {
+		switch runtime.GOOS {
+		case "darwin":
+			// on mac, sometimes the host isn't set correctly, if it fails check the home directory
+			c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
+			if err != nil {
+				// keep the original error, as we'll join with the next error (if another error occurs)
+				outerErr := err
+				c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", c.userHome)))
+				if err != nil {
+					err = errors.Join(err, outerErr)
+				}
+			}
+		case "windows":
+			c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("npipe:////./pipe/docker_engine"))
+		default:
+			c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
+		}
+		if err != nil {
+			return nil, errors.Join(ErrDocker, fmt.Errorf("could not create docker client: %w", err))
+		}
+	}
+
 	// set http client, if not defined
-	if c.h == nil {
-		c.h = &http.Client{Timeout: 10 * time.Second}
+	if c.http == nil {
+		c.http = &http.Client{Timeout: 10 * time.Second}
 	}
 
 	// set k8s client, if not defined
@@ -344,40 +384,18 @@ func (c *Command) Uninstall(ctx context.Context) error {
 	return nil
 }
 
+// checkDocker call the ServerVersion on the DockerClient.
+// Will return ErrDocker if any error is caused by docker.
 func (c *Command) checkDocker(ctx context.Context) error {
 	spinner, err := pterm.DefaultSpinner.Start("docker - verifying")
 	if err != nil {
 		return fmt.Errorf("could not start spinner: %w", err)
 	}
 
-	var docker *client.Client
-	switch runtime.GOOS {
-	case "darwin":
-		// on mac, sometimes the host isn't set correctly, if it fails check the home directory
-		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
-		if err != nil {
-			// keep the original error, as we'll join with the the next error (if another error occurs)
-			outerErr := err
-			docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", c.userHome)))
-			if err != nil {
-				err = errors.Join(err, outerErr)
-			}
-		}
-	case "windows":
-		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("npipe:////./pipe/docker_engine"))
-	default:
-		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
-	}
-
-	if err != nil {
-		spinner.Fail("docker verification failed, cold not create docker client")
-		return fmt.Errorf("could not create docker client: %w", err)
-	}
-
-	ver, err := docker.ServerVersion(ctx)
+	ver, err := c.docker.ServerVersion(ctx)
 	if err != nil {
 		spinner.Fail("docker is not running")
-		return fmt.Errorf("docker is not running: %w", err)
+		return errors.Join(ErrDocker, fmt.Errorf("docker is not running: %w", err))
 	}
 
 	c.tel.Attr("docker_version", ver.Version)
@@ -517,7 +535,7 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 				if err != nil {
 					alive <- fmt.Errorf("could not create request: %w", err)
 				}
-				res, _ := c.h.Do(req)
+				res, _ := c.http.Do(req)
 				// if no auth, we should get a 200
 				if res != nil && res.StatusCode == 200 {
 					alive <- nil
