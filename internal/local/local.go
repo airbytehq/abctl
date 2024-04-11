@@ -334,7 +334,14 @@ func (c *Command) checkDocker(ctx context.Context) error {
 
 	// TODO: remove this hack, docker-desktop on mac doesn't always correctly create the /var/run/docker.sock path,
 	// so instead search for the ~/.docker/run/docker.sock
-	docker, err := client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix://%s/.docker/run/docker.sock", c.userHome)))
+	var docker *client.Client
+	switch runtime.GOOS {
+	case "windows":
+		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("npipe:////./pipe/docker_engine"))
+	default:
+		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix://%s/.docker/run/docker.sock", c.userHome)))
+	}
+
 	if err != nil {
 		spinner.Fail("docker verification failed, cold not create docker client")
 		return fmt.Errorf("could not create docker client: %w", err)
