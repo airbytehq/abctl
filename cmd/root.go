@@ -12,6 +12,8 @@ var (
 	// flagDNT indicates if the do-not-track flag was specified
 	flagDNT bool
 
+	flagK8sProvider string
+
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
 		Use:   "abctl",

@@ -13,16 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	// envBasicAuthUser is the env-var that can be specified to override the default basic-auth username.
-	envBasicAuthUser = "ABCTL_LOCAL_INSTALL_USERNAME"
-	// envBasicAuthPass is the env-var that can be specified to override the default basic-auth password.
-	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
-)
-
-// telClient is the telemetry telClient to use
-var telClient telemetry.Client
-
 // Cmd represents the local command
 var Cmd = &cobra.Command{
 	Use: "local",
@@ -42,7 +32,8 @@ var Cmd = &cobra.Command{
 	Short: "Manages local Airbyte installations",
 }
 
-var InstallCmd = &cobra.Command{
+// installCmd is the local install command.
+var installCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install Airbyte locally",
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
@@ -66,12 +57,10 @@ var InstallCmd = &cobra.Command{
 	},
 }
 
-var UninstallCmd = &cobra.Command{
+// uninstallCmd is the local uninstall command.
+var uninstallCmd = &cobra.Command{
 	Use:   "uninstall",
 	Short: "Uninstall Airbyte locally",
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		return nil
-	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return telemetryWrapper(telemetry.Uninstall, func() error {
 			lc, err := local.New(local.WithTelemetryClient(telClient))
@@ -143,13 +132,28 @@ func getOrCreateCfg() (telemetry.Config, error) {
 }
 
 var (
+	// flagUsername is the basic-auth username as read from the cli flag
 	flagUsername string
+	// flagPassword is the basic-auth password as ready from the cli flag
 	flagPassword string
+	// flagProvider
+	flagProvider string
+
+	// telClient is the telemetry telClient to use
+	telClient telemetry.Client
+)
+
+const (
+	// envBasicAuthUser is the env-var that can be specified to override the default basic-auth username.
+	envBasicAuthUser = "ABCTL_LOCAL_INSTALL_USERNAME"
+	// envBasicAuthPass is the env-var that can be specified to override the default basic-auth password.
+	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
 )
 
 func init() {
-	Cmd.AddCommand(InstallCmd)
-	Cmd.AddCommand(UninstallCmd)
-	InstallCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via the env-var "+envBasicAuthUser)
-	InstallCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via the env-var "+envBasicAuthPass)
+	Cmd.PersistentFlags().StringVarP(&flagProvider, "k8s-cluster", "k", "docker-desktop", "k8s cluster")
+	Cmd.AddCommand(installCmd)
+	Cmd.AddCommand(uninstallCmd)
+	installCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via the env-var "+envBasicAuthUser)
+	installCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via the env-var "+envBasicAuthPass)
 }
