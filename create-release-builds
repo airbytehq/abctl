@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# script for automating the releasing of abctl to various hosts
+# will eventually be replaced by a github workflow and/or goreleaser
+ABCTL_VERSION="${ABCTL_VERSION:-dev}"
+# if ABCTL_VERSION is not dev, ensure that it starts with a 'v'
+if [ "$ABCTL_VERSION" != "dev" ]; then
+  if [[ "$ABCTL_VERSION" != v* ]]; then
+    ABCTL_VERSION="v$ABCTL_VERSION"
+  fi
+fi
+
+echo "creating release builds for ${ABCTL_VERSION}"
+
+release_prefix="build/release/abctl-${ABCTL_VERSION}"
+
+# darwin
+echo "- creating darwin builds"
+GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o "$release_prefix-darwin-amd64/" -ldflags "-w -X airbyte.io/abctl/internal/build.Version=${ABCTL_VERSION}" .
+tar -czf "$release_prefix-darwin-amd64.tar.gz" "$release_prefix-darwin-amd64"
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o "$release_prefix-darwin-arm64/" -ldflags "-w -X airbyte.io/abctl/internal/build.Version=${ABCTL_VERSION}" .
+tar -czf "$release_prefix-darwin-arm64.tar.gz" "$release_prefix-darwin-arm64"
+
+# linux
+echo "- creating linux builds"
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o "$release_prefix-linux-amd64/" -ldflags "-w -X airbyte.io/abctl/internal/build.Version=${ABCTL_VERSION}" .
+tar -czf "$release_prefix-linux-amd64.tar.gz" "$release_prefix-linux-amd64"
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -o "$release_prefix-linux-arm64/" -ldflags "-w -X airbyte.io/abctl/internal/build.Version=${ABCTL_VERSION}" .
+tar -czf "$release_prefix-linux-arm64.tar.gz" "$release_prefix-linux-arm64"
+
+# windows
+echo "- creating windows builds"
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o "$release_prefix-windows-amd64/" -ldflags "-w -X airbyte.io/abctl/internal/build.Version=${ABCTL_VERSION}" .
+# sleep is necessary otherwise the zip command can fail with the error "zip error: Zip file structure invalid (build/release/abctl-[VERSION]-windows-amd64)
+sleep 1
+zip -q -r "$release_prefix-windows-amd64" "$release_prefix-windows-amd64"
+
+echo "completed release builds"
