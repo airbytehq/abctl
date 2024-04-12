@@ -466,51 +466,6 @@ func (c *Command) handleChart(
 	return nil
 }
 
-// ingress creates an ingress type for defining the webapp ingress rules.
-func ingress() *networkingv1.Ingress {
-	var pathType = networkingv1.PathType("Prefix")
-	var ingressClassName = "nginx"
-
-	return &networkingv1.Ingress{
-		TypeMeta: v1.TypeMeta{},
-		ObjectMeta: v1.ObjectMeta{
-			Name:      airbyteIngress,
-			Namespace: airbyteNamespace,
-			Annotations: map[string]string{
-				"nginx.ingress.kubernetes.io/auth-type":   "basic",
-				"nginx.ingress.kubernetes.io/auth-secret": "basic-auth",
-				"nginx.ingress.kubernetes.io/auth-realm":  "Authentication Required - Airbyte (abctl)",
-			},
-		},
-		Spec: networkingv1.IngressSpec{
-			IngressClassName: &ingressClassName,
-			Rules: []networkingv1.IngressRule{
-				{
-					Host: "localhost",
-					IngressRuleValue: networkingv1.IngressRuleValue{
-						HTTP: &networkingv1.HTTPIngressRuleValue{
-							Paths: []networkingv1.HTTPIngressPath{
-								{
-									Path:     "/",
-									PathType: &pathType,
-									Backend: networkingv1.IngressBackend{
-										Service: &networkingv1.IngressServiceBackend{
-											Name: fmt.Sprintf("%s-airbyte-webapp-svc", airbyteChartRelease),
-											Port: networkingv1.ServiceBackendPort{
-												Name: "http",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
 // openBrowser will open the url in the user's browser but only if the url returns a 200 response code first
 // TODO: clean up this method
 func (c *Command) openBrowser(ctx context.Context, url string) error {
@@ -579,6 +534,51 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 
 	spinner.Success("browser - launched")
 	return nil
+}
+
+// ingress creates an ingress type for defining the webapp ingress rules.
+func ingress() *networkingv1.Ingress {
+	var pathType = networkingv1.PathType("Prefix")
+	var ingressClassName = "nginx"
+
+	return &networkingv1.Ingress{
+		TypeMeta: v1.TypeMeta{},
+		ObjectMeta: v1.ObjectMeta{
+			Name:      airbyteIngress,
+			Namespace: airbyteNamespace,
+			Annotations: map[string]string{
+				"nginx.ingress.kubernetes.io/auth-type":   "basic",
+				"nginx.ingress.kubernetes.io/auth-secret": "basic-auth",
+				"nginx.ingress.kubernetes.io/auth-realm":  "Authentication Required - Airbyte (abctl)",
+			},
+		},
+		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingressClassName,
+			Rules: []networkingv1.IngressRule{
+				{
+					Host: "localhost",
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: &pathType,
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: fmt.Sprintf("%s-airbyte-webapp-svc", airbyteChartRelease),
+											Port: networkingv1.ServiceBackendPort{
+												Name: "http",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 // noopWriter is used by the helm client to suppress its verbose output
