@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"airbyte.io/abctl/cmd/local"
+	"airbyte.io/abctl/cmd/version"
 	localcmd "airbyte.io/abctl/internal/local"
 	"errors"
 	"github.com/pterm/pterm"
@@ -51,6 +52,7 @@ func init() {
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
 
+	rootCmd.AddCommand(version.Cmd)
 	rootCmd.AddCommand(local.Cmd)
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.PersistentFlags().BoolVar(&flagDNT, "dnt", false, "opt out of telemetry data collection")

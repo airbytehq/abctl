@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"airbyte.io/abctl/internal/build"
 	"bytes"
 	"fmt"
 	"github.com/oklog/ulid/v2"
@@ -59,6 +60,7 @@ func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
 		"session_id":        s.sessionID.String(),
 		"state":             string(es),
 		"os":                runtime.GOOS,
+		"build":             build.Version,
 		"cpu_count":         strconv.Itoa(runtime.NumCPU()),
 		"mem_total_bytes":   strconv.FormatUint(memory.TotalMemory(), 10),
 		"mem_free_bytes":    strconv.FormatUint(memory.FreeMemory(), 10),
