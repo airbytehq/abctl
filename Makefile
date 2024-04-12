@@ -6,6 +6,7 @@ build:
 .PHONY: clean
 clean:
 	rm -rf build/
+	rm -rf release/
 
 .PHONY: fmt
 fmt:
@@ -14,3 +15,7 @@ fmt:
 .PHONY: vet
 vet:
 	go vet ./...
+
+.PHONY: release
+release:
+	@./create-release-builds

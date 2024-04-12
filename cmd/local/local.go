@@ -42,6 +42,7 @@ var Cmd = &cobra.Command{
 	Short: "Manages local Airbyte installations",
 }
 
+// InstallCmd installs Airbyte locally
 var InstallCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install Airbyte locally",
@@ -66,6 +67,7 @@ var InstallCmd = &cobra.Command{
 	},
 }
 
+// UninstallCmd uninstalls Airbyte locally
 var UninstallCmd = &cobra.Command{
 	Use:   "uninstall",
 	Short: "Uninstall Airbyte locally",
