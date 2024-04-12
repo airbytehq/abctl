@@ -56,7 +56,7 @@ func (s *SegmentClient) Attr(key, val string) {
 
 func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
 	properties := map[string]string{
-		"deployment_method": "quick_start",
+		"deployment_method": "abctl",
 		"session_id":        s.sessionID.String(),
 		"state":             string(es),
 		"os":                runtime.GOOS,
