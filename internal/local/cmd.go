@@ -57,6 +57,13 @@ type HelmClient interface {
 	UninstallReleaseByName(string) error
 }
 
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// BrowserLauncher for
+type BrowserLauncher func(url string) error
+
 // ErrDocker is returned anytime an error specific to docker occurs.
 var ErrDocker = errors.New("error communicating with docker")
 
@@ -68,13 +75,15 @@ type DockerClient interface {
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
 	docker   DockerClient
-	http     *http.Client
+	http     HTTPClient
 	helm     HelmClient
 	k8s      K8sClient
 	tel      telemetry.Client
+	launcher BrowserLauncher
 	userHome string
 }
 
+// Option for configuring the Command, primarily exists for testing
 type Option func(*Command)
 
 // WithTelemetryClient define the telemetry client for this command.
@@ -85,7 +94,7 @@ func WithTelemetryClient(client telemetry.Client) Option {
 }
 
 // WithHTTPClient define the http client for this command.
-func WithHTTPClient(client *http.Client) Option {
+func WithHTTPClient(client HTTPClient) Option {
 	return func(c *Command) {
 		c.http = client
 	}
@@ -105,12 +114,22 @@ func WithK8sClient(client K8sClient) Option {
 	}
 }
 
+// WithDockerClient define the docker client for this command.
 func WithDockerClient(client DockerClient) Option {
 	return func(c *Command) {
 		c.docker = client
 	}
 }
 
+// WithBrowserLauncher define the browser launcher for this command.
+func WithBrowserLauncher(launcher BrowserLauncher) Option {
+	return func(c *Command) {
+		c.launcher = launcher
+	}
+}
+
+// New creates a new Command
+// TODO: this method does too much
 func New(opts ...Option) (*Command, error) {
 	c := &Command{}
 	for _, opt := range opts {
@@ -197,6 +216,21 @@ func New(opts ...Option) (*Command, error) {
 	// set telemetry client, if not defined
 	if c.tel == nil {
 		c.tel = telemetry.NoopClient{}
+	}
+
+	if c.launcher == nil {
+		c.launcher = func(url string) error {
+			var cmd *exec.Cmd
+			switch runtime.GOOS {
+			case "darwin":
+				cmd = exec.Command("open", url)
+			case "windows":
+				cmd = exec.Command("cmd", "/c", "start", url)
+			default:
+				cmd = exec.Command("xdg-open", url)
+			}
+			return cmd.Run()
+		}
 	}
 
 	// fetch k8s version information
@@ -467,7 +501,7 @@ func (c *Command) handleChart(
 }
 
 // openBrowser will open the url in the user's browser but only if the url returns a 200 response code first
-// TODO: clean up this method
+// TODO: clean up this method, make it testable
 func (c *Command) openBrowser(ctx context.Context, url string) error {
 	spinner, err := pterm.DefaultSpinner.Start("browser - waiting for ingress")
 	if err != nil {
@@ -517,17 +551,7 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 
 	spinner.UpdateText("browser - launching")
 
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", url)
-	default:
-		cmd = exec.Command("xdg-open", url)
-	}
-
-	if err := cmd.Run(); err != nil {
+	if err := c.launcher(url); err != nil {
 		spinner.Fail(fmt.Sprintf("browser - failed to launch browser; please access %s directly", url))
 		return fmt.Errorf("could not launch browser: %w", err)
 	}

@@ -152,6 +152,6 @@ var (
 func init() {
 	Cmd.AddCommand(InstallCmd)
 	Cmd.AddCommand(UninstallCmd)
-	InstallCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via the env-var "+envBasicAuthUser)
-	InstallCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via the env-var "+envBasicAuthPass)
+	InstallCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
+	InstallCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 }

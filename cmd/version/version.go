@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Cmd returns a cobra command for printing the version information.
+// The version information is read directly from build.Version.
 var Cmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version number",
