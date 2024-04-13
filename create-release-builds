@@ -31,7 +31,6 @@ tar -czf "$release_prefix-linux-arm64.tar.gz" "$release_prefix-linux-arm64"
 echo "- creating windows builds"
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o "$release_prefix-windows-amd64/" -ldflags "-w -X airbyte.io/abctl/internal/build.Version=${ABCTL_VERSION}" .
 # sleep is necessary otherwise the zip command can fail with the error "zip error: Zip file structure invalid (build/release/abctl-[VERSION]-windows-amd64)
-sleep 1
-zip -q -r "$release_prefix-windows-amd64" "$release_prefix-windows-amd64"
+zip -q -r "$release_prefix-windows-amd64.zip" "$release_prefix-windows-amd64"
 
 echo "completed release builds"
