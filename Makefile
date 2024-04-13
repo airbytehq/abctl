@@ -6,7 +6,6 @@ build:
 .PHONY: clean
 clean:
 	rm -rf build/
-	rm -rf release/
 
 .PHONY: fmt
 fmt:
