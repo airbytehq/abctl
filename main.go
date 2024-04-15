@@ -1,7 +1,7 @@
 package main
 
 import (
-	"airbyte.io/abctl/cmd"
+	"github.com/airbytehq/abctl/cmd"
 )
 
 func main() {

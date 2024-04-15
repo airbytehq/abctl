@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"airbyte.io/abctl/cmd/local"
-	"airbyte.io/abctl/cmd/version"
-	localcmd "airbyte.io/abctl/internal/local"
 	"errors"
+	"github.com/airbytehq/abctl/cmd/local"
+	"github.com/airbytehq/abctl/cmd/version"
+	localcmd "github.com/airbytehq/abctl/internal/local"
 	"github.com/pterm/pterm"
 	"os"
 

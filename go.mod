@@ -1,4 +1,4 @@
-module airbyte.io/abctl
+module github.com/airbytehq/abctl
 
 go 1.21.9
 

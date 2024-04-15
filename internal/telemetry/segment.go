@@ -1,9 +1,9 @@
 package telemetry
 
 import (
-	"airbyte.io/abctl/internal/build"
 	"bytes"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/build"
 	"github.com/oklog/ulid/v2"
 	"github.com/pbnjay/memory"
 	"k8s.io/apimachinery/pkg/util/json"
