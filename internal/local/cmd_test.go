@@ -1,9 +1,9 @@
 package local
 
 import (
-	"airbyte.io/abctl/internal/telemetry"
 	"context"
 	"errors"
+	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
 	"github.com/google/go-cmp/cmp"
 	helmclient "github.com/mittwald/go-helm-client"

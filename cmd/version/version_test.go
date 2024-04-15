@@ -1,9 +1,9 @@
 package version
 
 import (
-	"airbyte.io/abctl/internal/build"
 	"bytes"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/build"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pterm/pterm"
 	"os"

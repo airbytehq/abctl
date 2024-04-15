@@ -1,11 +1,11 @@
 package local
 
 import (
-	"airbyte.io/abctl/internal/local"
-	"airbyte.io/abctl/internal/telemetry"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/local"
+	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"os"
 	"path/filepath"

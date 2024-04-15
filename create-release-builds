@@ -48,7 +48,7 @@ abbuild() {
   local goarch=$2
   local compress=$3
   echo " - $goos/$goarch"
-  GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build -trimpath -o "$release_dir/abctl-$ABCTL_VERSION-$goos-$goarch/" -ldflags "-w -X airbyte.io/abctl/internal/build.Version=${ABCTL_VERSION}" .
+  GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build -trimpath -o "$release_dir/abctl-$ABCTL_VERSION-$goos-$goarch/" -ldflags "-w -X github.com/airbytehq/abctl/internal/build.Version=${ABCTL_VERSION}" .
   eval $compress "$goos" "$goarch"
 }
 

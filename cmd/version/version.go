@@ -1,7 +1,7 @@
 package version
 
 import (
-	"airbyte.io/abctl/internal/build"
+	"github.com/airbytehq/abctl/internal/build"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
