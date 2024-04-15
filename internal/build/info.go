@@ -23,7 +23,6 @@ var readBuildInfo buildInfoFunc = debug.ReadBuildInfo
 // This method is only separated out from the init method for testing purposes and should only
 // be called by init and the unit tests.
 func setVersion() {
-	fmt.Println("init called")
 	if Version == "dev" {
 		buildInfo, ok := readBuildInfo()
 		if ok {
