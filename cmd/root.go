@@ -22,7 +22,7 @@ var (
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
 		Use:   "abctl",
-		Short: pterm.LightBlue("Airbyte") + "'s  command line tool",
+		Short: pterm.LightBlue("Airbyte") + "'s command line tool",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if flagDNT {
 				pterm.Info.Println("telemetry disabled (--dnt)")

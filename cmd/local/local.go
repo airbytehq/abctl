@@ -89,16 +89,16 @@ var UninstallCmd = &cobra.Command{
 // telemetryWrapper wraps the function calls with the telemetry handlers
 func telemetryWrapper(et telemetry.EventType, f func() error) (err error) {
 	if err := telClient.Start(et); err != nil {
-		pterm.Warning.Println("unable to send telemetry start data: %w", err)
+		pterm.Warning.Printfln("unable to send telemetry start data: %s", err)
 	}
 	defer func() {
 		if err != nil {
 			if err := telClient.Failure(et, err); err != nil {
-				pterm.Warning.Println("unable to send telemetry failure data: %w", err)
+				pterm.Warning.Printfln("unable to send telemetry failure data: %s", err)
 			}
 		} else {
 			if err := telClient.Success(et); err != nil {
-				pterm.Warning.Println("unable to send telemetry success data: %w", err)
+				pterm.Warning.Printfln("unable to send telemetry success data: %s", err)
 			}
 		}
 	}()
