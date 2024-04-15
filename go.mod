@@ -8,7 +8,6 @@ require (
 	github.com/mittwald/go-helm-client v0.12.9
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
-	github.com/pkg/errors v0.9.1
 	github.com/pterm/pterm v0.12.79
 	github.com/spf13/cobra v1.8.0
 	golang.org/x/crypto v0.22.0
@@ -110,6 +109,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc6 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.18.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.45.0 // indirect

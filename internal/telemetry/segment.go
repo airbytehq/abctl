@@ -64,8 +64,6 @@ func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
 		"cpu_count":         strconv.Itoa(runtime.NumCPU()),
 		"mem_total_bytes":   strconv.FormatUint(memory.TotalMemory(), 10),
 		"mem_free_bytes":    strconv.FormatUint(memory.FreeMemory(), 10),
-		// TODO: remove after manually testing
-		"testing": "true",
 	}
 	// add all the attributes to the properties map before sending it
 	maps.Copy(properties, s.attrs)
