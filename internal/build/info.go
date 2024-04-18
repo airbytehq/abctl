@@ -13,6 +13,18 @@ import (
 // Any invalid version will be replaced with "invalid (BAD_VERSION)".
 var Version = "dev"
 
+// Revision is the git hash which built this tool.
+// This value is automatically set if the buildInfoFunc function returns the "vcs.revision" setting.
+var Revision string
+
+// Modified is true if there are local code modifications when this binary was built.
+// This value is automatically set if the buildInfoFunc function returns the "vcs.modified" setting.
+var Modified bool
+
+// ModificationTime is the time, in RFC3339 format, of this binary.
+// This value is automatically set fi the buildInfoFunc function returns the "vcs.time" settings.
+var ModificationTime string
+
 // buildInfoFunc matches the debug.ReadBuildInfo method, redefined here for testing purposes.
 type buildInfoFunc func() (*debug.BuildInfo, bool)
 
@@ -28,6 +40,16 @@ func setVersion() {
 		if ok {
 			if buildInfo.Main.Version != "" && buildInfo.Main.Version != "(devel)" {
 				Version = buildInfo.Main.Version
+			}
+			for _, kv := range buildInfo.Settings {
+				switch kv.Key {
+				case "vcs.modified":
+					Modified = kv.Value == "true"
+				case "vcs.time":
+					ModificationTime = kv.Value
+				case "vcs.revision":
+					Revision = kv.Value
+				}
 			}
 		}
 	}

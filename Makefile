@@ -11,6 +11,10 @@ clean:
 fmt:
 	go fmt ./...
 
+.PHONY: test
+test:
+	go test ./...
+
 .PHONY: vet
 vet:
 	go vet ./...
