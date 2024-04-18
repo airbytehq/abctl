@@ -26,7 +26,7 @@ func setVersion() {
 	if Version == "dev" {
 		buildInfo, ok := readBuildInfo()
 		if ok {
-			if buildInfo.Main.Version != "" {
+			if buildInfo.Main.Version != "" && buildInfo.Main.Version != "(devel)" {
 				Version = buildInfo.Main.Version
 			}
 		}
