@@ -84,6 +84,15 @@ func TestVersion(t *testing.T) {
 			},
 			exp: "invalid (VBAD_BUILD)",
 		},
+		{
+			name: "(devel) version is ignored",
+			buildInfoFunc: func() (*debug.BuildInfo, bool) {
+				return &debug.BuildInfo{Main: debug.Module{
+					Version: "(devel)",
+				}}, true
+			},
+			exp: "dev",
+		},
 	}
 
 	origReadBuildInfo := readBuildInfo
