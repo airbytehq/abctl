@@ -1,7 +1,7 @@
 <p align="center">
     <img alt="abctl logo" src="https://avatars.githubusercontent.com/u/59758427?size=200" height="140" />
     <h3 align="center">abctl</h3>
-    <p align="center">Airbyte command line tool for running Airbyte locally.</p>
+    <p align="center">Airbyte's command line tool for running Airbyte locally.</p>
 </p>
 
 ---
@@ -14,11 +14,16 @@
 
 ### Installation
 Do one of the following:
-- Download the latest version of `abctl` from the [releases page](https://github.com/airbytehq/abctl/releases)
-- Install `abctl` using `go install`
+- Install using `brew`
+   ```shell
+   brew tap airbytehq/tap
+   brew install abctl
+   ```
+- Install using `go install`
    ```shell
    go install github.com/airbytehq/abctl@latest
    ```
+- Download the latest version of `abctl` from the [releases page](https://github.com/airbytehq/abctl/releases)
 
 ### Launch
 To launch Airbyte locally with the default settings, simply run
