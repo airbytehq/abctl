@@ -10,7 +10,7 @@
     - [Prerequisites](#prerequisites)
     - [Installation](#installation)
     - [Launch](#launch)
-    - [Additional Options](#additiona-options)
+    - [Additional Options](#additional-options)
 - [Contributing](#contributing) 
 
 ## Getting Started
