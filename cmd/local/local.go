@@ -49,7 +49,14 @@ var InstallCmd = &cobra.Command{
 	Short: "Install Airbyte locally",
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		return telemetryWrapper(telemetry.Install, func() error {
-			lc, err := local.New(local.WithTelemetryClient(telClient))
+			provider, err := k8s.ProviderFromString(flagProvider)
+			if err != nil {
+				return err
+			}
+
+			pterm.Info.Printfln("using kubernetes provider: %s", provider)
+
+			lc, err := local.New(provider, local.WithTelemetryClient(telClient))
 			if err != nil {
 				return fmt.Errorf("could not initialize local command: %w", err)
 			}
@@ -77,7 +84,14 @@ var UninstallCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return telemetryWrapper(telemetry.Uninstall, func() error {
-			lc, err := local.New(local.WithTelemetryClient(telClient))
+			provider, err := k8s.ProviderFromString(flagProvider)
+			if err != nil {
+				return err
+			}
+
+			pterm.Info.Printfln("using kubernetes provider: %s", provider)
+
+			lc, err := local.New(provider, local.WithTelemetryClient(telClient))
 			if err != nil {
 				return fmt.Errorf("could not initialize local command: %w", err)
 			}
@@ -156,7 +170,7 @@ func init() {
 	InstallCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	InstallCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 
-	Cmd.PersistentFlags().StringVarP(&flagProvider, "k8s-provider", "k", string(k8s.DockerDesktop), "kubernetes provider to use")
+	Cmd.PersistentFlags().StringVarP(&flagProvider, "k8s-provider", "k", k8s.DockerDesktop.String(), "kubernetes provider to use")
 	Cmd.AddCommand(InstallCmd)
 	Cmd.AddCommand(UninstallCmd)
 }

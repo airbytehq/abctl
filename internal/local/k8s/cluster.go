@@ -26,19 +26,46 @@ type Cluster interface {
 
 // New returns a Cluster implementation for the provider.
 func New(provider Provider) (Cluster, error) {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine user home directory: %w", err)
+	}
+
+	if err := provider.MkDirs(userHome); err != nil {
+		return nil, fmt.Errorf("could not create directory: %w", err)
+	}
+
 	switch provider {
+	case DockerDesktop:
+		return &DockerDesktopCluster{
+			kubeconfig: provider.Kubeconfig(userHome),
+		}, nil
 	case Kind:
-		kubeconfigDir, err := createAbctlDirectory()
-		if err != nil {
-			return nil, fmt.Errorf("unable to create abctl directory: %w", err)
-		}
 		return &KindCluster{
 			p:          cluster.NewProvider(),
-			kubeconfig: filepath.Join(kubeconfigDir, kubeconfig),
+			kubeconfig: provider.Kubeconfig(userHome),
 		}, nil
 	}
 
 	return nil, errors.New("unknown provider")
+}
+
+var _ Cluster = (*DockerDesktopCluster)(nil)
+
+type DockerDesktopCluster struct {
+	kubeconfig string
+}
+
+func (d DockerDesktopCluster) Create(name string) error {
+	return nil
+}
+
+func (d DockerDesktopCluster) Delete(name string) error {
+	return nil
+}
+
+func (d DockerDesktopCluster) Exists(name string) bool {
+	return true
 }
 
 // interface sanity check

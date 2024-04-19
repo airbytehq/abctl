@@ -131,7 +131,7 @@ func WithBrowserLauncher(launcher BrowserLauncher) Option {
 }
 
 // New creates a new Command
-func New(opts ...Option) (*Command, error) {
+func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	c := &Command{}
 	for _, opt := range opts {
 		opt(c)
