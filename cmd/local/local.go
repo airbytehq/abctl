@@ -10,6 +10,7 @@ import (
 	"github.com/pterm/pterm"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -21,8 +22,14 @@ const (
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
 )
 
+const (
+	clusterName = "abctl"
+)
+
 // telClient is the telemetry telClient to use
 var telClient telemetry.Client
+
+var provider k8s.Provider
 
 // Cmd represents the local command
 var Cmd = &cobra.Command{
@@ -38,9 +45,40 @@ var Cmd = &cobra.Command{
 			pterm.Warning.Println(fmt.Errorf("unable to create telemetry telClient: %w", err))
 		}
 
+		provider, err = k8s.ProviderFromString(flagProvider)
+		if err != nil {
+			return err
+		}
+
+		printK8sProvider(provider)
+
+		cluster, err := k8s.NewCluster(provider)
+		if err != nil {
+			return err
+		}
+
+		if cluster.Exists(clusterName) {
+			pterm.Info.Printfln("cluster '%s' located", clusterName)
+		} else {
+			spinner, err := pterm.DefaultSpinner.Start("cluster - creating")
+			if err != nil {
+				return fmt.Errorf("could not create cluster spinner: %w", err)
+			}
+			if err := cluster.Create(clusterName); err != nil {
+				spinner.Fail("cluster - failed to create")
+				return err
+			}
+			spinner.Success("cluster - created")
+		}
+
 		return nil
 	},
 	Short: "Manages local Airbyte installations",
+}
+
+func printK8sProvider(p k8s.Provider) {
+	pterm.Info.Printfln("using kubernetes provider:\n  name: %s\n  kubeconfig: %s\n  context: %s",
+		p.Name, p.Kubeconfig, p.Context)
 }
 
 // InstallCmd installs Airbyte locally
@@ -49,13 +87,6 @@ var InstallCmd = &cobra.Command{
 	Short: "Install Airbyte locally",
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		return telemetryWrapper(telemetry.Install, func() error {
-			provider, err := k8s.ProviderFromString(flagProvider)
-			if err != nil {
-				return err
-			}
-
-			pterm.Info.Printfln("using kubernetes provider: %s", provider)
-
 			lc, err := local.New(provider, local.WithTelemetryClient(telClient))
 			if err != nil {
 				return fmt.Errorf("could not initialize local command: %w", err)
@@ -84,13 +115,6 @@ var UninstallCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return telemetryWrapper(telemetry.Uninstall, func() error {
-			provider, err := k8s.ProviderFromString(flagProvider)
-			if err != nil {
-				return err
-			}
-
-			pterm.Info.Printfln("using kubernetes provider: %s", provider)
-
 			lc, err := local.New(provider, local.WithTelemetryClient(telClient))
 			if err != nil {
 				return fmt.Errorf("could not initialize local command: %w", err)
@@ -170,7 +194,16 @@ func init() {
 	InstallCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	InstallCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 
-	Cmd.PersistentFlags().StringVarP(&flagProvider, "k8s-provider", "k", k8s.DockerDesktop.String(), "kubernetes provider to use")
+	// switch the default provider based on the operating system... not sure if I like this idea or not
+	defaultProvider := k8s.KindProvider.Name
+	switch runtime.GOOS {
+	case "darwin":
+		defaultProvider = k8s.DockerDesktopProvider.Name
+	case "windows":
+		defaultProvider = k8s.DockerDesktopProvider.Name
+	}
+
+	Cmd.PersistentFlags().StringVarP(&flagProvider, "k8s-provider", "k", defaultProvider, "kubernetes provider to use")
 	Cmd.AddCommand(InstallCmd)
 	Cmd.AddCommand(UninstallCmd)
 }

@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 
 const (
 	k8sVersion = "v1.29.1"
-	kubeconfig = "abctl.kubeconfig"
 )
 
 // Cluster is an interface representing all the actions taken at the cluster level.
@@ -24,8 +22,8 @@ type Cluster interface {
 	Exists(name string) bool
 }
 
-// New returns a Cluster implementation for the provider.
-func New(provider Provider) (Cluster, error) {
+// NewCluster returns a Cluster implementation for the provider.
+func NewCluster(provider Provider) (Cluster, error) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("could not determine user home directory: %w", err)
@@ -36,22 +34,24 @@ func New(provider Provider) (Cluster, error) {
 	}
 
 	switch provider {
-	case DockerDesktop:
+	case DockerDesktopProvider:
 		return &DockerDesktopCluster{
-			kubeconfig: provider.Kubeconfig(userHome),
+			kubeconfig: filepath.Join(userHome, provider.Kubeconfig),
 		}, nil
-	case Kind:
+	case KindProvider:
 		return &KindCluster{
 			p:          cluster.NewProvider(),
-			kubeconfig: provider.Kubeconfig(userHome),
+			kubeconfig: filepath.Join(userHome, provider.Kubeconfig),
 		}, nil
 	}
 
-	return nil, errors.New("unknown provider")
+	return nil, fmt.Errorf("unsupported provider %s", provider)
 }
 
+// interface sanity check
 var _ Cluster = (*DockerDesktopCluster)(nil)
 
+// DockerDesktopCluster is a Cluster that represents a docker-desktop cluster
 type DockerDesktopCluster struct {
 	kubeconfig string
 }
@@ -80,10 +80,30 @@ type KindCluster struct {
 }
 
 func (k *KindCluster) Create(name string) error {
+	// see https://kind.sigs.k8s.io/docs/user/ingress/#create-cluster
+	rawCfg := `kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+    - |
+      kind: InitConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP`
+
 	opts := []cluster.CreateOption{
 		cluster.CreateWithWaitForReady(120 * time.Second),
 		cluster.CreateWithKubeconfigPath(k.kubeconfig),
 		cluster.CreateWithNodeImage("kindest/node:" + k8sVersion),
+		cluster.CreateWithRawConfig([]byte(rawCfg)),
 	}
 
 	if err := k.p.Create(name, opts...); err != nil {

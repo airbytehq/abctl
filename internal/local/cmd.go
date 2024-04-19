@@ -46,7 +46,6 @@ const (
 	nginxNamespace      = "ingress-nginx"
 	nginxRepoName       = "nginx"
 	nginxRepoURL        = "https://kubernetes.github.io/ingress-nginx"
-	k8sContext          = "docker-desktop"
 )
 
 // HelmClient primarily for testing purposes
@@ -130,6 +129,13 @@ func WithBrowserLauncher(launcher BrowserLauncher) Option {
 	}
 }
 
+// WithUserHome define the user's home directory.
+func WithUserHome(home string) Option {
+	return func(c *Command) {
+		c.userHome = home
+	}
+}
+
 // New creates a new Command
 func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	c := &Command{}
@@ -137,14 +143,16 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 		opt(c)
 	}
 
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("could not determine user home directory: %w", err)
+	if c.userHome == "" {
+		var err error
+		if c.userHome, err = os.UserHomeDir(); err != nil {
+			return nil, fmt.Errorf("could not determine user home directory: %w", err)
+		}
 	}
-	c.userHome = userHome
 
 	// set docker client if not defined
 	if c.docker == nil {
+		var err error
 		if c.docker, err = defaultDocker(c.userHome); err != nil {
 			return nil, err
 		}
@@ -157,14 +165,18 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 
 	// set k8s client, if not defined
 	if c.k8s == nil {
-		if c.k8s, err = defaultK8s(c.userHome); err != nil {
+		kubecfg := filepath.Join(c.userHome, provider.Kubeconfig)
+		var err error
+		if c.k8s, err = defaultK8s(kubecfg, provider.Context); err != nil {
 			return nil, err
 		}
 	}
 
 	// set the helm client, if not defined
 	if c.helm == nil {
-		if c.helm, err = defaultHelm(c.userHome); err != nil {
+		kubecfg := filepath.Join(c.userHome, provider.Kubeconfig)
+		var err error
+		if c.helm, err = defaultHelm(kubecfg, provider.Context); err != nil {
 			return nil, err
 		}
 	}
@@ -583,8 +595,8 @@ func defaultDocker(userHome string) (DockerClient, error) {
 }
 
 // defaultK8s returns the default k8s client
-func defaultK8s(userHome string) (k8s.K8sClient, error) {
-	k8sCfg, err := k8sClientConfig(userHome)
+func defaultK8s(kubecfg, kubectx string) (k8s.K8sClient, error) {
+	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
 		return nil, fmt.Errorf("could not create k8s client config: %w", err)
 	}
@@ -602,8 +614,8 @@ func defaultK8s(userHome string) (k8s.K8sClient, error) {
 }
 
 // defaultHelm returns the default helm client
-func defaultHelm(userHome string) (HelmClient, error) {
-	k8sCfg, err := k8sClientConfig(userHome)
+func defaultHelm(kubecfg, kubectx string) (HelmClient, error) {
+	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
 		return nil, fmt.Errorf("could not create k8s client config: %w", err)
 	}
@@ -625,10 +637,10 @@ func defaultHelm(userHome string) (HelmClient, error) {
 }
 
 // k8sClientConfig returns a k8s client config using the ~/.kubc/config file and the k8sContext context.
-func k8sClientConfig(userHome string) (clientcmd.ClientConfig, error) {
+func k8sClientConfig(kubecfg, kubectx string) (clientcmd.ClientConfig, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: filepath.Join(userHome, ".kube", "config")},
-		&clientcmd.ConfigOverrides{CurrentContext: k8sContext},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
+		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
 	), nil
 }
 

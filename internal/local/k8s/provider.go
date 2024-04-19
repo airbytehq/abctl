@@ -4,17 +4,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
+// Provider represents a k8s provider.
+// TODO: add support for nginx helm commands, see https://github.com/kubernetes-sigs/kind/issues/1693
 type Provider struct {
 	Name       string
-	kubeconfig string
-}
-
-// Kubeconfig returns the kubeconfig for this provider.
-// The kubeconfigs are always scoped to the user's home directory.
-func (p Provider) Kubeconfig(userHome string) string {
-	return filepath.Join(userHome, p.kubeconfig)
+	Context    string
+	Kubeconfig string
 }
 
 // MkDirs creates the directories for this providers kubeconfig.
@@ -22,37 +20,47 @@ func (p Provider) Kubeconfig(userHome string) string {
 // TODO: rename to something more clear
 func (p Provider) MkDirs(userHome string) error {
 	const permissions = 0700
-	if err := os.MkdirAll(p.Kubeconfig(userHome), permissions); err != nil {
-		return fmt.Errorf("could not create directory %s: %v", p.Kubeconfig(userHome), err)
+	kubeconfig := filepath.Join(userHome, p.Kubeconfig)
+	if err := os.MkdirAll(filepath.Dir(kubeconfig), permissions); err != nil {
+		return fmt.Errorf("could not create directory %s: %v", kubeconfig, err)
 	}
 
 	return nil
 }
 
-// String returns a human-readable name of this provider.
-func (p Provider) String() string {
-	return p.Name
-}
-
 var (
-	// DockerDesktop represents the docker-desktop provider.
-	DockerDesktop = Provider{
+	// DockerDesktopProvider represents the docker-desktop provider.
+	DockerDesktopProvider = Provider{
 		Name:       "docker-desktop",
-		kubeconfig: filepath.Join(".kube", "config"),
+		Context:    "docker-desktop",
+		Kubeconfig: filepath.Join(".kube", "config"),
 	}
-	// Kind represents the kind (https://kind.sigs.k8s.io/) provider.
-	Kind = Provider{
+
+	// KindProvider represents the kind (https://kind.sigs.k8s.io/) provider.
+	KindProvider = Provider{
 		Name:       "kind",
-		kubeconfig: filepath.Join(".airbyte", "abctl", "abctl.kubeconfig"),
+		Context:    "kind-abctl",
+		Kubeconfig: filepath.Join(".airbyte", "abctl", "abctl.kubeconfig"),
+	}
+
+	// TestProvider represents a test provider, for testing purposes
+	TestProvider = Provider{
+		Name:       "test",
+		Context:    "test-abctl",
+		Kubeconfig: filepath.Join(os.TempDir(), "abctl.kubeconfig"),
 	}
 )
 
+// ProviderFromString returns a provider from the given string s.
+// If no provider is found, an error is returned.
 func ProviderFromString(s string) (Provider, error) {
-	switch s {
+	switch strings.ToLower(s) {
 	case "docker-desktop":
-		return DockerDesktop, nil
+		return DockerDesktopProvider, nil
 	case "kind":
-		return Kind, nil
+		return KindProvider, nil
+	case "test":
+		return TestProvider, nil
 	}
 
 	return Provider{}, fmt.Errorf("unknown provider: %s", s)

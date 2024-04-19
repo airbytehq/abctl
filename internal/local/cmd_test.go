@@ -106,7 +106,7 @@ func TestCommand_Install(t *testing.T) {
 		},
 	}
 
-	k8s := mockK8sClient{
+	k8sClient := mockK8sClient{
 		getServerVersion: func() (string, error) {
 			return "test", nil
 		},
@@ -133,9 +133,10 @@ func TestCommand_Install(t *testing.T) {
 	}}
 
 	c, err := New(
+		k8s.TestProvider,
 		WithDockerClient(&docker),
 		WithHelmClient(&helm),
-		WithK8sClient(&k8s),
+		WithK8sClient(&k8sClient),
 		WithTelemetryClient(&tel),
 		WithHTTPClient(&httpClient),
 		WithBrowserLauncher(func(url string) error {
@@ -152,7 +153,9 @@ func TestCommand_Install(t *testing.T) {
 	}
 }
 
+// ---
 // only mocks below here
+// ---
 var _ HelmClient = (*mockHelmClient)(nil)
 
 type mockHelmClient struct {

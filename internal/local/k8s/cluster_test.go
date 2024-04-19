@@ -7,7 +7,7 @@ import (
 
 func TestKindK8s_Create(t *testing.T) {
 	name := "cole-test"
-	k, err := New(Kind)
+	k, err := NewCluster(KindProvider)
 	if err != nil {
 		t.Fatal(err)
 	}
