@@ -1,4 +1,4 @@
-package cluster
+package k8s
 
 import (
 	"errors"
@@ -9,32 +9,30 @@ import (
 	"time"
 )
 
-type Provider string
-
-const (
-	DockerDesktop Provider = "docker-desktop"
-	Kind          Provider = "kind"
-)
-
 const (
 	k8sVersion = "v1.29.1"
 	kubeconfig = "abctl.kubeconfig"
 )
 
-type K8s interface {
+// Cluster is an interface representing all the actions taken at the cluster level.
+type Cluster interface {
+	// Create a cluster with the provided name.
 	Create(name string) error
+	// Delete a cluster with the provided name.
 	Delete(name string) error
+	// Exists returns true if the cluster exists, false otherwise.
 	Exists(name string) bool
 }
 
-func New(provider Provider) (K8s, error) {
+// New returns a Cluster implementation for the provider.
+func New(provider Provider) (Cluster, error) {
 	switch provider {
 	case Kind:
 		kubeconfigDir, err := createAbctlDirectory()
 		if err != nil {
 			return nil, fmt.Errorf("unable to create abctl directory: %w", err)
 		}
-		return &KindK8s{
+		return &KindCluster{
 			p:          cluster.NewProvider(),
 			kubeconfig: filepath.Join(kubeconfigDir, kubeconfig),
 		}, nil
@@ -43,12 +41,18 @@ func New(provider Provider) (K8s, error) {
 	return nil, errors.New("unknown provider")
 }
 
-type KindK8s struct {
-	p          *cluster.Provider
+// interface sanity check
+var _ Cluster = (*KindCluster)(nil)
+
+// KindCluster is a Cluster implementation for kind (https://kind.sigs.k8s.io/).
+type KindCluster struct {
+	// p is the kind provider, not the abctl provider
+	p *cluster.Provider
+	// kubeconfig is the full path to the kubeconfig file kind is using
 	kubeconfig string
 }
 
-func (k *KindK8s) Create(name string) error {
+func (k *KindCluster) Create(name string) error {
 	opts := []cluster.CreateOption{
 		cluster.CreateWithWaitForReady(120 * time.Second),
 		cluster.CreateWithKubeconfigPath(k.kubeconfig),
@@ -62,7 +66,7 @@ func (k *KindK8s) Create(name string) error {
 	return nil
 }
 
-func (k *KindK8s) Delete(name string) error {
+func (k *KindCluster) Delete(name string) error {
 	if err := k.p.Delete(name, k.kubeconfig); err != nil {
 		return fmt.Errorf("unable to delete kind cluster: %w", err)
 	}
@@ -70,7 +74,7 @@ func (k *KindK8s) Delete(name string) error {
 	return nil
 }
 
-func (k *KindK8s) Exists(name string) bool {
+func (k *KindCluster) Exists(name string) bool {
 	clusters, _ := k.p.List()
 	for _, c := range clusters {
 		if c == name {
@@ -84,7 +88,8 @@ func (k *KindK8s) Exists(name string) bool {
 // permissions sets the file and directory permission level for the kind kube config file and directory.
 const permissions = 0700
 
-// createAbctlDirectory creates the ~/.airbyte/abctl directory
+// createAbctlDirectory creates the ~/.airbyte/abctl directory, if it doesn't already exist.
+// If successful returns the full path to the ~/.airbyte/abctl directory
 func createAbctlDirectory() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

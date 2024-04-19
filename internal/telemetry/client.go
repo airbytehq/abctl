@@ -12,10 +12,7 @@ type EventType string
 
 const (
 	Install   EventType = "install"
-	Sync      EventType = "sync"
 	Uninstall EventType = "uninstall"
-	Validate  EventType = "validate"
-	Check     EventType = "check"
 )
 
 // Client interface for telemetry data.

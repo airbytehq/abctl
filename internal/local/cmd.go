@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -74,10 +75,11 @@ type DockerClient interface {
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
+	cluster  k8s.Cluster
 	docker   DockerClient
 	http     HTTPClient
 	helm     HelmClient
-	k8s      K8sClient
+	k8s      k8s.K8sClient
 	tel      telemetry.Client
 	launcher BrowserLauncher
 	userHome string
@@ -108,7 +110,7 @@ func WithHelmClient(client HelmClient) Option {
 }
 
 // WithK8sClient define the k8s client for this command.
-func WithK8sClient(client K8sClient) Option {
+func WithK8sClient(client k8s.K8sClient) Option {
 	return func(c *Command) {
 		c.k8s = client
 	}
@@ -129,7 +131,6 @@ func WithBrowserLauncher(launcher BrowserLauncher) Option {
 }
 
 // New creates a new Command
-// TODO: this method does too much
 func New(opts ...Option) (*Command, error) {
 	c := &Command{}
 	for _, opt := range opts {
@@ -144,25 +145,8 @@ func New(opts ...Option) (*Command, error) {
 
 	// set docker client if not defined
 	if c.docker == nil {
-		switch runtime.GOOS {
-		case "darwin":
-			// on mac, sometimes the host isn't set correctly, if it fails check the home directory
-			c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
-			if err != nil {
-				// keep the original error, as we'll join with the next error (if another error occurs)
-				outerErr := err
-				c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", c.userHome)))
-				if err != nil {
-					err = errors.Join(err, outerErr)
-				}
-			}
-		case "windows":
-			c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("npipe:////./pipe/docker_engine"))
-		default:
-			c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
-		}
-		if err != nil {
-			return nil, errors.Join(ErrDocker, fmt.Errorf("could not create docker client: %w", err))
+		if c.docker, err = defaultDocker(c.userHome); err != nil {
+			return nil, err
 		}
 	}
 
@@ -173,44 +157,16 @@ func New(opts ...Option) (*Command, error) {
 
 	// set k8s client, if not defined
 	if c.k8s == nil {
-		k8sCfg, err := k8sClientConfig(c.userHome)
-		if err != nil {
-			return nil, fmt.Errorf("could not create k8s client config: %w", err)
+		if c.k8s, err = defaultK8s(c.userHome); err != nil {
+			return nil, err
 		}
-
-		restCfg, err := k8sCfg.ClientConfig()
-		if err != nil {
-			return nil, fmt.Errorf("could not create k8s config client: %w", err)
-		}
-		k8s, err := kubernetes.NewForConfig(restCfg)
-		if err != nil {
-			return nil, fmt.Errorf("could not create k8s client: %w", err)
-		}
-
-		c.k8s = &defaultK8sClient{k8s: k8s}
 	}
 
 	// set the helm client, if not defined
 	if c.helm == nil {
-		k8sCfg, err := k8sClientConfig(c.userHome)
-		if err != nil {
-			return nil, fmt.Errorf("could not create k8s client config: %w", err)
+		if c.helm, err = defaultHelm(c.userHome); err != nil {
+			return nil, err
 		}
-
-		restCfg, err := k8sCfg.ClientConfig()
-		if err != nil {
-			return nil, fmt.Errorf("could not determine kubernetes client: %w", err)
-		}
-
-		helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
-			Options:    &helmclient.Options{Namespace: airbyteNamespace, Output: &noopWriter{}, DebugLog: func(format string, v ...interface{}) {}},
-			RestConfig: restCfg,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("coud not create helm client: %w", err)
-		}
-
-		c.helm = helm
 	}
 
 	// set telemetry client, if not defined
@@ -243,14 +199,6 @@ func New(opts ...Option) (*Command, error) {
 	}
 
 	return c, nil
-}
-
-// k8sClientConfig returns a k8s client config using the ~/.kubc/config file and the k8sContext context.
-func k8sClientConfig(userHome string) (clientcmd.ClientConfig, error) {
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: filepath.Join(userHome, ".kube", "config")},
-		&clientcmd.ConfigOverrides{CurrentContext: k8sContext},
-	), nil
 }
 
 // Install handles the installation of Airbyte
@@ -603,6 +551,85 @@ func ingress() *networkingv1.Ingress {
 			},
 		},
 	}
+}
+
+// defaultDocker returns the default docker client
+func defaultDocker(userHome string) (DockerClient, error) {
+	var docker DockerClient
+	var err error
+
+	switch runtime.GOOS {
+	case "darwin":
+		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
+		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
+		if err != nil {
+			// keep the original error, as we'll join with the next error (if another error occurs)
+			outerErr := err
+			docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", userHome)))
+			if err != nil {
+				err = errors.Join(err, outerErr)
+			}
+		}
+	case "windows":
+		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("npipe:////./pipe/docker_engine"))
+	default:
+		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
+	}
+	if err != nil {
+		return nil, errors.Join(ErrDocker, fmt.Errorf("could not create docker client: %w", err))
+	}
+
+	return docker, nil
+}
+
+// defaultK8s returns the default k8s client
+func defaultK8s(userHome string) (k8s.K8sClient, error) {
+	k8sCfg, err := k8sClientConfig(userHome)
+	if err != nil {
+		return nil, fmt.Errorf("could not create k8s client config: %w", err)
+	}
+
+	restCfg, err := k8sCfg.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("could not create k8s config client: %w", err)
+	}
+	k8sClient, err := kubernetes.NewForConfig(restCfg)
+	if err != nil {
+		return nil, fmt.Errorf("could not create k8s client: %w", err)
+	}
+
+	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
+}
+
+// defaultHelm returns the default helm client
+func defaultHelm(userHome string) (HelmClient, error) {
+	k8sCfg, err := k8sClientConfig(userHome)
+	if err != nil {
+		return nil, fmt.Errorf("could not create k8s client config: %w", err)
+	}
+
+	restCfg, err := k8sCfg.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine kubernetes client: %w", err)
+	}
+
+	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
+		Options:    &helmclient.Options{Namespace: airbyteNamespace, Output: &noopWriter{}, DebugLog: func(format string, v ...interface{}) {}},
+		RestConfig: restCfg,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("coud not create helm client: %w", err)
+	}
+
+	return helm, nil
+}
+
+// k8sClientConfig returns a k8s client config using the ~/.kubc/config file and the k8sContext context.
+func k8sClientConfig(userHome string) (clientcmd.ClientConfig, error) {
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: filepath.Join(userHome, ".kube", "config")},
+		&clientcmd.ConfigOverrides{CurrentContext: k8sContext},
+	), nil
 }
 
 // noopWriter is used by the helm client to suppress its verbose output

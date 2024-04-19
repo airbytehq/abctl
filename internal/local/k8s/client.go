@@ -1,4 +1,4 @@
-package local
+package k8s
 
 import (
 	"context"
@@ -31,18 +31,18 @@ type K8sClient interface {
 	GetServerVersion() (string, error)
 }
 
-// defaultK8sClient converts the official kubernetes client to our more manageable interface
-type defaultK8sClient struct {
-	k8s *kubernetes.Clientset
+// DefaultK8sClient converts the official kubernetes client to our more manageable (and testable) interface
+type DefaultK8sClient struct {
+	ClientSet *kubernetes.Clientset
 }
 
-func (d *defaultK8sClient) CreateIngress(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
-	_, err := d.k8s.NetworkingV1().Ingresses(namespace).Create(ctx, ingress, metav1.CreateOptions{})
+func (d *DefaultK8sClient) CreateIngress(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
+	_, err := d.ClientSet.NetworkingV1().Ingresses(namespace).Create(ctx, ingress, metav1.CreateOptions{})
 	return err
 }
 
-func (d *defaultK8sClient) ExistsIngress(ctx context.Context, namespace string, ingress string) bool {
-	_, err := d.k8s.NetworkingV1().Ingresses(namespace).Get(ctx, ingress, metav1.GetOptions{})
+func (d *DefaultK8sClient) ExistsIngress(ctx context.Context, namespace string, ingress string) bool {
+	_, err := d.ClientSet.NetworkingV1().Ingresses(namespace).Get(ctx, ingress, metav1.GetOptions{})
 	if err == nil {
 		return true
 	}
@@ -50,13 +50,13 @@ func (d *defaultK8sClient) ExistsIngress(ctx context.Context, namespace string, 
 	return !k8serrors.IsNotFound(err)
 }
 
-func (d *defaultK8sClient) UpdateIngress(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
-	_, err := d.k8s.NetworkingV1().Ingresses(namespace).Update(ctx, ingress, metav1.UpdateOptions{})
+func (d *DefaultK8sClient) UpdateIngress(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
+	_, err := d.ClientSet.NetworkingV1().Ingresses(namespace).Update(ctx, ingress, metav1.UpdateOptions{})
 	return err
 }
 
-func (d *defaultK8sClient) ExistsNamespace(ctx context.Context, namespace string) bool {
-	_, err := d.k8s.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
+func (d *DefaultK8sClient) ExistsNamespace(ctx context.Context, namespace string) bool {
+	_, err := d.ClientSet.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
 	if err == nil {
 		return true
 	}
@@ -64,11 +64,11 @@ func (d *defaultK8sClient) ExistsNamespace(ctx context.Context, namespace string
 	return !k8serrors.IsNotFound(err)
 }
 
-func (d *defaultK8sClient) DeleteNamespace(ctx context.Context, namespace string) error {
-	return d.k8s.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
+func (d *DefaultK8sClient) DeleteNamespace(ctx context.Context, namespace string) error {
+	return d.ClientSet.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
 }
 
-func (d *defaultK8sClient) CreateOrUpdateSecret(ctx context.Context, namespace, name string, data map[string][]byte) error {
+func (d *DefaultK8sClient) CreateOrUpdateSecret(ctx context.Context, namespace, name string, data map[string][]byte) error {
 	secret := &coreV1.Secret{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -77,10 +77,10 @@ func (d *defaultK8sClient) CreateOrUpdateSecret(ctx context.Context, namespace, 
 		},
 		Data: data,
 	}
-	_, err := d.k8s.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	_, err := d.ClientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err == nil {
 		// update
-		if _, err := d.k8s.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
+		if _, err := d.ClientSet.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("could not update the secret %s: %w", name, err)
 		}
 
@@ -88,7 +88,7 @@ func (d *defaultK8sClient) CreateOrUpdateSecret(ctx context.Context, namespace, 
 	}
 
 	if k8serrors.IsNotFound(err) {
-		if _, err := d.k8s.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+		if _, err := d.ClientSet.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("could not create the secret %s: %w", name, err)
 		}
 
@@ -98,8 +98,8 @@ func (d *defaultK8sClient) CreateOrUpdateSecret(ctx context.Context, namespace, 
 	return fmt.Errorf("unexpected error while handling the secret %s: %w", name, err)
 }
 
-func (d *defaultK8sClient) GetServerVersion() (string, error) {
-	ver, err := d.k8s.DiscoveryClient.ServerVersion()
+func (d *DefaultK8sClient) GetServerVersion() (string, error) {
+	ver, err := d.ClientSet.DiscoveryClient.ServerVersion()
 	if err != nil {
 		return "", err
 	}

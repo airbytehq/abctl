@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"errors"
+	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
 	"github.com/google/go-cmp/cmp"
@@ -182,7 +183,7 @@ func (m *mockHelmClient) UninstallReleaseByName(s string) error {
 	return m.uninstallReleaseByName(s)
 }
 
-var _ K8sClient = (*mockK8sClient)(nil)
+var _ k8s.K8sClient = (*mockK8sClient)(nil)
 
 type mockK8sClient struct {
 	createIngress        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error

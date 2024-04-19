@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/local"
+	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"os"
@@ -114,6 +115,30 @@ func getTelemetryClient(dnt bool) (telemetry.Client, error) {
 	if dnt {
 		return telemetry.NoopClient{}, nil
 	}
+
+	// getOrCreateCfg returns the telemetry.Config data as read from telemetry.ConfigFile.
+	// If the telemetry.ConfigFile does not exist, this function will create it.
+	getOrCreateCfg := func() (telemetry.Config, error) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return telemetry.Config{}, fmt.Errorf("could not locate home directory: %w", err)
+		}
+		home = filepath.Join(home, telemetry.ConfigFile)
+		cfg, err := telemetry.LoadConfigFromFile(home)
+		if errors.Is(err, os.ErrNotExist) {
+			// file not found, create a new one
+			cfg = telemetry.Config{UserID: telemetry.NewULID()}
+			if err := telemetry.WriteConfigToFile(home, cfg); err != nil {
+				return cfg, fmt.Errorf("could not write file to %s: %w", home, err)
+			}
+			println(telemetry.Welcome)
+		} else if err != nil {
+			return telemetry.Config{}, fmt.Errorf("could not load config from %s: %w", home, err)
+		}
+
+		return cfg, nil
+	}
+
 	cfg, err := getOrCreateCfg()
 	if err != nil {
 		return telemetry.NoopClient{}, fmt.Errorf("could not get or create config: %w", err)
@@ -121,37 +146,17 @@ func getTelemetryClient(dnt bool) (telemetry.Client, error) {
 	return telemetry.NewSegmentClient(cfg), nil
 }
 
-// getOrCreateCfg returns the telemetry.Config data as read from telemetry.ConfigFile.
-// If the telemetry.ConfigFile does not exist, this method will create it.
-func getOrCreateCfg() (telemetry.Config, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return telemetry.Config{}, fmt.Errorf("could not locate home directory: %w", err)
-	}
-	home = filepath.Join(home, telemetry.ConfigFile)
-	cfg, err := telemetry.LoadConfigFromFile(home)
-	if errors.Is(err, os.ErrNotExist) {
-		// file not found, create a new one
-		cfg = telemetry.Config{UserID: telemetry.NewULID()}
-		if err := telemetry.WriteConfigToFile(home, cfg); err != nil {
-			return cfg, fmt.Errorf("could not write file to %s: %w", home, err)
-		}
-		println(telemetry.Welcome)
-	} else if err != nil {
-		return telemetry.Config{}, fmt.Errorf("could not load config from %s: %w", home, err)
-	}
-
-	return cfg, nil
-}
-
 var (
 	flagUsername string
 	flagPassword string
+	flagProvider string
 )
 
 func init() {
-	Cmd.AddCommand(InstallCmd)
-	Cmd.AddCommand(UninstallCmd)
 	InstallCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	InstallCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
+
+	Cmd.PersistentFlags().StringVarP(&flagProvider, "k8s-provider", "k", string(k8s.DockerDesktop), "kubernetes provider to use")
+	Cmd.AddCommand(InstallCmd)
+	Cmd.AddCommand(UninstallCmd)
 }
