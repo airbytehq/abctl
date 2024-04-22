@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	helmclient "github.com/mittwald/go-helm-client"
+	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
 	"golang.org/x/crypto/bcrypt"
 	"helm.sh/helm/v3/pkg/action"
@@ -39,8 +40,6 @@ const (
 	airbyteNamespace    = "abctl"
 	airbyteRepoName     = "airbyte"
 	airbyteRepoURL      = "https://airbytehq.github.io/helm-charts"
-	clusterName         = "airbyte-abctl"
-	clusterPort         = 6162
 	nginxChartName      = "nginx/ingress-nginx"
 	nginxChartRelease   = "ingress-nginx"
 	nginxNamespace      = "ingress-nginx"
@@ -74,6 +73,7 @@ type DockerClient interface {
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
+	provider k8s.Provider
 	cluster  k8s.Cluster
 	docker   DockerClient
 	http     HTTPClient
@@ -138,7 +138,7 @@ func WithUserHome(home string) Option {
 
 // New creates a new Command
 func New(provider k8s.Provider, opts ...Option) (*Command, error) {
-	c := &Command{}
+	c := &Command{provider: provider}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -205,7 +205,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	{
 		k8sVersion, err := c.k8s.GetServerVersion()
 		if err != nil {
-			return nil, fmt.Errorf("could not fetch k8s server version: %w", err)
+			return nil, fmt.Errorf("could not fetch kubernetes server version: %w", err)
 		}
 		c.tel.Attr("k8s_version", k8sVersion)
 	}
@@ -237,6 +237,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		chartName:    nginxChartName,
 		chartRelease: nginxChartRelease,
 		namespace:    nginxNamespace,
+		values:       c.provider.HelmNginx,
 	}); err != nil {
 		return fmt.Errorf("could not install nginx chart: %w", err)
 	}
@@ -409,6 +410,7 @@ type chartRequest struct {
 	chartName    string
 	chartRelease string
 	namespace    string
+	values       []string
 }
 
 // handleChart will handle the installation of a chart
@@ -446,6 +448,7 @@ func (c *Command) handleChart(
 		Namespace:       req.namespace,
 		Wait:            true,
 		Timeout:         10 * time.Minute,
+		ValuesOptions:   values.Options{Values: req.values},
 	},
 		&helmclient.GenericHelmOptions{},
 	)

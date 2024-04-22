@@ -13,6 +13,7 @@ type Provider struct {
 	Name       string
 	Context    string
 	Kubeconfig string
+	HelmNginx  []string
 }
 
 // MkDirs creates the directories for this providers kubeconfig.
@@ -34,20 +35,26 @@ var (
 		Name:       "docker-desktop",
 		Context:    "docker-desktop",
 		Kubeconfig: filepath.Join(".kube", "config"),
+		HelmNginx:  []string{},
 	}
 
 	// KindProvider represents the kind (https://kind.sigs.k8s.io/) provider.
 	KindProvider = Provider{
 		Name:       "kind",
-		Context:    "kind-abctl",
+		Context:    "kind-" + ClusterName,
 		Kubeconfig: filepath.Join(".airbyte", "abctl", "abctl.kubeconfig"),
+		HelmNginx: []string{
+			"controller.hostPort.enabled=true",
+			"controller.service.type=NodePort",
+		},
 	}
 
 	// TestProvider represents a test provider, for testing purposes
 	TestProvider = Provider{
 		Name:       "test",
-		Context:    "test-abctl",
+		Context:    "test-" + ClusterName,
 		Kubeconfig: filepath.Join(os.TempDir(), "abctl.kubeconfig"),
+		HelmNginx:  []string{},
 	}
 )
 

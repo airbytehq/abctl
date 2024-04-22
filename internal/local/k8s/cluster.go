@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	k8sVersion = "v1.29.1"
+	ClusterName = "airbyte-abctl"
+	k8sVersion  = "v1.29.1"
 )
 
 // Cluster is an interface representing all the actions taken at the cluster level.
@@ -33,12 +34,12 @@ func NewCluster(provider Provider) (Cluster, error) {
 		return nil, fmt.Errorf("could not create directory: %w", err)
 	}
 
-	switch provider {
-	case DockerDesktopProvider:
+	switch provider.Name {
+	case DockerDesktopProvider.Name:
 		return &DockerDesktopCluster{
 			kubeconfig: filepath.Join(userHome, provider.Kubeconfig),
 		}, nil
-	case KindProvider:
+	case KindProvider.Name:
 		return &KindCluster{
 			p:          cluster.NewProvider(),
 			kubeconfig: filepath.Join(userHome, provider.Kubeconfig),

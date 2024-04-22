@@ -15,17 +15,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	// envBasicAuthUser is the env-var that can be specified to override the default basic-auth username.
-	envBasicAuthUser = "ABCTL_LOCAL_INSTALL_USERNAME"
-	// envBasicAuthPass is the env-var that can be specified to override the default basic-auth password.
-	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
-)
-
-const (
-	clusterName = "abctl"
-)
-
 // telClient is the telemetry telClient to use
 var telClient telemetry.Client
 
@@ -35,36 +24,47 @@ var provider k8s.Provider
 var Cmd = &cobra.Command{
 	Use: "local",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// ignore the error as it will default to false if an error returns
-		dnt, _ := cmd.Flags().GetBool("dnt")
+		// telemetry client configuration
+		{
+			// ignore the error as it will default to false if an error returns
+			dnt, _ := cmd.Flags().GetBool("dnt")
 
-		var err error
-		telClient, err = getTelemetryClient(dnt)
-		if err != nil {
-			// if the telemetry telClient fails to load, log a warning and continue
-			pterm.Warning.Println(fmt.Errorf("unable to create telemetry telClient: %w", err))
+			var err error
+			telClient, err = getTelemetryClient(dnt)
+			if err != nil {
+				// if the telemetry telClient fails to load, log a warning and continue
+				pterm.Warning.Println(fmt.Errorf("unable to create telemetry telClient: %w", err))
+			}
+
 		}
+		// docker check?
+		{
 
-		provider, err = k8s.ProviderFromString(flagProvider)
-		if err != nil {
-			return err
 		}
+		// provider configuration
+		{
+			var err error
+			provider, err = k8s.ProviderFromString(flagProvider)
+			if err != nil {
+				return err
+			}
 
-		printK8sProvider(provider)
+			printK8sProvider(provider)
+		}
 
 		cluster, err := k8s.NewCluster(provider)
 		if err != nil {
 			return err
 		}
 
-		if cluster.Exists(clusterName) {
-			pterm.Info.Printfln("cluster '%s' located", clusterName)
+		if cluster.Exists(k8s.ClusterName) {
+			pterm.Info.Printfln("cluster '%s' located", k8s.ClusterName)
 		} else {
 			spinner, err := pterm.DefaultSpinner.Start("cluster - creating")
 			if err != nil {
 				return fmt.Errorf("could not create cluster spinner: %w", err)
 			}
-			if err := cluster.Create(clusterName); err != nil {
+			if err := cluster.Create(k8s.ClusterName); err != nil {
 				spinner.Fail("cluster - failed to create")
 				return err
 			}
@@ -80,6 +80,13 @@ func printK8sProvider(p k8s.Provider) {
 	pterm.Info.Printfln("using kubernetes provider:\n  name: %s\n  kubeconfig: %s\n  context: %s",
 		p.Name, p.Kubeconfig, p.Context)
 }
+
+const (
+	// envBasicAuthUser is the env-var that can be specified to override the default basic-auth username.
+	envBasicAuthUser = "ABCTL_LOCAL_INSTALL_USERNAME"
+	// envBasicAuthPass is the env-var that can be specified to override the default basic-auth password.
+	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
+)
 
 // InstallCmd installs Airbyte locally
 var InstallCmd = &cobra.Command{
@@ -185,9 +192,11 @@ func getTelemetryClient(dnt bool) (telemetry.Client, error) {
 }
 
 var (
-	flagUsername string
-	flagPassword string
-	flagProvider string
+	flagUsername    string
+	flagPassword    string
+	flagProvider    string
+	flagKubeconfig  string
+	flagKubeContext string
 )
 
 func init() {
@@ -204,6 +213,8 @@ func init() {
 	}
 
 	Cmd.PersistentFlags().StringVarP(&flagProvider, "k8s-provider", "k", defaultProvider, "kubernetes provider to use")
+	Cmd.PersistentFlags().StringVarP(&flagKubeconfig, "kubeconfig", "", "", "kubernetes config file to use")
+	Cmd.PersistentFlags().StringVarP(&flagKubeContext, "kubecontext", "", "", "kubernetes context to use")
 	Cmd.AddCommand(InstallCmd)
 	Cmd.AddCommand(UninstallCmd)
 }
