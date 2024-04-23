@@ -64,7 +64,7 @@ type HTTPClient interface {
 // BrowserLauncher primarily for testing purposes.
 type BrowserLauncher func(url string) error
 
-// Errors related to specific systems that this integrations with.
+// Errors related to specific systems that this code integrates with.
 var (
 	// ErrDocker is returned anytime an error occurs when attempting to communicate with docker.
 	ErrDocker = errors.New("error communicating with docker")
