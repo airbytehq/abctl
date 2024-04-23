@@ -61,11 +61,17 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// BrowserLauncher for
+// BrowserLauncher primarily for testing purposes.
 type BrowserLauncher func(url string) error
 
-// ErrDocker is returned anytime an error specific to docker occurs.
-var ErrDocker = errors.New("error communicating with docker")
+// Errors related to specific systems that this code integrates with.
+var (
+	// ErrDocker is returned anytime an error occurs when attempting to communicate with docker.
+	ErrDocker = errors.New("error communicating with docker")
+
+	// ErrKubernetes is returned anytime an error occurs when attempting to communicate with the kubernetes cluster
+	ErrKubernetes = errors.New("error communicating with kubernetes")
+)
 
 // DockerClient primarily for testing purposes
 type DockerClient interface {
@@ -175,16 +181,17 @@ func New(opts ...Option) (*Command, error) {
 	if c.k8s == nil {
 		k8sCfg, err := k8sClientConfig(c.userHome)
 		if err != nil {
-			return nil, fmt.Errorf("could not create k8s client config: %w", err)
+			return nil, fmt.Errorf("%w: %w", ErrKubernetes, err)
 		}
 
 		restCfg, err := k8sCfg.ClientConfig()
 		if err != nil {
-			return nil, fmt.Errorf("could not create k8s config client: %w", err)
+			return nil, fmt.Errorf("%w: could not create rest config: %w", ErrKubernetes, err)
 		}
+
 		k8s, err := kubernetes.NewForConfig(restCfg)
 		if err != nil {
-			return nil, fmt.Errorf("could not create k8s client: %w", err)
+			return nil, fmt.Errorf("%w: could not create clientset: %w", ErrKubernetes, err)
 		}
 
 		c.k8s = &defaultK8sClient{k8s: k8s}
@@ -207,7 +214,7 @@ func New(opts ...Option) (*Command, error) {
 			RestConfig: restCfg,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("coud not create helm client: %w", err)
+			return nil, fmt.Errorf("could not create helm client: %w", err)
 		}
 
 		c.helm = helm
@@ -237,7 +244,7 @@ func New(opts ...Option) (*Command, error) {
 	{
 		k8sVersion, err := c.k8s.GetServerVersion()
 		if err != nil {
-			return nil, fmt.Errorf("could not fetch k8s server version: %w", err)
+			return nil, fmt.Errorf("%w: could not fetch kubernetes server version: %w", ErrKubernetes, err)
 		}
 		c.tel.Attr("k8s_version", k8sVersion)
 	}
