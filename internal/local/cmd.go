@@ -60,11 +60,17 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// BrowserLauncher for
+// BrowserLauncher primarily for testing purposes.
 type BrowserLauncher func(url string) error
 
-// ErrDocker is returned anytime an error specific to docker occurs.
-var ErrDocker = errors.New("error communicating with docker")
+// Errors related to specific systems that this code integrates with.
+var (
+	// ErrDocker is returned anytime an error occurs when attempting to communicate with docker.
+	ErrDocker = errors.New("error communicating with docker")
+
+	// ErrKubernetes is returned anytime an error occurs when attempting to communicate with the kubernetes cluster
+	ErrKubernetes = errors.New("error communicating with kubernetes")
+)
 
 // DockerClient primarily for testing purposes
 type DockerClient interface {
@@ -205,7 +211,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	{
 		k8sVersion, err := c.k8s.GetServerVersion()
 		if err != nil {
-			return nil, fmt.Errorf("could not fetch kubernetes server version: %w", err)
+			return nil, fmt.Errorf("%w: could not fetch kubernetes server version: %w", ErrKubernetes, err)
 		}
 		c.tel.Attr("k8s_version", k8sVersion)
 	}
@@ -601,16 +607,16 @@ func defaultDocker(userHome string) (DockerClient, error) {
 func defaultK8s(kubecfg, kubectx string) (k8s.K8sClient, error) {
 	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
-		return nil, fmt.Errorf("could not create k8s client config: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrKubernetes, err)
 	}
 
 	restCfg, err := k8sCfg.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("could not create k8s config client: %w", err)
+		return nil, fmt.Errorf("%w: could not create rest config: %w", ErrKubernetes, err)
 	}
 	k8sClient, err := kubernetes.NewForConfig(restCfg)
 	if err != nil {
-		return nil, fmt.Errorf("could not create k8s client: %w", err)
+		return nil, fmt.Errorf("%w: could not create clientset: %w", ErrKubernetes, err)
 	}
 
 	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
@@ -620,12 +626,12 @@ func defaultK8s(kubecfg, kubectx string) (k8s.K8sClient, error) {
 func defaultHelm(kubecfg, kubectx string) (HelmClient, error) {
 	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
-		return nil, fmt.Errorf("could not create k8s client config: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrKubernetes, err)
 	}
 
 	restCfg, err := k8sCfg.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("could not determine kubernetes client: %w", err)
+		return nil, fmt.Errorf("%w: could not create rest config: %w", ErrKubernetes, err)
 	}
 
 	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{

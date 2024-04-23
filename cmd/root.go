@@ -11,9 +11,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// dockerHelp is displayed if ErrDocker is ever returned
-const dockerHelp = `An error occurred while communicating with the Docker daemon.
-Ensure that Docker is running and is accessible.  You may need to upgrade to a newer version of Docker.`
+// Help messages to display for specific error situations.
+const (
+	// helpDocker is displayed if ErrDocker is ever returned
+	helpDocker = `An error occurred while communicating with the Docker daemon.
+Ensure that Docker is running and is accessible.  You may need to upgrade to a newer version of Docker.
+For additional help please visit https://docs.docker.com/get-docker/`
+
+	// helpKubernetes is displayed if ErrKubernetes is ever returned
+	helpKubernetes = `An error occurred while communicating with the Kubernetes cluster.
+If using Docker Desktop, ensure that Kubernetes is enabled.
+For additional help please visit https://docs.docker.com/desktop/kubernetes/`
+)
 
 var (
 	// flagDNT indicates if the do-not-track flag was specified
@@ -42,7 +51,10 @@ func Execute() {
 
 		if errors.Is(err, localcmd.ErrDocker) {
 			pterm.Println()
-			pterm.Info.Println(dockerHelp)
+			pterm.Info.Println(helpDocker)
+		} else if errors.Is(err, localcmd.ErrKubernetes) {
+			pterm.Println()
+			pterm.Info.Println(helpKubernetes)
 		}
 		os.Exit(1)
 	}

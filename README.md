@@ -6,6 +6,13 @@
 
 ---
 
+- [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+    - [Launch](#launch)
+    - [Additional Options](#additional-options)
+- [Contributing](#contributing) 
+
 ## Getting Started
 
 ### Prerequisites
@@ -49,7 +56,7 @@ These credentials can be changed either of the following
   
 ### Additional Options
 For additional options supported by `abctl`, pass the `--help` flag
-```shell
+```
 abctl --help
 
 Usage:
@@ -64,7 +71,7 @@ Flags:
       --dnt    opt out of telemetry data collection
   -h, --help   help for abctl
 ```
-```shell
+```
 abctl local install --help
 
 Usage:
@@ -78,5 +85,7 @@ Flags:
 
 Global Flags:
       --dnt   opt out of telemetry data collection
-
 ```
+
+## Contributing
+If you have found a problem with `abctl`, please open a [Github Issue](https://github.com/airbytehq/airbyte/issues/new/choose) and use the `🐛 [abctl] Report an issue with the abctl tool` template.
