@@ -37,7 +37,7 @@ const (
 	airbyteChartName    = "airbyte/airbyte"
 	airbyteChartRelease = "airbyte-abctl"
 	airbyteIngress      = "ingress-abctl"
-	airbyteNamespace    = "abctl"
+	airbyteNamespace    = "airbyte-abctl"
 	airbyteRepoName     = "airbyte"
 	airbyteRepoURL      = "https://airbytehq.github.io/helm-charts"
 	nginxChartName      = "nginx/ingress-nginx"

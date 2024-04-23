@@ -92,6 +92,18 @@ const (
 var InstallCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install Airbyte locally",
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		available, err := portAvailable(cmd.Context(), 80)
+		if err != nil {
+			return fmt.Errorf("could not check available port: %w", err)
+		}
+
+		if !available {
+			return errors.New("port unavailable")
+		}
+
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		return telemetryWrapper(telemetry.Install, func() error {
 			lc, err := local.New(provider, local.WithTelemetryClient(telClient))
