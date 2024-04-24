@@ -16,18 +16,18 @@ import (
 	"time"
 )
 
-const (
-	host = "localhost"
-)
-
+// serverVersioner exists for testing purposes.
 type serverVersioner interface {
 	ServerVersion(context.Context) (types.Version, error)
 }
 
-var dockerClient serverVersioner = func() serverVersioner {
-	return nil
-}()
+// dockerClient is exposed here primarily for testing purposes.
+// A test should override this value to mock out a docker-client.
+// If this value is nil, the default docker-client (as returned from defaultDocker) will be utilized.
+var dockerClient serverVersioner
 
+// defaultDocker returns a docker-client (serverVersioner) that is platform and user specific.
+// The userHome is required for osx users given how docker configures itself.
 func defaultDocker(userHome string) (serverVersioner, error) {
 	var docker serverVersioner
 	var err error
@@ -56,6 +56,9 @@ func defaultDocker(userHome string) (serverVersioner, error) {
 	return docker, nil
 }
 
+// dockerInstalled checks if docker is installed on the host machine.
+// Returns a nil error if docker was successfully detected, otherwise an error will be returned.  Any error returned
+// is guaranteed to include the ErrDocker error in the error chain.
 func dockerInstalled(ctx context.Context, t telemetry.Client, userHome string) error {
 	spinner, _ := pterm.DefaultSpinner.Start("docker - checking for docker installation")
 
@@ -98,7 +101,7 @@ var httpClient doer = &http.Client{Timeout: 3 * time.Second}
 func portAvailable(ctx context.Context, port int) error {
 	spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("port %d - checking port availability", port))
 
-	server, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%d", host, port))
+	server, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
 		spinner.Fail(fmt.Sprintf("port %d - could not resolve host tcp address", port))
 		return fmt.Errorf("could not resolve host tcp address: %w", err)
