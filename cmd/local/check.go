@@ -131,16 +131,6 @@ func portAvailable(ctx context.Context, port int) error {
 
 	res, err := httpClient.Do(req)
 	if err != nil {
-		// check for connection reset by peer
-		var opErr *net.OpError
-		if errors.As(err, &opErr) {
-			// if the connection fails due to a reset error, that appears to mean the port is actually available.
-			if strings.Contains(opErr.Err.Error(), "connection reset by peer") {
-				spinner.Success(fmt.Sprintf("port %d - port is available", port))
-				return nil
-			}
-		}
-
 		spinner.Fail(fmt.Sprintf("port %d - port is already in use", port))
 		return fmt.Errorf("could not send request: %w", err)
 	}
