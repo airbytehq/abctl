@@ -7,7 +7,6 @@ import (
 	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
@@ -81,7 +80,6 @@ type DockerClient interface {
 type Command struct {
 	provider k8s.Provider
 	cluster  k8s.Cluster
-	docker   DockerClient
 	http     HTTPClient
 	helm     HelmClient
 	k8s      k8s.K8sClient
@@ -121,13 +119,6 @@ func WithK8sClient(client k8s.K8sClient) Option {
 	}
 }
 
-// WithDockerClient define the docker client for this command.
-func WithDockerClient(client DockerClient) Option {
-	return func(c *Command) {
-		c.docker = client
-	}
-}
-
 // WithBrowserLauncher define the browser launcher for this command.
 func WithBrowserLauncher(launcher BrowserLauncher) Option {
 	return func(c *Command) {
@@ -149,18 +140,11 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 		opt(c)
 	}
 
+	// determine userhome if not defined
 	if c.userHome == "" {
 		var err error
 		if c.userHome, err = os.UserHomeDir(); err != nil {
 			return nil, fmt.Errorf("could not determine user home directory: %w", err)
-		}
-	}
-
-	// set docker client if not defined
-	if c.docker == nil {
-		var err error
-		if c.docker, err = defaultDocker(c.userHome); err != nil {
-			return nil, err
 		}
 	}
 
@@ -192,6 +176,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 		c.tel = telemetry.NoopClient{}
 	}
 
+	// set the browser launcher, if not defined
 	if c.launcher == nil {
 		c.launcher = func(url string) error {
 			var cmd *exec.Cmd
@@ -221,10 +206,6 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, user, pass string) error {
-	if err := c.checkDocker(ctx); err != nil {
-		return err
-	}
-
 	if err := c.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     airbyteRepoName,
@@ -248,10 +229,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		return fmt.Errorf("could not install nginx chart: %w", err)
 	}
 
-	spinnerIngress, err := pterm.DefaultSpinner.Start("ingress - installing")
-	if err != nil {
-		return fmt.Errorf("could not start ingress spinner: %w", err)
-	}
+	spinnerIngress, _ := pterm.DefaultSpinner.Start("ingress - installing")
 
 	// basic auth
 	if err := c.handleBasicAuthSecret(ctx, user, pass); err != nil {
@@ -288,15 +266,8 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 
 // Uninstall handles the uninstallation of Airbyte.
 func (c *Command) Uninstall(ctx context.Context) error {
-	if err := c.checkDocker(ctx); err != nil {
-		return err
-	}
-
 	{
-		spinnerAb, err := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling airbyte chart %s", airbyteChartRelease))
-		if err != nil {
-			return fmt.Errorf("could not create spinner: %w", err)
-		}
+		spinnerAb, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling airbyte chart %s", airbyteChartRelease))
 
 		airbyteChartExists := true
 		if _, err := c.helm.GetRelease(airbyteChartRelease); err != nil {
@@ -316,10 +287,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 	}
 
 	{
-		spinnerNginx, err := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling nginx chart %s", nginxChartRelease))
-		if err != nil {
-			return fmt.Errorf("coud not create spinner: %w", err)
-		}
+		spinnerNginx, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling nginx chart %s", nginxChartRelease))
 
 		nginxChartExists := true
 		if _, err := c.helm.GetRelease(nginxChartRelease); err != nil {
@@ -339,10 +307,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 		spinnerNginx.Success()
 	}
 
-	spinnerNamespace, err := pterm.DefaultSpinner.Start(fmt.Sprintf("k8s - deleting namespace %s", airbyteNamespace))
-	if err != nil {
-		return fmt.Errorf("could not create spinner: %w", err)
-	}
+	spinnerNamespace, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("k8s - deleting namespace %s", airbyteNamespace))
 
 	if err := c.k8s.DeleteNamespace(ctx, airbyteNamespace); err != nil {
 		if !k8serrors.IsNotFound(err) {
@@ -385,29 +350,6 @@ func (c *Command) Uninstall(ctx context.Context) error {
 	return nil
 }
 
-// checkDocker call the ServerVersion on the DockerClient.
-// Will return ErrDocker if any error is caused by docker.
-func (c *Command) checkDocker(ctx context.Context) error {
-	spinner, err := pterm.DefaultSpinner.Start("docker - verifying")
-	if err != nil {
-		return fmt.Errorf("could not start spinner: %w", err)
-	}
-
-	ver, err := c.docker.ServerVersion(ctx)
-	if err != nil {
-		spinner.Fail("docker is not running")
-		return errors.Join(ErrDocker, fmt.Errorf("docker is not running: %w", err))
-	}
-
-	c.tel.Attr("docker_version", ver.Version)
-	c.tel.Attr("docker_arch", ver.Arch)
-	c.tel.Attr("docker_platform", ver.Platform.Name)
-
-	spinner.Success(fmt.Sprintf("docker - verified; version: %s", ver.Version))
-
-	return nil
-}
-
 // chartRequest exists to make all the parameters to handleChart somewhat manageable
 type chartRequest struct {
 	name         string
@@ -424,10 +366,7 @@ func (c *Command) handleChart(
 	ctx context.Context,
 	req chartRequest,
 ) error {
-	spinner, err := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - adding %s repository", req.name))
-	if err != nil {
-		return fmt.Errorf("could not start spinner: %w", err)
-	}
+	spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - adding %s repository", req.name))
 
 	if err := c.helm.AddOrUpdateChartRepo(repo.Entry{
 		Name: req.repoName,
@@ -453,7 +392,7 @@ func (c *Command) handleChart(
 		CreateNamespace: true,
 		Namespace:       req.namespace,
 		Wait:            true,
-		Timeout:         10 * time.Minute,
+		Timeout:         20 * time.Minute,
 		ValuesOptions:   values.Options{Values: req.values},
 	},
 		&helmclient.GenericHelmOptions{},
@@ -472,10 +411,7 @@ func (c *Command) handleChart(
 // openBrowser will open the url in the user's browser but only if the url returns a 200 response code first
 // TODO: clean up this method, make it testable
 func (c *Command) openBrowser(ctx context.Context, url string) error {
-	spinner, err := pterm.DefaultSpinner.Start("browser - waiting for ingress")
-	if err != nil {
-		return fmt.Errorf("could not start browser spinner: %w", err)
-	}
+	spinner, _ := pterm.DefaultSpinner.Start("browser - waiting for ingress")
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -572,35 +508,6 @@ func ingress() *networkingv1.Ingress {
 			},
 		},
 	}
-}
-
-// defaultDocker returns the default docker client
-func defaultDocker(userHome string) (DockerClient, error) {
-	var docker DockerClient
-	var err error
-
-	switch runtime.GOOS {
-	case "darwin":
-		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
-		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
-		if err != nil {
-			// keep the original error, as we'll join with the next error (if another error occurs)
-			outerErr := err
-			docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", userHome)))
-			if err != nil {
-				err = errors.Join(err, outerErr)
-			}
-		}
-	case "windows":
-		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("npipe:////./pipe/docker_engine"))
-	default:
-		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
-	}
-	if err != nil {
-		return nil, errors.Join(ErrDocker, fmt.Errorf("could not create docker client: %w", err))
-	}
-
-	return docker, nil
 }
 
 // defaultK8s returns the default k8s client

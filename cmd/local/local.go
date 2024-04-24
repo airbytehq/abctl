@@ -37,10 +37,6 @@ var Cmd = &cobra.Command{
 			}
 
 		}
-		// docker check?
-		{
-
-		}
 		// provider configuration
 		{
 			var err error
@@ -52,23 +48,25 @@ var Cmd = &cobra.Command{
 			printK8sProvider(provider)
 		}
 
+		spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("cluster - checking status of cluster %s", k8s.ClusterName))
+
 		cluster, err := k8s.NewCluster(provider)
 		if err != nil {
+			spinner.Fail(fmt.Sprintf("cluster - unable to determine status of cluster %s", k8s.ClusterName))
 			return err
 		}
 
 		if cluster.Exists(k8s.ClusterName) {
-			pterm.Info.Printfln("cluster '%s' located", k8s.ClusterName)
+			spinner.Success(fmt.Sprintf("cluster - found existing cluster %s", k8s.ClusterName))
 		} else {
-			spinner, err := pterm.DefaultSpinner.Start("cluster - creating")
-			if err != nil {
-				return fmt.Errorf("could not create cluster spinner: %w", err)
-			}
+			spinner.UpdateText(fmt.Sprintf("cluster - creating cluster %s", k8s.ClusterName))
+
 			if err := cluster.Create(k8s.ClusterName); err != nil {
-				spinner.Fail("cluster - failed to create")
+				spinner.Fail(fmt.Sprintf("cluster - failed to create cluster %s", k8s.ClusterName))
 				return err
 			}
-			spinner.Success("cluster - created")
+
+			spinner.Success(fmt.Sprintf("cluster - cluster %s created", k8s.ClusterName))
 		}
 
 		return nil
@@ -77,8 +75,10 @@ var Cmd = &cobra.Command{
 }
 
 func printK8sProvider(p k8s.Provider) {
-	pterm.Info.Printfln("using kubernetes provider:\n  name: %s\n  kubeconfig: %s\n  context: %s",
-		p.Name, p.Kubeconfig, p.Context)
+	userHome, _ := os.UserHomeDir()
+	configPath := filepath.Join(userHome, p.Kubeconfig)
+	pterm.Info.Printfln("using kubernetes provider:\n  provider name: %s\n  kubeconfig: %s\n  context: %s",
+		p.Name, configPath, p.Context)
 }
 
 const (
@@ -93,13 +93,19 @@ var InstallCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install Airbyte locally",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		available, err := portAvailable(cmd.Context(), 80)
-		if err != nil {
-			return fmt.Errorf("could not check available port: %w", err)
+		{
+			userHome, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("could not determine user home directory: %w", err)
+			}
+
+			if err := dockerInstalled(cmd.Context(), telClient, userHome); err != nil {
+				return fmt.Errorf("could not determine docker installation status: %w", err)
+			}
 		}
 
-		if !available {
-			return errors.New("port unavailable")
+		if err := portAvailable(cmd.Context(), 80); err != nil {
+			return fmt.Errorf("could not check available port: %w", err)
 		}
 
 		return nil
