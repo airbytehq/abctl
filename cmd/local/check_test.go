@@ -2,8 +2,10 @@ package local
 
 import (
 	"context"
+	"errors"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
+	"github.com/google/go-cmp/cmp"
 	"net"
 	"os"
 	"strconv"
@@ -30,7 +32,61 @@ func TestDockerInstalled(t *testing.T) {
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
+}
 
+func TestDockerInstalled_TelemetryAttrs(t *testing.T) {
+	t.Cleanup(func() {
+		dockerClient = nil
+	})
+
+	platformName := "platform name"
+	version := "version"
+	arch := "arch"
+
+	dockerClient = mockServerVersion{
+		serverVersion: func(ctx context.Context) (types.Version, error) {
+			return types.Version{
+				Platform: struct{ Name string }{Name: platformName},
+				Version:  version,
+				Arch:     arch,
+			}, nil
+		},
+	}
+
+	attrs := map[string]string{}
+	telemetryClient := &mockTelemetryClient{attr: func(key, val string) {
+		attrs[key] = val
+	}}
+
+	err := dockerInstalled(context.Background(), telemetryClient, os.TempDir())
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	expAttrs := map[string]string{
+		"docker_version":  version,
+		"docker_arch":     arch,
+		"docker_platform": platformName,
+	}
+	if d := cmp.Diff(expAttrs, attrs); d != "" {
+		t.Error("mismatched attributes:", d)
+	}
+}
+
+func TestDockerInstalled_Error(t *testing.T) {
+	t.Cleanup(func() {
+		dockerClient = nil
+	})
+
+	dockerClient = mockServerVersion{
+		serverVersion: func(ctx context.Context) (types.Version, error) {
+			return types.Version{}, errors.New("test")
+		},
+	}
+
+	err := dockerInstalled(context.Background(), telemetry.NoopClient{}, os.TempDir())
+	if err == nil {
+		t.Error("unexpected error:", err)
+	}
 }
 
 func TestPortAvailable_Available(t *testing.T) {
@@ -74,10 +130,38 @@ func port(s string) int {
 }
 
 // mocks
+
+var _ serverVersioner = (*mockServerVersion)(nil)
+
 type mockServerVersion struct {
 	serverVersion func(ctx context.Context) (types.Version, error)
 }
 
 func (m mockServerVersion) ServerVersion(ctx context.Context) (types.Version, error) {
 	return m.serverVersion(ctx)
+}
+
+var _ telemetry.Client = (*mockTelemetryClient)(nil)
+
+type mockTelemetryClient struct {
+	start   func(eventType telemetry.EventType) error
+	success func(eventType telemetry.EventType) error
+	failure func(eventType telemetry.EventType, err error) error
+	attr    func(key, val string)
+}
+
+func (m *mockTelemetryClient) Start(eventType telemetry.EventType) error {
+	return m.start(eventType)
+}
+
+func (m *mockTelemetryClient) Success(eventType telemetry.EventType) error {
+	return m.success(eventType)
+}
+
+func (m *mockTelemetryClient) Failure(eventType telemetry.EventType, err error) error {
+	return m.failure(eventType, err)
+}
+
+func (m *mockTelemetryClient) Attr(key, val string) {
+	m.attr(key, val)
 }

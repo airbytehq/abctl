@@ -5,9 +5,9 @@ import (
 	"errors"
 	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
-	"github.com/docker/docker/api/types"
 	"github.com/google/go-cmp/cmp"
 	helmclient "github.com/mittwald/go-helm-client"
+	"github.com/mittwald/go-helm-client/values"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
@@ -19,12 +19,6 @@ import (
 )
 
 func TestCommand_Install(t *testing.T) {
-	docker := mockDockerClient{
-		serverVersion: func(ctx context.Context) (types.Version, error) {
-			return types.Version{}, nil
-		},
-	}
-
 	expChartRepoCnt := 0
 	expChartRepo := []struct {
 		name string
@@ -61,6 +55,9 @@ func TestCommand_Install(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         10 * time.Minute,
+				ValuesOptions: values.Options{
+					Values: []string{},
+				},
 			},
 			release: release.Release{
 				Name:      nginxChartRelease,
@@ -134,7 +131,6 @@ func TestCommand_Install(t *testing.T) {
 
 	c, err := New(
 		k8s.TestProvider,
-		WithDockerClient(&docker),
 		WithHelmClient(&helm),
 		WithK8sClient(&k8sClient),
 		WithTelemetryClient(&tel),
@@ -224,16 +220,6 @@ func (m *mockK8sClient) CreateOrUpdateSecret(ctx context.Context, namespace, nam
 
 func (m *mockK8sClient) GetServerVersion() (string, error) {
 	return m.getServerVersion()
-}
-
-var _ DockerClient = (*mockDockerClient)(nil)
-
-type mockDockerClient struct {
-	serverVersion func(ctx context.Context) (types.Version, error)
-}
-
-func (m *mockDockerClient) ServerVersion(ctx context.Context) (types.Version, error) {
-	return m.serverVersion(ctx)
 }
 
 var _ telemetry.Client = (*mockTelemetryClient)(nil)

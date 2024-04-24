@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
-	"github.com/docker/docker/api/types"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
@@ -70,11 +69,6 @@ var (
 	// ErrKubernetes is returned anytime an error occurs when attempting to communicate with the kubernetes cluster
 	ErrKubernetes = errors.New("error communicating with kubernetes")
 )
-
-// DockerClient primarily for testing purposes
-type DockerClient interface {
-	ServerVersion(context.Context) (types.Version, error)
-}
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
@@ -392,7 +386,7 @@ func (c *Command) handleChart(
 		CreateNamespace: true,
 		Namespace:       req.namespace,
 		Wait:            true,
-		Timeout:         20 * time.Minute,
+		Timeout:         10 * time.Minute,
 		ValuesOptions:   values.Options{Values: req.values},
 	},
 		&helmclient.GenericHelmOptions{},

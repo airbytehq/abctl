@@ -35,7 +35,9 @@ var (
 		Name:       "docker-desktop",
 		Context:    "docker-desktop",
 		Kubeconfig: filepath.Join(".kube", "config"),
-		HelmNginx:  []string{},
+		HelmNginx: []string{
+			"controller.service.ports.http=9798",
+		},
 	}
 
 	// KindProvider represents the kind (https://kind.sigs.k8s.io/) provider.
@@ -46,6 +48,7 @@ var (
 		HelmNginx: []string{
 			"controller.hostPort.enabled=true",
 			"controller.service.type=NodePort",
+			//"controller.service.ports.http=9798",
 		},
 	}
 
