@@ -25,7 +25,7 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 		} else {
 			spinner.UpdateText(fmt.Sprintf("cluster - creating cluster %s", provider.ClusterName))
 
-			if err := cluster.Create(); err != nil {
+			if err := cluster.Create(flagPortHTTP); err != nil {
 				spinner.Fail(fmt.Sprintf("cluster - failed to create cluster %s", provider.ClusterName))
 				return err
 			}

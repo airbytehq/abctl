@@ -18,7 +18,7 @@ const (
 // Cluster is an interface representing all the actions taken at the cluster level.
 type Cluster interface {
 	// Create a cluster with the provided name.
-	Create() error
+	Create(portHTTP int) error
 	// Delete a cluster with the provided name.
 	Delete() error
 	// Exists returns true if the cluster exists, false otherwise.
@@ -68,7 +68,7 @@ type DockerDesktopCluster struct {
 	clusterName string
 }
 
-func (d DockerDesktopCluster) Create() error {
+func (d DockerDesktopCluster) Create(_ int) error {
 	return fmt.Errorf("%w: docker-desktop cluster should already exist", localerr.ErrKubernetes)
 }
 
@@ -105,9 +105,9 @@ type KindCluster struct {
 	clusterName string
 }
 
-func (k *KindCluster) Create() error {
+func (k *KindCluster) Create(portHTTP int) error {
 	// see https://kind.sigs.k8s.io/docs/user/ingress/#create-cluster
-	rawCfg := `kind: Cluster
+	rawCfg := fmt.Sprintf(`kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
@@ -119,11 +119,12 @@ nodes:
           node-labels: "ingress-ready=true"
     extraPortMappings:
       - containerPort: 80
-        hostPort: 80
-        protocol: TCP
-      - containerPort: 443
-        hostPort: 443
-        protocol: TCP`
+        hostPort: %d
+        protocol: TCP`,
+		portHTTP)
+	//- containerPort: 443
+	//  hostPort: 443
+	//  protocol: TCP`
 
 	opts := []cluster.CreateOption{
 		cluster.CreateWithWaitForReady(120 * time.Second),

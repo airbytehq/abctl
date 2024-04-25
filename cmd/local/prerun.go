@@ -59,6 +59,7 @@ func preRunInstall(cmd *cobra.Command, _ []string) error {
 	}
 
 	if err := portAvailable(cmd.Context(), flagPortHTTP); err != nil {
+		// TODO remove this
 		fmt.Println("port issue:", err)
 		//return fmt.Errorf("could not verify if port %d is available: %w", port, err)
 	}
