@@ -27,6 +27,9 @@ type K8sClient interface {
 	// CreateOrUpdateSecret will update or create the secret name with the payload of data in the specified namespace
 	CreateOrUpdateSecret(ctx context.Context, namespace, name string, data map[string][]byte) error
 
+	// GetService returns a the service for the given namespace and name
+	GetService(ctx context.Context, namespace, name string) (*coreV1.Service, error)
+
 	// GetServerVersion returns the k8s version.
 	GetServerVersion() (string, error)
 }
@@ -105,4 +108,8 @@ func (d *DefaultK8sClient) GetServerVersion() (string, error) {
 	}
 
 	return ver.String(), nil
+}
+
+func (d *DefaultK8sClient) GetService(ctx context.Context, namespace string, name string) (*coreV1.Service, error) {
+	return d.ClientSet.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 }

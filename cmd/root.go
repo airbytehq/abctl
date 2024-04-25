@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"github.com/airbytehq/abctl/cmd/local"
 	"github.com/airbytehq/abctl/cmd/version"
@@ -22,6 +23,10 @@ For additional help please visit https://docs.docker.com/get-docker/`
 	helpKubernetes = `An error occurred while communicating with the Kubernetes cluster.
 If using Docker Desktop, ensure that Kubernetes is enabled.
 For additional help please visit https://docs.docker.com/desktop/kubernetes/`
+
+	helpIngress = `An error occurred while configuring ingress.
+This could be in indication that the ingress port is already in use by a different application.
+The ingress port can be changed by passing the flag --port-http.`
 )
 
 var (
@@ -45,8 +50,8 @@ var (
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+func Execute(ctx context.Context) {
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		pterm.Error.Println(err)
 
 		if errors.Is(err, localcmd.ErrDocker) {
@@ -55,6 +60,9 @@ func Execute() {
 		} else if errors.Is(err, localcmd.ErrKubernetes) {
 			pterm.Println()
 			pterm.Info.Println(helpKubernetes)
+		} else if errors.Is(err, localcmd.ErrIngress) {
+			pterm.Println()
+			pterm.Info.Println(helpIngress)
 		}
 		os.Exit(1)
 	}

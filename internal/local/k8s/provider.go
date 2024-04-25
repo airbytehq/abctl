@@ -35,8 +35,8 @@ var (
 		Name:       "docker-desktop",
 		Context:    "docker-desktop",
 		Kubeconfig: filepath.Join(".kube", "config"),
-		HelmNginx: []string{
-			"controller.service.ports.http=9798",
+		HelmNginx:  []string{
+			//"controller.service.ports.http=9798",
 		},
 	}
 

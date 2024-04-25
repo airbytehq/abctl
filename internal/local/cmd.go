@@ -66,8 +66,11 @@ var (
 	// ErrDocker is returned anytime an error occurs when attempting to communicate with docker.
 	ErrDocker = errors.New("error communicating with docker")
 
-	// ErrKubernetes is returned anytime an error occurs when attempting to communicate with the kubernetes cluster
+	// ErrKubernetes is returned anytime an error occurs when attempting to communicate with the kubernetes cluster.
 	ErrKubernetes = errors.New("error communicating with kubernetes")
+
+	// ErrIngress is returned in the event that ingress configuration failed.
+	ErrIngress = errors.New("error configuring ingress")
 )
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
@@ -77,6 +80,7 @@ type Command struct {
 	http     HTTPClient
 	helm     HelmClient
 	k8s      k8s.K8sClient
+	portHTTP int
 	tel      telemetry.Client
 	launcher BrowserLauncher
 	userHome string
@@ -128,8 +132,8 @@ func WithUserHome(home string) Option {
 }
 
 // New creates a new Command
-func New(provider k8s.Provider, opts ...Option) (*Command, error) {
-	c := &Command{provider: provider}
+func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) {
+	c := &Command{provider: provider, portHTTP: portHTTP}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -195,6 +199,9 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 		c.tel.Attr("k8s_version", k8sVersion)
 	}
 
+	// set provider version
+	c.tel.Attr("provider", provider.Name)
+
 	return c, nil
 }
 
@@ -218,8 +225,22 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		chartName:    nginxChartName,
 		chartRelease: nginxChartRelease,
 		namespace:    nginxNamespace,
-		values:       c.provider.HelmNginx,
+		values:       append(c.provider.HelmNginx, fmt.Sprintf("controller.service.ports.http=%d", c.portHTTP)),
 	}); err != nil {
+		// If we timed out, there is a good chance it's due to an unavailable port, check if this is the case.
+		// As the kubernetes client doesn't return usable error types, have to check for a specific string value.
+		if strings.Contains(err.Error(), "client rate limiter Wait returned an error") {
+			srv, err := c.k8s.GetService(ctx, nginxNamespace, "ingress-nginx-controller")
+			// If there is an error, we can ignore it as we only are checking for a missing ingress entry,
+			// and an error would indicate the inability to check for that entry.
+			if err == nil {
+				ingresses := srv.Status.LoadBalancer.Ingress
+				if len(ingresses) == 0 {
+					// if there are no ingresses, that is a possible indicator that the port is already in use.
+					return fmt.Errorf("%w: could not install nginx chart", ErrIngress)
+				}
+			}
+		}
 		return fmt.Errorf("could not install nginx chart: %w", err)
 	}
 
@@ -244,7 +265,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		spinnerIngress.Success("ingress - installed")
 	}
 
-	return c.openBrowser(ctx, "http://localhost")
+	return c.openBrowser(ctx, fmt.Sprintf("http://localhost:%d", c.portHTTP))
 }
 
 // handleBasicAuthSecret creates or updates the appropriate basic auth credentials for ingress.

@@ -101,13 +101,14 @@ var httpClient doer = &http.Client{Timeout: 3 * time.Second}
 func portAvailable(ctx context.Context, port int) error {
 	spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("port %d - checking port availability", port))
 
-	server, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("localhost:%d", port))
-	if err != nil {
-		spinner.Fail(fmt.Sprintf("port %d - could not resolve host tcp address", port))
-		return fmt.Errorf("could not resolve host tcp address: %w", err)
-	}
+	//server, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("localhost:%d", port))
+	//if err != nil {
+	//	spinner.Fail(fmt.Sprintf("port %d - could not resolve host tcp address", port))
+	//	return fmt.Errorf("could not resolve host tcp address: %w", err)
+	//}
 
-	conn, err := net.DialTCP("tcp", nil, server)
+	//conn, err := net.DialTCP("tcp", nil, server)
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 3*time.Second)
 	if err != nil {
 		var opErr *net.OpError
 		if errors.As(err, &opErr) {

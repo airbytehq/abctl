@@ -12,6 +12,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
+	coreV1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"net/http"
 	"testing"
@@ -191,6 +192,7 @@ type mockK8sClient struct {
 	existsNamespace      func(ctx context.Context, namespace string) bool
 	deleteNamespace      func(ctx context.Context, namespace string) error
 	createOrUpdateSecret func(ctx context.Context, namespace, name string, data map[string][]byte) error
+	getService           func(ctx context.Context, namespace, name string) (*coreV1.Service, error)
 	getServerVersion     func() (string, error)
 }
 
@@ -216,6 +218,10 @@ func (m *mockK8sClient) DeleteNamespace(ctx context.Context, namespace string) e
 
 func (m *mockK8sClient) CreateOrUpdateSecret(ctx context.Context, namespace, name string, data map[string][]byte) error {
 	return m.createOrUpdateSecret(ctx, namespace, name, data)
+}
+
+func (m *mockK8sClient) GetService(ctx context.Context, namespace, name string) (*coreV1.Service, error) {
+	return m.getService(ctx, namespace, name)
 }
 
 func (m *mockK8sClient) GetServerVersion() (string, error) {

@@ -1,7 +1,6 @@
 package local
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/local"
@@ -22,56 +21,58 @@ var provider k8s.Provider
 
 // Cmd represents the local command
 var Cmd = &cobra.Command{
-	Use: "local",
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// telemetry client configuration
-		{
-			// ignore the error as it will default to false if an error returns
-			dnt, _ := cmd.Flags().GetBool("dnt")
+	Use:               "local",
+	PersistentPreRunE: persistentPreRun,
+	Short:             "Manages local Airbyte installations",
+}
 
-			var err error
-			telClient, err = getTelemetryClient(dnt)
-			if err != nil {
-				// if the telemetry telClient fails to load, log a warning and continue
-				pterm.Warning.Println(fmt.Errorf("unable to create telemetry telClient: %w", err))
-			}
+func persistentPreRun(cmd *cobra.Command, _ []string) error {
+	// telemetry client configuration
+	{
+		// ignore the error as it will default to false if an error returns
+		dnt, _ := cmd.Flags().GetBool("dnt")
 
-		}
-		// provider configuration
-		{
-			var err error
-			provider, err = k8s.ProviderFromString(flagProvider)
-			if err != nil {
-				return err
-			}
-
-			printK8sProvider(provider)
-		}
-
-		spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("cluster - checking status of cluster %s", k8s.ClusterName))
-
-		cluster, err := k8s.NewCluster(provider)
+		var err error
+		telClient, err = getTelemetryClient(dnt)
 		if err != nil {
-			spinner.Fail(fmt.Sprintf("cluster - unable to determine status of cluster %s", k8s.ClusterName))
+			// if the telemetry telClient fails to load, log a warning and continue
+			pterm.Warning.Println(fmt.Errorf("unable to create telemetry telClient: %w", err))
+		}
+
+	}
+	// provider configuration
+	{
+		var err error
+		provider, err = k8s.ProviderFromString(flagProvider)
+		if err != nil {
 			return err
 		}
 
-		if cluster.Exists(k8s.ClusterName) {
-			spinner.Success(fmt.Sprintf("cluster - found existing cluster %s", k8s.ClusterName))
-		} else {
-			spinner.UpdateText(fmt.Sprintf("cluster - creating cluster %s", k8s.ClusterName))
+		printK8sProvider(provider)
+	}
 
-			if err := cluster.Create(k8s.ClusterName); err != nil {
-				spinner.Fail(fmt.Sprintf("cluster - failed to create cluster %s", k8s.ClusterName))
-				return err
-			}
+	spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("cluster - checking status of cluster %s", k8s.ClusterName))
 
-			spinner.Success(fmt.Sprintf("cluster - cluster %s created", k8s.ClusterName))
+	cluster, err := k8s.NewCluster(provider)
+	if err != nil {
+		spinner.Fail(fmt.Sprintf("cluster - unable to determine status of cluster %s", k8s.ClusterName))
+		return err
+	}
+
+	if cluster.Exists(k8s.ClusterName) {
+		spinner.Success(fmt.Sprintf("cluster - found existing cluster %s", k8s.ClusterName))
+	} else {
+		spinner.UpdateText(fmt.Sprintf("cluster - creating cluster %s", k8s.ClusterName))
+
+		if err := cluster.Create(k8s.ClusterName); err != nil {
+			spinner.Fail(fmt.Sprintf("cluster - failed to create cluster %s", k8s.ClusterName))
+			return err
 		}
 
-		return nil
-	},
-	Short: "Manages local Airbyte installations",
+		spinner.Success(fmt.Sprintf("cluster - cluster %s created", k8s.ClusterName))
+	}
+
+	return nil
 }
 
 func printK8sProvider(p k8s.Provider) {
@@ -104,15 +105,16 @@ var InstallCmd = &cobra.Command{
 			}
 		}
 
-		if err := portAvailable(cmd.Context(), 80); err != nil {
-			return fmt.Errorf("could not check available port: %w", err)
+		if err := portAvailable(cmd.Context(), flagPortHTTP); err != nil {
+			fmt.Println("port issue:", err)
+			//return fmt.Errorf("could not verify if port %d is available: %w", port, err)
 		}
 
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 		return telemetryWrapper(telemetry.Install, func() error {
-			lc, err := local.New(provider, local.WithTelemetryClient(telClient))
+			lc, err := local.New(provider, flagPortHTTP, local.WithTelemetryClient(telClient))
 			if err != nil {
 				return fmt.Errorf("could not initialize local command: %w", err)
 			}
@@ -126,7 +128,7 @@ var InstallCmd = &cobra.Command{
 				pass = env
 			}
 
-			return lc.Install(context.Background(), user, pass)
+			return lc.Install(cmd.Context(), user, pass)
 		})
 	},
 }
@@ -140,12 +142,12 @@ var UninstallCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return telemetryWrapper(telemetry.Uninstall, func() error {
-			lc, err := local.New(provider, local.WithTelemetryClient(telClient))
+			lc, err := local.New(provider, flagPortHTTP, local.WithTelemetryClient(telClient))
 			if err != nil {
 				return fmt.Errorf("could not initialize local command: %w", err)
 			}
 
-			return lc.Uninstall(context.Background())
+			return lc.Uninstall(cmd.Context())
 		})
 	},
 }
@@ -215,13 +217,15 @@ var (
 	flagProvider    string
 	flagKubeconfig  string
 	flagKubeContext string
+	flagPortHTTP    int
+	flagPortHTTPS   int
 )
 
 func init() {
 	InstallCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	InstallCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 
-	// switch the default provider based on the operating system... not sure if I like this idea or not
+	// switch the default provider based on the operating system... not sure if I like this idea
 	defaultProvider := k8s.KindProvider.Name
 	switch runtime.GOOS {
 	case "darwin":
@@ -233,6 +237,9 @@ func init() {
 	Cmd.PersistentFlags().StringVarP(&flagProvider, "k8s-provider", "k", defaultProvider, "kubernetes provider to use")
 	Cmd.PersistentFlags().StringVarP(&flagKubeconfig, "kubeconfig", "", "", "kubernetes config file to use")
 	Cmd.PersistentFlags().StringVarP(&flagKubeContext, "kubecontext", "", "", "kubernetes context to use")
+	Cmd.PersistentFlags().IntVarP(&flagPortHTTP, "port-http", "", 80, "ingress http port")
+	Cmd.PersistentFlags().IntVarP(&flagPortHTTPS, "port-https", "", 443, "ingress https port")
+
 	Cmd.AddCommand(InstallCmd)
 	Cmd.AddCommand(UninstallCmd)
 }
