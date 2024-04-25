@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/local/k8s"
+	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
@@ -60,18 +61,6 @@ type HTTPClient interface {
 
 // BrowserLauncher primarily for testing purposes.
 type BrowserLauncher func(url string) error
-
-// Errors related to specific systems that this code integrates with.
-var (
-	// ErrDocker is returned anytime an error occurs when attempting to communicate with docker.
-	ErrDocker = errors.New("error communicating with docker")
-
-	// ErrKubernetes is returned anytime an error occurs when attempting to communicate with the kubernetes cluster.
-	ErrKubernetes = errors.New("error communicating with kubernetes")
-
-	// ErrIngress is returned in the event that ingress configuration failed.
-	ErrIngress = errors.New("error configuring ingress")
-)
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
@@ -194,7 +183,7 @@ func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) 
 	{
 		k8sVersion, err := c.k8s.GetServerVersion()
 		if err != nil {
-			return nil, fmt.Errorf("%w: could not fetch kubernetes server version: %w", ErrKubernetes, err)
+			return nil, fmt.Errorf("%w: could not fetch kubernetes server version: %w", localerr.ErrKubernetes, err)
 		}
 		c.tel.Attr("k8s_version", k8sVersion)
 	}
@@ -237,7 +226,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 				ingresses := srv.Status.LoadBalancer.Ingress
 				if len(ingresses) == 0 {
 					// if there are no ingresses, that is a possible indicator that the port is already in use.
-					return fmt.Errorf("%w: could not install nginx chart", ErrIngress)
+					return fmt.Errorf("%w: could not install nginx chart", localerr.ErrIngress)
 				}
 			}
 		}
@@ -331,7 +320,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 		}
 	}
 
-	// there is no blocking delete namespace call, so poll until it's been deleted or we've exhausted our time
+	// there is no blocking delete namespace call, so poll until it's been deleted, or we've exhausted our time
 	namespaceDeleted := false
 	var wg sync.WaitGroup
 	ticker := time.NewTicker(1 * time.Second) // how ofter to check
@@ -392,16 +381,16 @@ func (c *Command) handleChart(
 	}
 
 	spinner.UpdateText(fmt.Sprintf("helm - fetching chart %s", req.chartName))
-	chart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{})
+	helmChart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{})
 	if err != nil {
 		spinner.Fail(fmt.Sprintf("helm - could not fetch chart %s", req.chartName))
 		return fmt.Errorf("could not fetch chart %s: %w", req.chartName, err)
 	}
 
-	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), chart.Metadata.Version)
+	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
 
-	spinner.UpdateText(fmt.Sprintf("helm - installing chart %s (%s)", req.chartName, chart.Metadata.Version))
-	release, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
+	spinner.UpdateText(fmt.Sprintf("helm - installing chart %s (%s)", req.chartName, helmChart.Metadata.Version))
+	helmRelease, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
 		ReleaseName:     req.chartRelease,
 		ChartName:       req.chartName,
 		CreateNamespace: true,
@@ -413,13 +402,13 @@ func (c *Command) handleChart(
 		&helmclient.GenericHelmOptions{},
 	)
 	if err != nil {
-		spinner.Fail(fmt.Sprintf("helm - failed to install chart %s (%s)", req.chartName, chart.Metadata.Version))
+		spinner.Fail(fmt.Sprintf("helm - failed to install chart %s (%s)", req.chartName, helmChart.Metadata.Version))
 		return fmt.Errorf("could not install helm: %w", err)
 	}
 
-	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(release.Version))
+	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 
-	spinner.Success(fmt.Sprintf("helm - chart installed; name: %s, namespace: %s, version: %d", release.Name, release.Namespace, release.Version))
+	spinner.Success(fmt.Sprintf("helm - chart installed; name: %s, namespace: %s, version: %d", helmRelease.Name, helmRelease.Namespace, helmRelease.Version))
 	return nil
 }
 
@@ -529,16 +518,16 @@ func ingress() *networkingv1.Ingress {
 func defaultK8s(kubecfg, kubectx string) (k8s.K8sClient, error) {
 	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrKubernetes, err)
+		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
 	}
 
 	restCfg, err := k8sCfg.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("%w: could not create rest config: %w", ErrKubernetes, err)
+		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
 	}
 	k8sClient, err := kubernetes.NewForConfig(restCfg)
 	if err != nil {
-		return nil, fmt.Errorf("%w: could not create clientset: %w", ErrKubernetes, err)
+		return nil, fmt.Errorf("%w: could not create clientset: %w", localerr.ErrKubernetes, err)
 	}
 
 	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
@@ -548,12 +537,12 @@ func defaultK8s(kubecfg, kubectx string) (k8s.K8sClient, error) {
 func defaultHelm(kubecfg, kubectx string) (HelmClient, error) {
 	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrKubernetes, err)
+		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
 	}
 
 	restCfg, err := k8sCfg.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("%w: could not create rest config: %w", ErrKubernetes, err)
+		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
 	}
 
 	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{

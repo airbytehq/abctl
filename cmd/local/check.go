@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/airbytehq/abctl/internal/local"
+	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -50,7 +50,7 @@ func defaultDocker(userHome string) (serverVersioner, error) {
 		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%w: could not create docker client: %w", local.ErrDocker, err)
+		return nil, fmt.Errorf("%w: could not create docker client: %w", localerr.ErrDocker, err)
 	}
 
 	return docker, nil
@@ -66,14 +66,14 @@ func dockerInstalled(ctx context.Context, t telemetry.Client, userHome string) e
 	if dockerClient == nil {
 		if dockerClient, err = defaultDocker(userHome); err != nil {
 			spinner.Fail("docker - could not create client")
-			return fmt.Errorf("%w: could not create client: %w", local.ErrDocker, err)
+			return fmt.Errorf("%w: could not create client: %w", localerr.ErrDocker, err)
 		}
 	}
 
 	v, err := dockerClient.ServerVersion(ctx)
 	if err != nil {
 		spinner.Fail("docker - could not communicate with the docker agent")
-		return fmt.Errorf("%w: %w", local.ErrDocker, err)
+		return fmt.Errorf("%w: %w", localerr.ErrDocker, err)
 	}
 
 	t.Attr("docker_version", v.Version)
@@ -101,13 +101,6 @@ var httpClient doer = &http.Client{Timeout: 3 * time.Second}
 func portAvailable(ctx context.Context, port int) error {
 	spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("port %d - checking port availability", port))
 
-	//server, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("localhost:%d", port))
-	//if err != nil {
-	//	spinner.Fail(fmt.Sprintf("port %d - could not resolve host tcp address", port))
-	//	return fmt.Errorf("could not resolve host tcp address: %w", err)
-	//}
-
-	//conn, err := net.DialTCP("tcp", nil, server)
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 3*time.Second)
 	if err != nil {
 		var opErr *net.OpError

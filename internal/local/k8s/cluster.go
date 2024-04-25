@@ -2,6 +2,9 @@ package k8s
 
 import (
 	"fmt"
+	"github.com/airbytehq/abctl/internal/local/localerr"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"os"
 	"path/filepath"
 	"sigs.k8s.io/kind/pkg/cluster"
@@ -9,18 +12,17 @@ import (
 )
 
 const (
-	ClusterName = "airbyte-abctl"
-	k8sVersion  = "v1.29.1"
+	k8sVersion = "v1.29.1"
 )
 
 // Cluster is an interface representing all the actions taken at the cluster level.
 type Cluster interface {
 	// Create a cluster with the provided name.
-	Create(name string) error
+	Create() error
 	// Delete a cluster with the provided name.
-	Delete(name string) error
+	Delete() error
 	// Exists returns true if the cluster exists, false otherwise.
-	Exists(name string) bool
+	Exists() bool
 }
 
 // NewCluster returns a Cluster implementation for the provider.
@@ -36,13 +38,20 @@ func NewCluster(provider Provider) (Cluster, error) {
 
 	switch provider.Name {
 	case DockerDesktopProvider.Name:
+		kubeCfg := filepath.Join(userHome, provider.Kubeconfig)
 		return &DockerDesktopCluster{
-			kubeconfig: filepath.Join(userHome, provider.Kubeconfig),
+			clientCfg: clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+				&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeCfg},
+				&clientcmd.ConfigOverrides{CurrentContext: provider.Context},
+			),
+			kubeCfg:     filepath.Join(userHome, provider.Kubeconfig),
+			clusterName: provider.ClusterName,
 		}, nil
 	case KindProvider.Name:
 		return &KindCluster{
-			p:          cluster.NewProvider(),
-			kubeconfig: filepath.Join(userHome, provider.Kubeconfig),
+			p:           cluster.NewProvider(),
+			kubeconfig:  filepath.Join(userHome, provider.Kubeconfig),
+			clusterName: provider.ClusterName,
 		}, nil
 	}
 
@@ -54,18 +63,33 @@ var _ Cluster = (*DockerDesktopCluster)(nil)
 
 // DockerDesktopCluster is a Cluster that represents a docker-desktop cluster
 type DockerDesktopCluster struct {
-	kubeconfig string
+	clientCfg   clientcmd.ClientConfig
+	kubeCfg     string
+	clusterName string
 }
 
-func (d DockerDesktopCluster) Create(name string) error {
+func (d DockerDesktopCluster) Create() error {
+	return fmt.Errorf("%w: docker-desktop cluster should already exist", localerr.ErrKubernetes)
+}
+
+func (d DockerDesktopCluster) Delete() error {
 	return nil
 }
 
-func (d DockerDesktopCluster) Delete(name string) error {
-	return nil
-}
+func (d DockerDesktopCluster) Exists() bool {
+	restCfg, err := d.clientCfg.ClientConfig()
+	if err != nil {
+		return false
+	}
+	cli, err := kubernetes.NewForConfig(restCfg)
+	if err != nil {
+		return false
+	}
+	v, err := cli.ServerVersion()
+	if err != nil || v.Platform == "" {
+		return false
+	}
 
-func (d DockerDesktopCluster) Exists(name string) bool {
 	return true
 }
 
@@ -77,10 +101,11 @@ type KindCluster struct {
 	// p is the kind provider, not the abctl provider
 	p *cluster.Provider
 	// kubeconfig is the full path to the kubeconfig file kind is using
-	kubeconfig string
+	kubeconfig  string
+	clusterName string
 }
 
-func (k *KindCluster) Create(name string) error {
+func (k *KindCluster) Create() error {
 	// see https://kind.sigs.k8s.io/docs/user/ingress/#create-cluster
 	rawCfg := `kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -107,25 +132,25 @@ nodes:
 		cluster.CreateWithRawConfig([]byte(rawCfg)),
 	}
 
-	if err := k.p.Create(name, opts...); err != nil {
+	if err := k.p.Create(k.clusterName, opts...); err != nil {
 		return fmt.Errorf("unable to create kind cluster: %w", err)
 	}
 
 	return nil
 }
 
-func (k *KindCluster) Delete(name string) error {
-	if err := k.p.Delete(name, k.kubeconfig); err != nil {
+func (k *KindCluster) Delete() error {
+	if err := k.p.Delete(k.clusterName, k.kubeconfig); err != nil {
 		return fmt.Errorf("unable to delete kind cluster: %w", err)
 	}
 
 	return nil
 }
 
-func (k *KindCluster) Exists(name string) bool {
+func (k *KindCluster) Exists() bool {
 	clusters, _ := k.p.List()
 	for _, c := range clusters {
-		if c == name {
+		if c == k.clusterName {
 			return true
 		}
 	}

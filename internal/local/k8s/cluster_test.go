@@ -14,7 +14,7 @@ func TestKindK8s_Create(t *testing.T) {
 
 	//t.Cleanup(func() { k.Delete(name) })
 
-	if err := k.Create(name); err != nil {
+	if err := k.Create(); err != nil {
 		t.Fatal(err)
 	}
 	fmt.Println("created")

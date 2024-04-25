@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/airbytehq/abctl/cmd/local"
 	"github.com/airbytehq/abctl/cmd/version"
-	localcmd "github.com/airbytehq/abctl/internal/local"
+	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/pterm/pterm"
 	"os"
 
@@ -54,13 +54,13 @@ func Execute(ctx context.Context) {
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		pterm.Error.Println(err)
 
-		if errors.Is(err, localcmd.ErrDocker) {
+		if errors.Is(err, localerr.ErrDocker) {
 			pterm.Println()
 			pterm.Info.Println(helpDocker)
-		} else if errors.Is(err, localcmd.ErrKubernetes) {
+		} else if errors.Is(err, localerr.ErrKubernetes) {
 			pterm.Println()
 			pterm.Info.Println(helpKubernetes)
-		} else if errors.Is(err, localcmd.ErrIngress) {
+		} else if errors.Is(err, localerr.ErrIngress) {
 			pterm.Println()
 			pterm.Info.Println(helpIngress)
 		}

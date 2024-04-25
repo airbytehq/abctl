@@ -8,12 +8,17 @@ import (
 )
 
 // Provider represents a k8s provider.
-// TODO: add support for nginx helm commands, see https://github.com/kubernetes-sigs/kind/issues/1693
 type Provider struct {
-	Name       string
-	Context    string
+	// Name of this provider
+	Name string
+	// ClusterName is the name of the cluster this provider will interact with
+	ClusterName string
+	// Context this provider should use
+	Context string
+	// Kubeconfig location
 	Kubeconfig string
-	HelmNginx  []string
+	// HelmNginx additional helm values to pass to the nginx chart
+	HelmNginx []string
 }
 
 // MkDirs creates the directories for this providers kubeconfig.
@@ -32,32 +37,32 @@ func (p Provider) MkDirs(userHome string) error {
 var (
 	// DockerDesktopProvider represents the docker-desktop provider.
 	DockerDesktopProvider = Provider{
-		Name:       "docker-desktop",
-		Context:    "docker-desktop",
-		Kubeconfig: filepath.Join(".kube", "config"),
-		HelmNginx:  []string{
-			//"controller.service.ports.http=9798",
-		},
+		Name:        "docker-desktop",
+		ClusterName: "docker-desktop",
+		Context:     "docker-desktop",
+		Kubeconfig:  filepath.Join(".kube", "config"),
+		HelmNginx:   []string{},
 	}
 
 	// KindProvider represents the kind (https://kind.sigs.k8s.io/) provider.
 	KindProvider = Provider{
-		Name:       "kind",
-		Context:    "kind-" + ClusterName,
-		Kubeconfig: filepath.Join(".airbyte", "abctl", "abctl.kubeconfig"),
+		Name:        "kind",
+		ClusterName: "airbyte-abctl",
+		Context:     "kind-airbyte-abctl",
+		Kubeconfig:  filepath.Join(".airbyte", "abctl", "abctl.kubeconfig"),
 		HelmNginx: []string{
 			"controller.hostPort.enabled=true",
 			"controller.service.type=NodePort",
-			//"controller.service.ports.http=9798",
 		},
 	}
 
 	// TestProvider represents a test provider, for testing purposes
 	TestProvider = Provider{
-		Name:       "test",
-		Context:    "test-" + ClusterName,
-		Kubeconfig: filepath.Join(os.TempDir(), "abctl.kubeconfig"),
-		HelmNginx:  []string{},
+		Name:        "test",
+		ClusterName: "test",
+		Context:     "test-abctl",
+		Kubeconfig:  filepath.Join(os.TempDir(), "abctl.kubeconfig"),
+		HelmNginx:   []string{},
 	}
 )
 
