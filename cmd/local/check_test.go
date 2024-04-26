@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"github.com/airbytehq/abctl/internal/local/docker"
+	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
 	"github.com/google/go-cmp/cmp"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -63,7 +63,7 @@ func TestDockerInstalled_TelemetryAttrs(t *testing.T) {
 		attrs[key] = val
 	}}
 
-	err := dockerInstalled(context.Background(), telemetryClient, os.TempDir())
+	err := dockerInstalled(context.Background(), telemetryClient)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -90,7 +90,7 @@ func TestDockerInstalled_Error(t *testing.T) {
 		},
 	}
 
-	err := dockerInstalled(context.Background(), telemetry.NoopClient{}, os.TempDir())
+	err := dockerInstalled(context.Background(), telemetry.NoopClient{})
 	if err == nil {
 		t.Error("unexpected error:", err)
 	}
@@ -115,7 +115,7 @@ func TestPortAvailable_Available(t *testing.T) {
 
 func TestPortAvailable_Unavailable(t *testing.T) {
 	// spin up a listener to find a port, and leave it running so that port is unavailable
-	listener, err := net.Listen("tcp", ":0")
+	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal("could not create listener", err)
 	}
@@ -125,7 +125,10 @@ func TestPortAvailable_Unavailable(t *testing.T) {
 	err = portAvailable(context.Background(), p)
 	// expecting an error
 	if err == nil {
-		t.Error("portAvailable returned nil error")
+		t.Error("portAvailable should have returned an error")
+	}
+	if !errors.Is(err, localerr.ErrPort) {
+		t.Error("error should be of type ErrPort")
 	}
 }
 

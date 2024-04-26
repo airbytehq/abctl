@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
@@ -18,6 +19,8 @@ import (
 	"testing"
 	"time"
 )
+
+const portTest = 9999
 
 func TestCommand_Install(t *testing.T) {
 	expChartRepoCnt := 0
@@ -56,9 +59,7 @@ func TestCommand_Install(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         10 * time.Minute,
-				ValuesOptions: values.Options{
-					Values: []string{},
-				},
+				ValuesOptions:   values.Options{Values: []string{fmt.Sprintf("controller.service.ports.http=%d", portTest)}},
 			},
 			release: release.Release{
 				Name:      nginxChartRelease,
@@ -132,6 +133,7 @@ func TestCommand_Install(t *testing.T) {
 
 	c, err := New(
 		k8s.TestProvider,
+		portTest,
 		WithHelmClient(&helm),
 		WithK8sClient(&k8sClient),
 		WithTelemetryClient(&tel),
