@@ -23,7 +23,7 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 
 		if cluster.Exists() {
 			// only for kind do we need to check the existing port
-			if provider.Name == "kind" {
+			if provider.Name == k8s.Kind {
 				if dockerClient == nil {
 					dockerClient, err = docker.New()
 					if err != nil {
@@ -103,12 +103,12 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 			}
 		}
 
-		spinnerClusterDelete, _ := pterm.DefaultSpinner.Start("cluster - checking status of cluster deleted")
-
+		spinnerClusterDelete, _ := pterm.DefaultSpinner.Start("cluster - checking status of cluster uninstall")
 		if err := cluster.Delete(); err != nil {
-			return fmt.Errorf("could not delete cluster %s", provider.ClusterName)
+			return fmt.Errorf("could not uninstall cluster %s", provider.ClusterName)
 		}
-		spinnerClusterDelete.Success(fmt.Sprintf("cluster %s - successfully deleted", provider.ClusterName))
+		spinnerClusterDelete.Success(fmt.Sprintf("cluster %s - successfully uninstalled", provider.ClusterName))
+
 		return nil
 	})
 }
