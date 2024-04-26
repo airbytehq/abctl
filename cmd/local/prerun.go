@@ -24,7 +24,6 @@ func persistentPreRunLocal(cmd *cobra.Command, _ []string) error {
 			// if the telemetry telClient fails to load, log a warning and continue
 			pterm.Warning.Println(fmt.Errorf("unable to create telemetry telClient: %w", err))
 		}
-
 	}
 	// provider configuration
 	{

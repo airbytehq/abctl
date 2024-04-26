@@ -86,7 +86,7 @@ func portAvailable(ctx context.Context, port int) error {
 			return fmt.Errorf("%w: could not send request: %w", localerr.ErrPort, err)
 		}
 
-		if res.StatusCode == 401 && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
+		if res.StatusCode == http.StatusUnauthorized && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
 			spinner.Success(fmt.Sprintf("port %d - port appears to be running a previous Airbyte installation", port))
 			return nil
 		}

@@ -31,7 +31,7 @@ func TestDockerInstalled(t *testing.T) {
 		},
 	}
 
-	err := dockerInstalled(context.Background(), telemetry.NoopClient{}, os.TempDir())
+	err := dockerInstalled(context.Background(), telemetry.NoopClient{})
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}

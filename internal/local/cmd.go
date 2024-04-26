@@ -435,11 +435,11 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 				}
 				res, _ := c.http.Do(req)
 				// if no auth, we should get a 200
-				if res != nil && res.StatusCode == 200 {
+				if res != nil && res.StatusCode == http.StatusOK {
 					alive <- nil
 				}
 				// if basic auth, we should get a 401 with a specific header that contains abctl
-				if res != nil && res.StatusCode == 401 && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
+				if res != nil && res.StatusCode == http.StatusUnauthorized && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
 					alive <- nil
 				}
 			}

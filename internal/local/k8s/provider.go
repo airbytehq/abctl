@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// TODO: add supported map
 const (
 	DockerDesktop = "docker-desktop"
 	Kind          = "kind"
