@@ -3,8 +3,6 @@ package local
 import (
 	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
-	"runtime"
-
 	"github.com/spf13/cobra"
 )
 
@@ -30,6 +28,8 @@ const (
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
 )
 
+const Port = 6566
+
 // InstallCmd installs Airbyte locally
 var InstallCmd = &cobra.Command{
 	Use:     "install",
@@ -52,28 +52,17 @@ var (
 	flagProvider    string
 	flagKubeconfig  string
 	flagKubeContext string
-	flagPortHTTP    int
-	flagPortHTTPS   int
+	flagPort        int
 )
 
 func init() {
 	InstallCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	InstallCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 
-	// switch the default provider based on the operating system... not sure if I like this idea
-	defaultProvider := k8s.KindProvider.Name
-	switch runtime.GOOS {
-	case "darwin":
-		defaultProvider = k8s.DockerDesktopProvider.Name
-	case "windows":
-		defaultProvider = k8s.DockerDesktopProvider.Name
-	}
-
-	Cmd.PersistentFlags().StringVarP(&flagProvider, "k8s-provider", "k", defaultProvider, "kubernetes provider to use")
+	Cmd.PersistentFlags().StringVarP(&flagProvider, "k8s-provider", "k", k8s.KindProvider.Name, "kubernetes provider to use")
 	Cmd.PersistentFlags().StringVarP(&flagKubeconfig, "kubeconfig", "", "", "kubernetes config file to use")
 	Cmd.PersistentFlags().StringVarP(&flagKubeContext, "kubecontext", "", "", "kubernetes context to use")
-	Cmd.PersistentFlags().IntVarP(&flagPortHTTP, "port-http", "", 80, "ingress http port")
-	Cmd.PersistentFlags().IntVarP(&flagPortHTTPS, "port-https", "", 443, "ingress https port")
+	Cmd.PersistentFlags().IntVarP(&flagPort, "port", "", Port, "ingress http port")
 
 	Cmd.AddCommand(InstallCmd)
 	Cmd.AddCommand(UninstallCmd)

@@ -11,10 +11,6 @@ import (
 	"time"
 )
 
-const (
-	k8sVersion = "v1.29.1"
-)
-
 // Cluster is an interface representing all the actions taken at the cluster level.
 type Cluster interface {
 	// Create a cluster with the provided name.
@@ -105,7 +101,9 @@ type KindCluster struct {
 	clusterName string
 }
 
-func (k *KindCluster) Create(portHTTP int) error {
+const k8sVersion = "v1.29.1"
+
+func (k *KindCluster) Create(port int) error {
 	// see https://kind.sigs.k8s.io/docs/user/ingress/#create-cluster
 	rawCfg := fmt.Sprintf(`kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -121,10 +119,7 @@ nodes:
       - containerPort: 80
         hostPort: %d
         protocol: TCP`,
-		portHTTP)
-	//- containerPort: 443
-	//  hostPort: 443
-	//  protocol: TCP`
+		port)
 
 	opts := []cluster.CreateOption{
 		cluster.CreateWithWaitForReady(120 * time.Second),
@@ -157,23 +152,4 @@ func (k *KindCluster) Exists() bool {
 	}
 
 	return false
-}
-
-// permissions sets the file and directory permission level for the kind kube config file and directory.
-const permissions = 0700
-
-// createAbctlDirectory creates the ~/.airbyte/abctl directory, if it doesn't already exist.
-// If successful returns the full path to the ~/.airbyte/abctl directory
-func createAbctlDirectory() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("could not determine home directory: %w", err)
-	}
-
-	path := filepath.Join(home, ".airbyte", "abctl")
-	if err := os.MkdirAll(path, permissions); err != nil {
-		return "", fmt.Errorf("could not create abctl directory: %w", err)
-	}
-
-	return path, nil
 }

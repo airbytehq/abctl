@@ -113,7 +113,7 @@ func portAvailable(ctx context.Context, port int) error {
 		}
 
 		spinner.Fail(fmt.Sprintf("port %d - could not dial tcp address", port))
-		return fmt.Errorf("could not dial tcp address: %w", err)
+		return fmt.Errorf("%w: could not dial tcp address: %w", localerr.ErrPort, err)
 	}
 	defer func() {
 		_ = conn.Close()
@@ -123,13 +123,13 @@ func portAvailable(ctx context.Context, port int) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d", port), nil)
 	if err != nil {
 		spinner.Fail(fmt.Sprintf("port %d - could not create request", port))
-		return fmt.Errorf("could not create request: %w", err)
+		return fmt.Errorf("%w: could not create request: %w", localerr.ErrPort, err)
 	}
 
 	res, err := httpClient.Do(req)
 	if err != nil {
 		spinner.Fail(fmt.Sprintf("port %d - port is already in use", port))
-		return fmt.Errorf("could not send request: %w", err)
+		return fmt.Errorf("%w: could not send request: %w", localerr.ErrPort, err)
 	}
 
 	if res.StatusCode == 401 && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
@@ -137,6 +137,6 @@ func portAvailable(ctx context.Context, port int) error {
 		return nil
 	}
 
-	spinner.Fail(fmt.Sprintf("port %d - port is already in use", port))
-	return fmt.Errorf("port %d already in use", port)
+	spinner.Fail(fmt.Sprintf("port %d - port is unavailable", port))
+	return fmt.Errorf("%w: port %d unavailable", localerr.ErrPort, port)
 }

@@ -11,4 +11,7 @@ var (
 
 	// ErrIngress is returned in the event that ingress configuration failed.
 	ErrIngress = errors.New("error configuring ingress")
+
+	// ErrPort is returned in the event that the requested port is unavailable.
+	ErrPort = errors.New("error verifying port availability")
 )

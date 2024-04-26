@@ -1,6 +1,7 @@
 package local
 
 import (
+	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/local"
 	"github.com/airbytehq/abctl/internal/local/k8s"
@@ -22,10 +23,13 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 
 		if cluster.Exists() {
 			spinner.Success(fmt.Sprintf("cluster - found existing cluster %s", provider.ClusterName))
+			if flagPort != Port {
+				return errors.New("specifying a --port for an existing cluster is not currently supported ")
+			}
 		} else {
 			spinner.UpdateText(fmt.Sprintf("cluster - creating cluster %s", provider.ClusterName))
 
-			if err := cluster.Create(flagPortHTTP); err != nil {
+			if err := cluster.Create(flagPort); err != nil {
 				spinner.Fail(fmt.Sprintf("cluster - failed to create cluster %s", provider.ClusterName))
 				return err
 			}
@@ -33,7 +37,7 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 			spinner.Success(fmt.Sprintf("cluster - cluster %s created", provider.ClusterName))
 		}
 
-		lc, err := local.New(provider, flagPortHTTP, local.WithTelemetryClient(telClient))
+		lc, err := local.New(provider, flagPort, local.WithTelemetryClient(telClient))
 		if err != nil {
 			return fmt.Errorf("could not initialize local command: %w", err)
 		}
@@ -69,7 +73,7 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 			spinnerClusterCheck.Success(fmt.Sprintf("cluster - found existing cluster %s", provider.ClusterName))
 		}
 
-		lc, err := local.New(provider, flagPortHTTP, local.WithTelemetryClient(telClient))
+		lc, err := local.New(provider, flagPort, local.WithTelemetryClient(telClient))
 		if err != nil {
 			pterm.Warning.Printfln("could not initialize local command: %s", err.Error())
 			pterm.Warning.Println("will still attempt to uninstall the cluster")

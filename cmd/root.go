@@ -7,9 +7,8 @@ import (
 	"github.com/airbytehq/abctl/cmd/version"
 	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/pterm/pterm"
-	"os"
-
 	"github.com/spf13/cobra"
+	"os"
 )
 
 // Help messages to display for specific error situations.
@@ -24,9 +23,15 @@ For additional help please visit https://docs.docker.com/get-docker/`
 If using Docker Desktop, ensure that Kubernetes is enabled.
 For additional help please visit https://docs.docker.com/desktop/kubernetes/`
 
+	// helpIngress is displayed if ErrIngress is ever returned
 	helpIngress = `An error occurred while configuring ingress.
 This could be in indication that the ingress port is already in use by a different application.
-The ingress port can be changed by passing the flag --port-http.`
+The ingress port can be changed by passing the flag --port.`
+
+	// helpPort is displayed if ErrPort is ever returned
+	helpPort = `An error occurred while verifying if the request port is available.
+This could be in indication that the ingress port is already in use by a different application.
+The ingress port can be changed by passing the flag --port.`
 )
 
 var (
@@ -42,7 +47,7 @@ var (
 		Short: pterm.LightBlue("Airbyte") + "'s command line tool",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if flagDNT {
-				pterm.Info.Println("telemetry disabled (--dnt)")
+				pterm.Info.Println("telemetry collection disabled (--dnt)")
 			}
 		},
 	}
@@ -63,6 +68,9 @@ func Execute(ctx context.Context) {
 		} else if errors.Is(err, localerr.ErrIngress) {
 			pterm.Println()
 			pterm.Info.Println(helpIngress)
+		} else if errors.Is(err, localerr.ErrPort) {
+			pterm.Println()
+			pterm.Info.Printfln(helpPort)
 		}
 		os.Exit(1)
 	}
