@@ -24,7 +24,7 @@ anonymous_user_id: ` + id.String()); err != nil {
 		t.Fatal("could not write to temp file", err)
 	}
 
-	cnf, err := LoadConfigFromFile(f.Name())
+	cnf, err := loadConfigFromFile(f.Name())
 	if d := cmp.Diff(nil, err); d != "" {
 		t.Error("failed to load file", d)
 	}
@@ -34,7 +34,7 @@ anonymous_user_id: ` + id.String()); err != nil {
 }
 
 func TestLoadFromFile_NoFileReturnsErrNotExist(t *testing.T) {
-	_, err := LoadConfigFromFile(filepath.Join(t.TempDir(), "dne.yml"))
+	_, err := loadConfigFromFile(filepath.Join(t.TempDir(), "dne.yml"))
 	if err == nil {
 		t.Error("expected an error to be returned")
 	}
@@ -49,7 +49,7 @@ func TestWriteToFile(t *testing.T) {
 
 	c := Config{UserID: ULID(id)}
 
-	if err := WriteConfigToFile(path, c); err != nil {
+	if err := writeConfigToFile(path, c); err != nil {
 		t.Error("failed to create file", err)
 	}
 
