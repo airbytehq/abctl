@@ -1,9 +1,9 @@
 package local
 
 import (
-	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/local"
+	"github.com/airbytehq/abctl/internal/local/docker"
 	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
@@ -22,10 +22,28 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 		}
 
 		if cluster.Exists() {
-			spinner.Success(fmt.Sprintf("cluster - found existing cluster %s", provider.ClusterName))
-			if flagPort != Port {
-				return errors.New("specifying a --port for an existing cluster is not currently supported ")
+			// only for kind do we need to check the existing port
+			if provider.Name == "kind" {
+				if dockerClient == nil {
+					dockerClient, err = docker.New()
+					if err != nil {
+						spinner.Fail("cluster - unable to connect to docker")
+						return fmt.Errorf("could not connect to docker: %w", err)
+					}
+				}
+
+				providedPort := flagPort
+				flagPort, err = dockerClient.Port(cmd.Context(), fmt.Sprintf("%s-control-plane", provider.ClusterName))
+				if err != nil {
+					spinner.Fail("cluster - unable to determine existing port")
+					return fmt.Errorf("could not determine existing ingress port: %w", err)
+				}
+				if providedPort != flagPort {
+					pterm.Info.Printfln("overriding port %d with %d, existing cluster used port %d\nports cannot be changed without uninstalling", providedPort, flagPort, flagPort)
+				}
+
 			}
+			spinner.Success(fmt.Sprintf("cluster - found existing cluster %s", provider.ClusterName))
 		} else {
 			spinner.UpdateText(fmt.Sprintf("cluster - creating cluster %s", provider.ClusterName))
 
@@ -67,7 +85,8 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 
 		// if no cluster exists, there is nothing to do
 		if !cluster.Exists() {
-			spinnerClusterCheck.Success(fmt.Sprintf("cluster - unable to find existing cluster %s, nothing to uninstall", provider.ClusterName))
+			spinnerClusterCheck.Success(fmt.Sprintf("cluster - unable to find existing cluster %s", provider.ClusterName))
+			pterm.Info.Println("nothing to uninstall")
 			return nil
 		} else {
 			spinnerClusterCheck.Success(fmt.Sprintf("cluster - found existing cluster %s", provider.ClusterName))

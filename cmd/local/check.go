@@ -4,73 +4,36 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/local/docker"
 	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"github.com/pterm/pterm"
 	"net"
 	"net/http"
-	"runtime"
 	"strings"
 	"time"
 )
 
-// serverVersioner exists for testing purposes.
-type serverVersioner interface {
-	ServerVersion(context.Context) (types.Version, error)
-}
-
 // dockerClient is exposed here primarily for testing purposes.
 // A test should override this value to mock out a docker-client.
 // If this value is nil, the default docker-client (as returned from defaultDocker) will be utilized.
-var dockerClient serverVersioner
-
-// defaultDocker returns a docker-client (serverVersioner) that is platform and user specific.
-// The userHome is required for osx users given how docker configures itself.
-func defaultDocker(userHome string) (serverVersioner, error) {
-	var docker serverVersioner
-	var err error
-
-	switch runtime.GOOS {
-	case "darwin":
-		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
-		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
-		if err != nil {
-			// keep the original error, as we'll join with the next error (if another error occurs)
-			outerErr := err
-			docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", userHome)))
-			if err != nil {
-				err = fmt.Errorf("%w: %w", err, outerErr)
-			}
-		}
-	case "windows":
-		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("npipe:////./pipe/docker_engine"))
-	default:
-		docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
-	}
-	if err != nil {
-		return nil, fmt.Errorf("%w: could not create docker client: %w", localerr.ErrDocker, err)
-	}
-
-	return docker, nil
-}
+var dockerClient *docker.Docker
 
 // dockerInstalled checks if docker is installed on the host machine.
 // Returns a nil error if docker was successfully detected, otherwise an error will be returned.  Any error returned
 // is guaranteed to include the ErrDocker error in the error chain.
-func dockerInstalled(ctx context.Context, t telemetry.Client, userHome string) error {
+func dockerInstalled(ctx context.Context, t telemetry.Client) error {
 	spinner, _ := pterm.DefaultSpinner.Start("docker - checking for docker installation")
 
 	var err error
 	if dockerClient == nil {
-		if dockerClient, err = defaultDocker(userHome); err != nil {
+		if dockerClient, err = docker.New(); err != nil {
 			spinner.Fail("docker - could not create client")
 			return fmt.Errorf("%w: could not create client: %w", localerr.ErrDocker, err)
 		}
 	}
 
-	v, err := dockerClient.ServerVersion(ctx)
+	v, err := dockerClient.Version(ctx)
 	if err != nil {
 		spinner.Fail("docker - could not communicate with the docker agent")
 		return fmt.Errorf("%w: %w", localerr.ErrDocker, err)
@@ -78,7 +41,7 @@ func dockerInstalled(ctx context.Context, t telemetry.Client, userHome string) e
 
 	t.Attr("docker_version", v.Version)
 	t.Attr("docker_arch", v.Arch)
-	t.Attr("docker_platform", v.Platform.Name)
+	t.Attr("docker_platform", v.Platform)
 
 	spinner.Success(fmt.Sprintf("docker - found; version: %s", v.Version))
 	return nil

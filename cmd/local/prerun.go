@@ -49,12 +49,7 @@ func printK8sProvider(p k8s.Provider) {
 
 // preRunInstall is extracted from the cobra.Command initialization for reading purposes only
 func preRunInstall(cmd *cobra.Command, _ []string) error {
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("could not determine user home directory: %w", err)
-	}
-
-	if err := dockerInstalled(cmd.Context(), telClient, userHome); err != nil {
+	if err := dockerInstalled(cmd.Context(), telClient); err != nil {
 		return fmt.Errorf("could not determine docker installation status: %w", err)
 	}
 
@@ -67,12 +62,7 @@ func preRunInstall(cmd *cobra.Command, _ []string) error {
 
 // preRunUninstall is extracted from the cobra.Command initialization for reading purposes only
 func preRunUninstall(cmd *cobra.Command, _ []string) error {
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("could not determine user home directory: %w", err)
-	}
-
-	if err := dockerInstalled(cmd.Context(), telClient, userHome); err != nil {
+	if err := dockerInstalled(cmd.Context(), telClient); err != nil {
 		return fmt.Errorf("could not determine docker installation status: %w", err)
 	}
 

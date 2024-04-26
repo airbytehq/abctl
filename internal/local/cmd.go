@@ -449,11 +449,11 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 	select {
 	case <-ctx.Done():
 		spinner.Fail("browser - timed out")
-		return fmt.Errorf("liveness check failed: %w", ctx.Err())
+		return fmt.Errorf("browser liveness check failed: %w", ctx.Err())
 	case err := <-alive:
 		if err != nil {
 			spinner.Fail("browser - failed liveness check")
-			return fmt.Errorf("failed liveness check: %w", err)
+			return fmt.Errorf("browser failed liveness check: %w", err)
 		}
 	}
 	// if we're here, then no errors occurred
@@ -465,7 +465,7 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 		return fmt.Errorf("could not launch browser: %w", err)
 	}
 
-	spinner.Success("browser - launched")
+	spinner.Success(fmt.Sprintf("browser - launched (%s)", url))
 	return nil
 }
 

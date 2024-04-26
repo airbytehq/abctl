@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"errors"
+	"github.com/airbytehq/abctl/internal/local/docker"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
 	"github.com/google/go-cmp/cmp"
@@ -18,13 +19,15 @@ func TestDockerInstalled(t *testing.T) {
 		dockerClient = nil
 	})
 
-	dockerClient = mockServerVersion{
-		serverVersion: func(ctx context.Context) (types.Version, error) {
-			return types.Version{
-				Platform: struct{ Name string }{Name: "test"},
-				Version:  "version",
-				Arch:     "arch",
-			}, nil
+	dockerClient = &docker.Docker{
+		Client: mockDockerClient{
+			serverVersion: func(ctx context.Context) (types.Version, error) {
+				return types.Version{
+					Platform: struct{ Name string }{Name: "test"},
+					Version:  "version",
+					Arch:     "arch",
+				}, nil
+			},
 		},
 	}
 
@@ -43,13 +46,15 @@ func TestDockerInstalled_TelemetryAttrs(t *testing.T) {
 	version := "version"
 	arch := "arch"
 
-	dockerClient = mockServerVersion{
-		serverVersion: func(ctx context.Context) (types.Version, error) {
-			return types.Version{
-				Platform: struct{ Name string }{Name: platformName},
-				Version:  version,
-				Arch:     arch,
-			}, nil
+	dockerClient = &docker.Docker{
+		Client: mockDockerClient{
+			serverVersion: func(ctx context.Context) (types.Version, error) {
+				return types.Version{
+					Platform: struct{ Name string }{Name: platformName},
+					Version:  version,
+					Arch:     arch,
+				}, nil
+			},
 		},
 	}
 
@@ -77,9 +82,11 @@ func TestDockerInstalled_Error(t *testing.T) {
 		dockerClient = nil
 	})
 
-	dockerClient = mockServerVersion{
-		serverVersion: func(ctx context.Context) (types.Version, error) {
-			return types.Version{}, errors.New("test")
+	dockerClient = &docker.Docker{
+		Client: mockDockerClient{
+			serverVersion: func(ctx context.Context) (types.Version, error) {
+				return types.Version{}, errors.New("test")
+			},
 		},
 	}
 
@@ -131,13 +138,18 @@ func port(s string) int {
 
 // mocks
 
-var _ serverVersioner = (*mockServerVersion)(nil)
+var _ docker.Client = (*mockDockerClient)(nil)
 
-type mockServerVersion struct {
-	serverVersion func(ctx context.Context) (types.Version, error)
+type mockDockerClient struct {
+	serverVersion    func(ctx context.Context) (types.Version, error)
+	containerInspect func(ctx context.Context, containerID string) (types.ContainerJSON, error)
 }
 
-func (m mockServerVersion) ServerVersion(ctx context.Context) (types.Version, error) {
+func (m mockDockerClient) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+	return m.containerInspect(ctx, containerID)
+}
+
+func (m mockDockerClient) ServerVersion(ctx context.Context) (types.Version, error) {
 	return m.serverVersion(ctx)
 }
 
