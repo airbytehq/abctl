@@ -28,7 +28,7 @@ const (
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
 )
 
-const Port = 9899
+const Port = 8000
 
 // InstallCmd installs Airbyte locally
 var InstallCmd = &cobra.Command{
