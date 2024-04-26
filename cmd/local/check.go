@@ -2,7 +2,6 @@ package local
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/local/docker"
 	"github.com/airbytehq/abctl/internal/local/localerr"
@@ -64,42 +63,39 @@ var httpClient doer = &http.Client{Timeout: 3 * time.Second}
 func portAvailable(ctx context.Context, port int) error {
 	spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("port %d - checking port availability", port))
 
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 3*time.Second)
-	if err != nil {
-		var opErr *net.OpError
-		if errors.As(err, &opErr) {
-			// if the connection is refused, that should mean the port is actually available.
-			if strings.Contains(opErr.Err.Error(), "connection refused") {
-				spinner.Success(fmt.Sprintf("port %d - port is available", port))
-				return nil
-			}
-		}
-
-		spinner.Fail(fmt.Sprintf("port %d - could not dial tcp address", port))
-		return fmt.Errorf("%w: could not dial tcp address: %w", localerr.ErrPort, err)
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	// check if an existing airbyte installation is already listening on this port
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d", port), nil)
-	if err != nil {
-		spinner.Fail(fmt.Sprintf("port %d - could not create request", port))
-		return fmt.Errorf("%w: could not create request: %w", localerr.ErrPort, err)
-	}
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		spinner.Fail(fmt.Sprintf("port %d - port is already in use", port))
-		return fmt.Errorf("%w: could not send request: %w", localerr.ErrPort, err)
-	}
-
-	if res.StatusCode == 401 && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
-		spinner.Success(fmt.Sprintf("port %d - port appears to be running a previous Airbyte installation", port))
+	if port < 1024 {
+		spinner.Warning(fmt.Sprintf(
+			"port %d - availability cannot be determined as this is a privileged port\n"+
+				"(less than 1024), installation may not complete successfully",
+			port))
 		return nil
 	}
 
-	spinner.Fail(fmt.Sprintf("port %d - port is unavailable", port))
-	return fmt.Errorf("%w: port %d unavailable", localerr.ErrPort, port)
+	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+	if err != nil {
+		// check if an existing airbyte installation is already listening on this port
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d", port), nil)
+		if err != nil {
+			spinner.Fail(fmt.Sprintf("port %d - could not create request", port))
+			return fmt.Errorf("%w: could not create request: %w", localerr.ErrPort, err)
+		}
+
+		res, err := httpClient.Do(req)
+		if err != nil {
+			spinner.Fail(fmt.Sprintf("port %d - port is already in use", port))
+			return fmt.Errorf("%w: could not send request: %w", localerr.ErrPort, err)
+		}
+
+		if res.StatusCode == 401 && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
+			spinner.Success(fmt.Sprintf("port %d - port appears to be running a previous Airbyte installation", port))
+			return nil
+		}
+	}
+	// if we're able to bind to the port (and then release it), it should be available
+	defer func() {
+		_ = listener.Close()
+	}()
+
+	spinner.Success(fmt.Sprintf("port %d - appears to be available", port))
+	return nil
 }
