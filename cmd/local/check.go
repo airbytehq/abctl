@@ -56,9 +56,8 @@ var httpClient doer = &http.Client{Timeout: 3 * time.Second}
 
 // portAvailable returns a nil error if the port is available, or already is use by Airbyte, otherwise returns an error.
 //
-// This function works by attempting to establish a tcp connection to the port.
-// If this connection fails with a "connection refused" message, the assumption is that the port ia actually available.
-// If we can establish a tcp connection to the port, an additional check is made to see if Airbyte may already be
+// This function works by attempting to establish a tcp listener on a port.
+// If we can establish a tcp listener on the port, an additional check is made to see if Airbyte may already be
 // bound to that port. If something behinds Airbyte is using it, then treat this as a inaccessible port.
 func portAvailable(ctx context.Context, port int) error {
 	spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("port %d - checking port availability", port))
