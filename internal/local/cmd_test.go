@@ -3,27 +3,26 @@ package local
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
-	"github.com/docker/docker/api/types"
 	"github.com/google/go-cmp/cmp"
 	helmclient "github.com/mittwald/go-helm-client"
+	"github.com/mittwald/go-helm-client/values"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
+	coreV1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"net/http"
 	"testing"
 	"time"
 )
 
-func TestCommand_Install(t *testing.T) {
-	docker := mockDockerClient{
-		serverVersion: func(ctx context.Context) (types.Version, error) {
-			return types.Version{}, nil
-		},
-	}
+const portTest = 9999
 
+func TestCommand_Install(t *testing.T) {
 	expChartRepoCnt := 0
 	expChartRepo := []struct {
 		name string
@@ -60,6 +59,7 @@ func TestCommand_Install(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         10 * time.Minute,
+				ValuesOptions:   values.Options{Values: []string{fmt.Sprintf("controller.service.ports.http=%d", portTest)}},
 			},
 			release: release.Release{
 				Name:      nginxChartRelease,
@@ -105,7 +105,7 @@ func TestCommand_Install(t *testing.T) {
 		},
 	}
 
-	k8s := mockK8sClient{
+	k8sClient := mockK8sClient{
 		getServerVersion: func() (string, error) {
 			return "test", nil
 		},
@@ -132,9 +132,10 @@ func TestCommand_Install(t *testing.T) {
 	}}
 
 	c, err := New(
-		WithDockerClient(&docker),
+		k8s.TestProvider,
+		portTest,
 		WithHelmClient(&helm),
-		WithK8sClient(&k8s),
+		WithK8sClient(&k8sClient),
 		WithTelemetryClient(&tel),
 		WithHTTPClient(&httpClient),
 		WithBrowserLauncher(func(url string) error {
@@ -151,7 +152,9 @@ func TestCommand_Install(t *testing.T) {
 	}
 }
 
+// ---
 // only mocks below here
+// ---
 var _ HelmClient = (*mockHelmClient)(nil)
 
 type mockHelmClient struct {
@@ -182,7 +185,7 @@ func (m *mockHelmClient) UninstallReleaseByName(s string) error {
 	return m.uninstallReleaseByName(s)
 }
 
-var _ K8sClient = (*mockK8sClient)(nil)
+var _ k8s.K8sClient = (*mockK8sClient)(nil)
 
 type mockK8sClient struct {
 	createIngress        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
@@ -191,6 +194,7 @@ type mockK8sClient struct {
 	existsNamespace      func(ctx context.Context, namespace string) bool
 	deleteNamespace      func(ctx context.Context, namespace string) error
 	createOrUpdateSecret func(ctx context.Context, namespace, name string, data map[string][]byte) error
+	getService           func(ctx context.Context, namespace, name string) (*coreV1.Service, error)
 	getServerVersion     func() (string, error)
 }
 
@@ -218,18 +222,12 @@ func (m *mockK8sClient) CreateOrUpdateSecret(ctx context.Context, namespace, nam
 	return m.createOrUpdateSecret(ctx, namespace, name, data)
 }
 
+func (m *mockK8sClient) GetService(ctx context.Context, namespace, name string) (*coreV1.Service, error) {
+	return m.getService(ctx, namespace, name)
+}
+
 func (m *mockK8sClient) GetServerVersion() (string, error) {
 	return m.getServerVersion()
-}
-
-var _ DockerClient = (*mockDockerClient)(nil)
-
-type mockDockerClient struct {
-	serverVersion func(ctx context.Context) (types.Version, error)
-}
-
-func (m *mockDockerClient) ServerVersion(ctx context.Context) (types.Version, error) {
-	return m.serverVersion(ctx)
 }
 
 var _ telemetry.Client = (*mockTelemetryClient)(nil)

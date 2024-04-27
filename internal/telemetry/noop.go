@@ -14,8 +14,8 @@ func (n NoopClient) Success(EventType) error {
 	return nil
 }
 
-func (n NoopClient) Failure(eventType EventType, err error) error {
+func (n NoopClient) Failure(_ EventType, _ error) error {
 	return nil
 }
 
-func (n NoopClient) Attr(key, val string) {}
+func (n NoopClient) Attr(_, _ string) {}

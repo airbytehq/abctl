@@ -1,14 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"github.com/airbytehq/abctl/cmd/local"
 	"github.com/airbytehq/abctl/cmd/version"
-	localcmd "github.com/airbytehq/abctl/internal/local"
+	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/pterm/pterm"
-	"os"
-
 	"github.com/spf13/cobra"
+	"os"
 )
 
 // Help messages to display for specific error situations.
@@ -22,11 +22,24 @@ For additional help please visit https://docs.docker.com/get-docker/`
 	helpKubernetes = `An error occurred while communicating with the Kubernetes cluster.
 If using Docker Desktop, ensure that Kubernetes is enabled.
 For additional help please visit https://docs.docker.com/desktop/kubernetes/`
+
+	// helpIngress is displayed if ErrIngress is ever returned
+	helpIngress = `An error occurred while configuring ingress.
+This could be in indication that the ingress port is already in use by a different application.
+The ingress port can be changed by passing the flag --port.`
+
+	// helpPort is displayed if ErrPort is ever returned
+	helpPort = `An error occurred while verifying if the request port is available.
+This could be in indication that the ingress port is already in use by a different application.
+The ingress port can be changed by passing the flag --port.`
 )
 
 var (
 	// flagDNT indicates if the do-not-track flag was specified
 	flagDNT bool
+
+	// flagK8sProvider indicates which k8s provider to use
+	flagK8sProvider bool
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
@@ -34,7 +47,7 @@ var (
 		Short: pterm.LightBlue("Airbyte") + "'s command line tool",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if flagDNT {
-				pterm.Info.Println("telemetry disabled (--dnt)")
+				pterm.Info.Println("telemetry collection disabled (--dnt)")
 			}
 		},
 	}
@@ -42,16 +55,22 @@ var (
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+func Execute(ctx context.Context) {
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		pterm.Error.Println(err)
 
-		if errors.Is(err, localcmd.ErrDocker) {
+		if errors.Is(err, localerr.ErrDocker) {
 			pterm.Println()
 			pterm.Info.Println(helpDocker)
-		} else if errors.Is(err, localcmd.ErrKubernetes) {
+		} else if errors.Is(err, localerr.ErrKubernetes) {
 			pterm.Println()
 			pterm.Info.Println(helpKubernetes)
+		} else if errors.Is(err, localerr.ErrIngress) {
+			pterm.Println()
+			pterm.Info.Println(helpIngress)
+		} else if errors.Is(err, localerr.ErrPort) {
+			pterm.Println()
+			pterm.Info.Printfln(helpPort)
 		}
 		os.Exit(1)
 	}

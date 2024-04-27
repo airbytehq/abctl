@@ -67,7 +67,8 @@ type Config struct {
 // between this code and PyAirbyte
 const permissions = 0777
 
-func LoadConfigFromFile(path string) (Config, error) {
+// loadConfigFromFile reads the file located at path and returns a Config based on it.
+func loadConfigFromFile(path string) (Config, error) {
 	if _, err := os.Stat(path); err != nil {
 		return Config{}, fmt.Errorf("could not location file %s: %w", path, err)
 	}
@@ -92,8 +93,8 @@ const header = `# This file is used by Airbyte to track anonymous usage statisti
 # - https://docs.airbyte.com/operator-guides/telemetry
 `
 
-// WriteConfigToFile will write the cfg to the provided path.
-func WriteConfigToFile(path string, cfg Config) error {
+// writeConfigToFile will write the cfg to the provided path.
+func writeConfigToFile(path string, cfg Config) error {
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("could not marshal config: %w", err)

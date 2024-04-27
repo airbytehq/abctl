@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/local/k8s"
+	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	helmclient "github.com/mittwald/go-helm-client"
+	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
 	"golang.org/x/crypto/bcrypt"
 	"helm.sh/helm/v3/pkg/action"
@@ -35,17 +36,14 @@ const (
 	airbyteChartName    = "airbyte/airbyte"
 	airbyteChartRelease = "airbyte-abctl"
 	airbyteIngress      = "ingress-abctl"
-	airbyteNamespace    = "abctl"
+	airbyteNamespace    = "airbyte-abctl"
 	airbyteRepoName     = "airbyte"
 	airbyteRepoURL      = "https://airbytehq.github.io/helm-charts"
-	clusterName         = "airbyte-abctl"
-	clusterPort         = 6162
 	nginxChartName      = "nginx/ingress-nginx"
 	nginxChartRelease   = "ingress-nginx"
 	nginxNamespace      = "ingress-nginx"
 	nginxRepoName       = "nginx"
 	nginxRepoURL        = "https://kubernetes.github.io/ingress-nginx"
-	k8sContext          = "docker-desktop"
 )
 
 // HelmClient primarily for testing purposes
@@ -64,26 +62,14 @@ type HTTPClient interface {
 // BrowserLauncher primarily for testing purposes.
 type BrowserLauncher func(url string) error
 
-// Errors related to specific systems that this code integrates with.
-var (
-	// ErrDocker is returned anytime an error occurs when attempting to communicate with docker.
-	ErrDocker = errors.New("error communicating with docker")
-
-	// ErrKubernetes is returned anytime an error occurs when attempting to communicate with the kubernetes cluster
-	ErrKubernetes = errors.New("error communicating with kubernetes")
-)
-
-// DockerClient primarily for testing purposes
-type DockerClient interface {
-	ServerVersion(context.Context) (types.Version, error)
-}
-
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
-	docker   DockerClient
+	provider k8s.Provider
+	cluster  k8s.Cluster
 	http     HTTPClient
 	helm     HelmClient
-	k8s      K8sClient
+	k8s      k8s.K8sClient
+	portHTTP int
 	tel      telemetry.Client
 	launcher BrowserLauncher
 	userHome string
@@ -114,16 +100,9 @@ func WithHelmClient(client HelmClient) Option {
 }
 
 // WithK8sClient define the k8s client for this command.
-func WithK8sClient(client K8sClient) Option {
+func WithK8sClient(client k8s.K8sClient) Option {
 	return func(c *Command) {
 		c.k8s = client
-	}
-}
-
-// WithDockerClient define the docker client for this command.
-func WithDockerClient(client DockerClient) Option {
-	return func(c *Command) {
-		c.docker = client
 	}
 }
 
@@ -134,41 +113,25 @@ func WithBrowserLauncher(launcher BrowserLauncher) Option {
 	}
 }
 
+// WithUserHome define the user's home directory.
+func WithUserHome(home string) Option {
+	return func(c *Command) {
+		c.userHome = home
+	}
+}
+
 // New creates a new Command
-// TODO: this method does too much
-func New(opts ...Option) (*Command, error) {
-	c := &Command{}
+func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) {
+	c := &Command{provider: provider, portHTTP: portHTTP}
 	for _, opt := range opts {
 		opt(c)
 	}
 
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("could not determine user home directory: %w", err)
-	}
-	c.userHome = userHome
-
-	// set docker client if not defined
-	if c.docker == nil {
-		switch runtime.GOOS {
-		case "darwin":
-			// on mac, sometimes the host isn't set correctly, if it fails check the home directory
-			c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
-			if err != nil {
-				// keep the original error, as we'll join with the next error (if another error occurs)
-				outerErr := err
-				c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", c.userHome)))
-				if err != nil {
-					err = errors.Join(err, outerErr)
-				}
-			}
-		case "windows":
-			c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("npipe:////./pipe/docker_engine"))
-		default:
-			c.docker, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
-		}
-		if err != nil {
-			return nil, errors.Join(ErrDocker, fmt.Errorf("could not create docker client: %w", err))
+	// determine userhome if not defined
+	if c.userHome == "" {
+		var err error
+		if c.userHome, err = os.UserHomeDir(); err != nil {
+			return nil, fmt.Errorf("could not determine user home directory: %w", err)
 		}
 	}
 
@@ -179,45 +142,20 @@ func New(opts ...Option) (*Command, error) {
 
 	// set k8s client, if not defined
 	if c.k8s == nil {
-		k8sCfg, err := k8sClientConfig(c.userHome)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrKubernetes, err)
+		kubecfg := filepath.Join(c.userHome, provider.Kubeconfig)
+		var err error
+		if c.k8s, err = defaultK8s(kubecfg, provider.Context); err != nil {
+			return nil, err
 		}
-
-		restCfg, err := k8sCfg.ClientConfig()
-		if err != nil {
-			return nil, fmt.Errorf("%w: could not create rest config: %w", ErrKubernetes, err)
-		}
-
-		k8s, err := kubernetes.NewForConfig(restCfg)
-		if err != nil {
-			return nil, fmt.Errorf("%w: could not create clientset: %w", ErrKubernetes, err)
-		}
-
-		c.k8s = &defaultK8sClient{k8s: k8s}
 	}
 
 	// set the helm client, if not defined
 	if c.helm == nil {
-		k8sCfg, err := k8sClientConfig(c.userHome)
-		if err != nil {
-			return nil, fmt.Errorf("could not create k8s client config: %w", err)
+		kubecfg := filepath.Join(c.userHome, provider.Kubeconfig)
+		var err error
+		if c.helm, err = defaultHelm(kubecfg, provider.Context); err != nil {
+			return nil, err
 		}
-
-		restCfg, err := k8sCfg.ClientConfig()
-		if err != nil {
-			return nil, fmt.Errorf("could not determine kubernetes client: %w", err)
-		}
-
-		helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
-			Options:    &helmclient.Options{Namespace: airbyteNamespace, Output: &noopWriter{}, DebugLog: func(format string, v ...interface{}) {}},
-			RestConfig: restCfg,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("could not create helm client: %w", err)
-		}
-
-		c.helm = helm
 	}
 
 	// set telemetry client, if not defined
@@ -225,6 +163,7 @@ func New(opts ...Option) (*Command, error) {
 		c.tel = telemetry.NoopClient{}
 	}
 
+	// set the browser launcher, if not defined
 	if c.launcher == nil {
 		c.launcher = func(url string) error {
 			var cmd *exec.Cmd
@@ -244,28 +183,19 @@ func New(opts ...Option) (*Command, error) {
 	{
 		k8sVersion, err := c.k8s.GetServerVersion()
 		if err != nil {
-			return nil, fmt.Errorf("%w: could not fetch kubernetes server version: %w", ErrKubernetes, err)
+			return nil, fmt.Errorf("%w: could not fetch kubernetes server version: %w", localerr.ErrKubernetes, err)
 		}
 		c.tel.Attr("k8s_version", k8sVersion)
 	}
 
-	return c, nil
-}
+	// set provider version
+	c.tel.Attr("provider", provider.Name)
 
-// k8sClientConfig returns a k8s client config using the ~/.kubc/config file and the k8sContext context.
-func k8sClientConfig(userHome string) (clientcmd.ClientConfig, error) {
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: filepath.Join(userHome, ".kube", "config")},
-		&clientcmd.ConfigOverrides{CurrentContext: k8sContext},
-	), nil
+	return c, nil
 }
 
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, user, pass string) error {
-	if err := c.checkDocker(ctx); err != nil {
-		return err
-	}
-
 	if err := c.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     airbyteRepoName,
@@ -284,14 +214,26 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		chartName:    nginxChartName,
 		chartRelease: nginxChartRelease,
 		namespace:    nginxNamespace,
+		values:       append(c.provider.HelmNginx, fmt.Sprintf("controller.service.ports.http=%d", c.portHTTP)),
 	}); err != nil {
+		// If we timed out, there is a good chance it's due to an unavailable port, check if this is the case.
+		// As the kubernetes client doesn't return usable error types, have to check for a specific string value.
+		if strings.Contains(err.Error(), "client rate limiter Wait returned an error") {
+			srv, err := c.k8s.GetService(ctx, nginxNamespace, "ingress-nginx-controller")
+			// If there is an error, we can ignore it as we only are checking for a missing ingress entry,
+			// and an error would indicate the inability to check for that entry.
+			if err == nil {
+				ingresses := srv.Status.LoadBalancer.Ingress
+				if len(ingresses) == 0 {
+					// if there are no ingresses, that is a possible indicator that the port is already in use.
+					return fmt.Errorf("%w: could not install nginx chart", localerr.ErrIngress)
+				}
+			}
+		}
 		return fmt.Errorf("could not install nginx chart: %w", err)
 	}
 
-	spinnerIngress, err := pterm.DefaultSpinner.Start("ingress - installing")
-	if err != nil {
-		return fmt.Errorf("could not start ingress spinner: %w", err)
-	}
+	spinnerIngress, _ := pterm.DefaultSpinner.Start("ingress - installing")
 
 	// basic auth
 	if err := c.handleBasicAuthSecret(ctx, user, pass); err != nil {
@@ -312,7 +254,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		spinnerIngress.Success("ingress - installed")
 	}
 
-	return c.openBrowser(ctx, "http://localhost")
+	return c.openBrowser(ctx, fmt.Sprintf("http://localhost:%d", c.portHTTP))
 }
 
 // handleBasicAuthSecret creates or updates the appropriate basic auth credentials for ingress.
@@ -328,15 +270,8 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 
 // Uninstall handles the uninstallation of Airbyte.
 func (c *Command) Uninstall(ctx context.Context) error {
-	if err := c.checkDocker(ctx); err != nil {
-		return err
-	}
-
 	{
-		spinnerAb, err := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling airbyte chart %s", airbyteChartRelease))
-		if err != nil {
-			return fmt.Errorf("could not create spinner: %w", err)
-		}
+		spinnerAb, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling airbyte chart %s", airbyteChartRelease))
 
 		airbyteChartExists := true
 		if _, err := c.helm.GetRelease(airbyteChartRelease); err != nil {
@@ -356,10 +291,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 	}
 
 	{
-		spinnerNginx, err := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling nginx chart %s", nginxChartRelease))
-		if err != nil {
-			return fmt.Errorf("coud not create spinner: %w", err)
-		}
+		spinnerNginx, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling nginx chart %s", nginxChartRelease))
 
 		nginxChartExists := true
 		if _, err := c.helm.GetRelease(nginxChartRelease); err != nil {
@@ -379,10 +311,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 		spinnerNginx.Success()
 	}
 
-	spinnerNamespace, err := pterm.DefaultSpinner.Start(fmt.Sprintf("k8s - deleting namespace %s", airbyteNamespace))
-	if err != nil {
-		return fmt.Errorf("could not create spinner: %w", err)
-	}
+	spinnerNamespace, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("k8s - deleting namespace %s", airbyteNamespace))
 
 	if err := c.k8s.DeleteNamespace(ctx, airbyteNamespace); err != nil {
 		if !k8serrors.IsNotFound(err) {
@@ -391,7 +320,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 		}
 	}
 
-	// there is no blocking delete namespace call, so poll until it's been deleted or we've exhausted our time
+	// there is no blocking delete namespace call, so poll until it's been deleted, or we've exhausted our time
 	namespaceDeleted := false
 	var wg sync.WaitGroup
 	ticker := time.NewTicker(1 * time.Second) // how ofter to check
@@ -425,29 +354,6 @@ func (c *Command) Uninstall(ctx context.Context) error {
 	return nil
 }
 
-// checkDocker call the ServerVersion on the DockerClient.
-// Will return ErrDocker if any error is caused by docker.
-func (c *Command) checkDocker(ctx context.Context) error {
-	spinner, err := pterm.DefaultSpinner.Start("docker - verifying")
-	if err != nil {
-		return fmt.Errorf("could not start spinner: %w", err)
-	}
-
-	ver, err := c.docker.ServerVersion(ctx)
-	if err != nil {
-		spinner.Fail("docker is not running")
-		return errors.Join(ErrDocker, fmt.Errorf("docker is not running: %w", err))
-	}
-
-	c.tel.Attr("docker_version", ver.Version)
-	c.tel.Attr("docker_arch", ver.Arch)
-	c.tel.Attr("docker_platform", ver.Platform.Name)
-
-	spinner.Success(fmt.Sprintf("docker - verified; version: %s", ver.Version))
-
-	return nil
-}
-
 // chartRequest exists to make all the parameters to handleChart somewhat manageable
 type chartRequest struct {
 	name         string
@@ -456,6 +362,7 @@ type chartRequest struct {
 	chartName    string
 	chartRelease string
 	namespace    string
+	values       []string
 }
 
 // handleChart will handle the installation of a chart
@@ -463,10 +370,7 @@ func (c *Command) handleChart(
 	ctx context.Context,
 	req chartRequest,
 ) error {
-	spinner, err := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - adding %s repository", req.name))
-	if err != nil {
-		return fmt.Errorf("could not start spinner: %w", err)
-	}
+	spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - adding %s repository", req.name))
 
 	if err := c.helm.AddOrUpdateChartRepo(repo.Entry{
 		Name: req.repoName,
@@ -477,43 +381,41 @@ func (c *Command) handleChart(
 	}
 
 	spinner.UpdateText(fmt.Sprintf("helm - fetching chart %s", req.chartName))
-	chart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{})
+	helmChart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{})
 	if err != nil {
 		spinner.Fail(fmt.Sprintf("helm - could not fetch chart %s", req.chartName))
 		return fmt.Errorf("could not fetch chart %s: %w", req.chartName, err)
 	}
 
-	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), chart.Metadata.Version)
+	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
 
-	spinner.UpdateText(fmt.Sprintf("helm - installing chart %s (%s)", req.chartName, chart.Metadata.Version))
-	release, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
+	spinner.UpdateText(fmt.Sprintf("helm - installing chart %s (%s)", req.chartName, helmChart.Metadata.Version))
+	helmRelease, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
 		ReleaseName:     req.chartRelease,
 		ChartName:       req.chartName,
 		CreateNamespace: true,
 		Namespace:       req.namespace,
 		Wait:            true,
 		Timeout:         10 * time.Minute,
+		ValuesOptions:   values.Options{Values: req.values},
 	},
 		&helmclient.GenericHelmOptions{},
 	)
 	if err != nil {
-		spinner.Fail(fmt.Sprintf("helm - failed to install chart %s (%s)", req.chartName, chart.Metadata.Version))
+		spinner.Fail(fmt.Sprintf("helm - failed to install chart %s (%s)", req.chartName, helmChart.Metadata.Version))
 		return fmt.Errorf("could not install helm: %w", err)
 	}
 
-	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(release.Version))
+	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 
-	spinner.Success(fmt.Sprintf("helm - chart installed; name: %s, namespace: %s, version: %d", release.Name, release.Namespace, release.Version))
+	spinner.Success(fmt.Sprintf("helm - chart installed; name: %s, namespace: %s, version: %d", helmRelease.Name, helmRelease.Namespace, helmRelease.Version))
 	return nil
 }
 
 // openBrowser will open the url in the user's browser but only if the url returns a 200 response code first
 // TODO: clean up this method, make it testable
 func (c *Command) openBrowser(ctx context.Context, url string) error {
-	spinner, err := pterm.DefaultSpinner.Start("browser - waiting for ingress")
-	if err != nil {
-		return fmt.Errorf("could not start browser spinner: %w", err)
-	}
+	spinner, _ := pterm.DefaultSpinner.Start("browser - waiting for ingress")
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -533,11 +435,11 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 				}
 				res, _ := c.http.Do(req)
 				// if no auth, we should get a 200
-				if res != nil && res.StatusCode == 200 {
+				if res != nil && res.StatusCode == http.StatusOK {
 					alive <- nil
 				}
 				// if basic auth, we should get a 401 with a specific header that contains abctl
-				if res != nil && res.StatusCode == 401 && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
+				if res != nil && res.StatusCode == http.StatusUnauthorized && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
 					alive <- nil
 				}
 			}
@@ -547,11 +449,11 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 	select {
 	case <-ctx.Done():
 		spinner.Fail("browser - timed out")
-		return fmt.Errorf("liveness check failed: %w", ctx.Err())
+		return fmt.Errorf("browser liveness check failed: %w", ctx.Err())
 	case err := <-alive:
 		if err != nil {
 			spinner.Fail("browser - failed liveness check")
-			return fmt.Errorf("failed liveness check: %w", err)
+			return fmt.Errorf("browser failed liveness check: %w", err)
 		}
 	}
 	// if we're here, then no errors occurred
@@ -563,7 +465,7 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 		return fmt.Errorf("could not launch browser: %w", err)
 	}
 
-	spinner.Success("browser - launched")
+	spinner.Success(fmt.Sprintf("browser - launched (%s)", url))
 	return nil
 }
 
@@ -610,6 +512,56 @@ func ingress() *networkingv1.Ingress {
 			},
 		},
 	}
+}
+
+// defaultK8s returns the default k8s client
+func defaultK8s(kubecfg, kubectx string) (k8s.K8sClient, error) {
+	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
+	}
+
+	restCfg, err := k8sCfg.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
+	}
+	k8sClient, err := kubernetes.NewForConfig(restCfg)
+	if err != nil {
+		return nil, fmt.Errorf("%w: could not create clientset: %w", localerr.ErrKubernetes, err)
+	}
+
+	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
+}
+
+// defaultHelm returns the default helm client
+func defaultHelm(kubecfg, kubectx string) (HelmClient, error) {
+	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
+	}
+
+	restCfg, err := k8sCfg.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
+	}
+
+	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
+		Options:    &helmclient.Options{Namespace: airbyteNamespace, Output: &noopWriter{}, DebugLog: func(format string, v ...interface{}) {}},
+		RestConfig: restCfg,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("coud not create helm client: %w", err)
+	}
+
+	return helm, nil
+}
+
+// k8sClientConfig returns a k8s client config using the ~/.kubc/config file and the k8sContext context.
+func k8sClientConfig(kubecfg, kubectx string) (clientcmd.ClientConfig, error) {
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
+		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
+	), nil
 }
 
 // noopWriter is used by the helm client to suppress its verbose output
