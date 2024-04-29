@@ -61,6 +61,7 @@ func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
 		"state":             string(es),
 		"os":                runtime.GOOS,
 		"build":             build.Version,
+		"script_version":    build.Version,
 		"cpu_count":         strconv.Itoa(runtime.NumCPU()),
 		"mem_total_bytes":   strconv.FormatUint(memory.TotalMemory(), 10),
 		"mem_free_bytes":    strconv.FormatUint(memory.FreeMemory(), 10),
