@@ -43,23 +43,25 @@ func New() (*Docker, error) {
 	}
 
 	var dockerCli *client.Client
+	dockerOpts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
 
 	switch runtime.GOOS {
 	case "darwin":
 		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
-		dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
+		dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost("unix:///var/run/docker.sock"))...)
 		if err != nil {
 			// keep the original error, as we'll join with the next error (if another error occurs)
 			outerErr := err
-			dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", userHome)))
+			// this works as the last WithHost call will win
+			dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", userHome)))...)
 			if err != nil {
 				err = fmt.Errorf("%w: %w", err, outerErr)
 			}
 		}
 	case "windows":
-		dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("npipe:////./pipe/docker_engine"))
+		dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost("npipe:////./pipe/docker_engine"))...)
 	default:
-		dockerCli, err = client.NewClientWithOpts(client.FromEnv, client.WithHost("unix:///var/run/docker.sock"))
+		dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost("unix:///var/run/docker.sock"))...)
 	}
 
 	if err != nil {
