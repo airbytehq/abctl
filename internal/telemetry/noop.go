@@ -1,20 +1,22 @@
 package telemetry
 
+import "context"
+
 var _ Client = (*NoopClient)(nil)
 
 // NoopClient client, all methods are no-ops.
 type NoopClient struct {
 }
 
-func (n NoopClient) Start(EventType) error {
+func (n NoopClient) Start(context.Context, EventType) error {
 	return nil
 }
 
-func (n NoopClient) Success(EventType) error {
+func (n NoopClient) Success(context.Context, EventType) error {
 	return nil
 }
 
-func (n NoopClient) Failure(_ EventType, _ error) error {
+func (n NoopClient) Failure(context.Context, EventType, error) error {
 	return nil
 }
 

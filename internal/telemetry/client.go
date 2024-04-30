@@ -1,9 +1,11 @@
 package telemetry
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/pterm/pterm"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -27,11 +29,11 @@ const (
 // Client interface for telemetry data.
 type Client interface {
 	// Start should be called as soon quickly as possible.
-	Start(EventType) error
+	Start(context.Context, EventType) error
 	// Success should be called only if the activity succeeded.
-	Success(EventType) error
+	Success(context.Context, EventType) error
 	// Failure should be called only if the activity failed.
-	Failure(EventType, error) error
+	Failure(context.Context, EventType, error) error
 	// Attr should be called to add additional attributes to this activity.
 	Attr(key, val string)
 }
@@ -39,6 +41,7 @@ type Client interface {
 type getConfig struct {
 	dnt      bool
 	userHome string
+	h        *http.Client
 }
 
 // GetOption is for optional configuration of the Get call.

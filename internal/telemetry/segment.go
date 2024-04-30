@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/oklog/ulid/v2"
@@ -14,47 +15,75 @@ import (
 	"time"
 )
 
-const (
-	trackingKey = "kpYsVGLgxEqD5OuSZAQ9zWmdgBlyiaej"
-	url         = "https://api.segment.io/v1/track"
-)
-
 var _ Client = (*SegmentClient)(nil)
+
+// Doer interface for testing purposes
+type Doer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// Option is a configuration option for segment
+type Option func(*SegmentClient)
+
+// WithHTTPClient overrides the default http.Client, primarily for testing purposes.
+func WithHTTPClient(d Doer) Option {
+	return func(client *SegmentClient) {
+		client.doer = d
+	}
+}
+
+// WithSessionID overrides the default ulid session, primarily for testing purposes.
+func WithSessionID(sessionID ulid.ULID) Option {
+	return func(client *SegmentClient) {
+		client.sessionID = sessionID
+	}
+}
 
 // SegmentClient client, all methods communicate with segment.
 type SegmentClient struct {
-	h         http.Client
+	doer      Doer
 	sessionID ulid.ULID
 	cfg       Config
 	attrs     map[string]string
 }
 
-func NewSegmentClient(cfg Config) *SegmentClient {
-	return &SegmentClient{
-		h:         http.Client{Timeout: 10 * time.Second},
+func NewSegmentClient(cfg Config, opts ...Option) *SegmentClient {
+	cli := &SegmentClient{
+		doer:      &http.Client{Timeout: 10 * time.Second},
 		cfg:       cfg,
 		sessionID: ulid.Make(),
 		attrs:     map[string]string{},
 	}
+
+	for _, opt := range opts {
+		opt(cli)
+	}
+
+	return cli
 }
 
-func (s *SegmentClient) Start(et EventType) error {
-	return s.send(Start, et, nil)
+func (s *SegmentClient) Start(ctx context.Context, et EventType) error {
+	return s.send(ctx, Start, et, nil)
 }
 
-func (s *SegmentClient) Success(et EventType) error {
-	return s.send(Success, et, nil)
+func (s *SegmentClient) Success(ctx context.Context, et EventType) error {
+	return s.send(ctx, Success, et, nil)
 }
 
-func (s *SegmentClient) Failure(et EventType, err error) error {
-	return s.send(Failed, et, err)
+func (s *SegmentClient) Failure(ctx context.Context, et EventType, err error) error {
+	return s.send(ctx, Failed, et, err)
 }
 
 func (s *SegmentClient) Attr(key, val string) {
 	s.attrs[key] = val
 }
 
-func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
+const (
+	trackingKey = "kpYsVGLgxEqD5OuSZAQ9zWmdgBlyiaej"
+	url         = "https://api.segment.io/v1/track"
+)
+
+func (s *SegmentClient) send(ctx context.Context, es EventState, et EventType, ee error) error {
 	properties := map[string]string{
 		"deployment_method": "abctl",
 		"session_id":        s.sessionID.String(),
@@ -86,7 +115,13 @@ func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
 		return fmt.Errorf("could not create request body: %w", err)
 	}
 
-	resp, err := s.h.Post(url, "application/json", bytes.NewBuffer(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	if err != nil {
+		return fmt.Errorf("could not create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.doer.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not post: %w", err)
 	}
