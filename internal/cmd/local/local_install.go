@@ -1,6 +1,8 @@
 package local
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+)
 
 const (
 	// envBasicAuthUser is the env-var that can be specified to override the default basic-auth username.
@@ -9,15 +11,7 @@ const (
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
 )
 
-type InstallOptions struct {
-}
-
 func NewCmdInstall() *cobra.Command {
-	var (
-		flagUsername string
-		flagPassword string
-	)
-
 	cmd := &cobra.Command{
 		Use:     "install",
 		Short:   "Install Airbyte locally",
@@ -25,8 +19,8 @@ func NewCmdInstall() *cobra.Command {
 		RunE:    runInstall,
 	}
 
-	InstallCmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
-	InstallCmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
+	cmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
+	cmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 
 	return cmd
 }

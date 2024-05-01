@@ -3,7 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
-	"github.com/airbytehq/abctl/cmd/local"
+	"github.com/airbytehq/abctl/internal/cmd/local"
 	"github.com/airbytehq/abctl/internal/cmd/version"
 	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/pterm/pterm"
@@ -81,20 +81,7 @@ func NewCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&flagDNT, "dnt", false, "opt out of telemetry data collection")
 
 	cmd.AddCommand(version.NewCmdVersion())
-	cmd.AddCommand(local.Cmd)
+	cmd.AddCommand(local.NewCmdLocal())
 
 	return cmd
 }
-
-//func init() {
-//	// configure cobra to chain Persistent*Run commands together
-//	cobra.EnableTraverseRunHooks = true
-//
-//	rootCmd.SilenceUsage = true
-//	rootCmd.SilenceErrors = true
-//
-//	rootCmd.AddCommand(version.Cmd)
-//	rootCmd.AddCommand(local.Cmd)
-//	rootCmd.CompletionOptions.DisableDefaultCmd = true
-//	rootCmd.PersistentFlags().BoolVar(&flagDNT, "dnt", false, "opt out of telemetry data collection")
-//}
