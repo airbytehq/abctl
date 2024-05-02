@@ -3,8 +3,8 @@ package cmd
 import (
 	"context"
 	"errors"
-	"github.com/airbytehq/abctl/cmd/local"
-	"github.com/airbytehq/abctl/cmd/version"
+	"github.com/airbytehq/abctl/internal/cmd/local"
+	"github.com/airbytehq/abctl/internal/cmd/version"
 	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -34,29 +34,10 @@ This could be in indication that the ingress port is already in use by a differe
 The ingress port can be changed by passing the flag --port.`
 )
 
-var (
-	// flagDNT indicates if the do-not-track flag was specified
-	flagDNT bool
-
-	// flagK8sProvider indicates which k8s provider to use
-	flagK8sProvider bool
-
-	// rootCmd represents the base command when called without any subcommands
-	rootCmd = &cobra.Command{
-		Use:   "abctl",
-		Short: pterm.LightBlue("Airbyte") + "'s command line tool",
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if flagDNT {
-				pterm.Info.Println("telemetry collection disabled (--dnt)")
-			}
-		},
-	}
-)
-
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute(ctx context.Context) {
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
+func Execute(ctx context.Context, cmd *cobra.Command) {
+	if err := cmd.ExecuteContext(ctx); err != nil {
 		pterm.Error.Println(err)
 
 		if errors.Is(err, localerr.ErrDocker) {
@@ -72,19 +53,35 @@ func Execute(ctx context.Context) {
 			pterm.Println()
 			pterm.Info.Printfln(helpPort)
 		}
+
 		os.Exit(1)
 	}
 }
 
-func init() {
-	// configure cobra to chain Persistent*Run commands together
+// NewCmd returns the abctl cobra command.
+func NewCmd() *cobra.Command {
 	cobra.EnableTraverseRunHooks = true
 
-	rootCmd.SilenceUsage = true
-	rootCmd.SilenceErrors = true
+	var flagDNT bool
 
-	rootCmd.AddCommand(version.Cmd)
-	rootCmd.AddCommand(local.Cmd)
-	rootCmd.CompletionOptions.DisableDefaultCmd = true
-	rootCmd.PersistentFlags().BoolVar(&flagDNT, "dnt", false, "opt out of telemetry data collection")
+	cmd := &cobra.Command{
+		Use:   "abctl",
+		Short: pterm.LightBlue("Airbyte") + "'s command line tool",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if flagDNT {
+				pterm.Info.Println("telemetry collection disabled (--dnt)")
+			}
+		},
+	}
+
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+	cmd.CompletionOptions.DisableDefaultCmd = true
+
+	cmd.PersistentFlags().BoolVar(&flagDNT, "dnt", false, "opt out of telemetry data collection")
+
+	cmd.AddCommand(version.NewCmdVersion())
+	cmd.AddCommand(local.NewCmdLocal())
+
+	return cmd
 }

@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/local"
 	"github.com/airbytehq/abctl/internal/local/docker"
@@ -12,7 +13,7 @@ import (
 )
 
 func runInstall(cmd *cobra.Command, _ []string) error {
-	return telemetryWrapper(telemetry.Install, func() error {
+	return telemetryWrapper(cmd.Context(), telemetry.Install, func() error {
 		spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("cluster - checking status of cluster %s", provider.ClusterName))
 
 		cluster, err := k8s.NewCluster(provider)
@@ -74,7 +75,7 @@ func runInstall(cmd *cobra.Command, _ []string) error {
 }
 
 func runUninstall(cmd *cobra.Command, _ []string) error {
-	return telemetryWrapper(telemetry.Uninstall, func() error {
+	return telemetryWrapper(cmd.Context(), telemetry.Uninstall, func() error {
 		spinnerClusterCheck, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("cluster - checking status of cluster %s", provider.ClusterName))
 
 		cluster, err := k8s.NewCluster(provider)
@@ -114,17 +115,17 @@ func runUninstall(cmd *cobra.Command, _ []string) error {
 }
 
 // telemetryWrapper wraps the function calls with the telemetry handlers
-func telemetryWrapper(et telemetry.EventType, f func() error) (err error) {
-	if err := telClient.Start(et); err != nil {
+func telemetryWrapper(ctx context.Context, et telemetry.EventType, f func() error) (err error) {
+	if err := telClient.Start(ctx, et); err != nil {
 		pterm.Warning.Printfln("unable to send telemetry start data: %s", err)
 	}
 	defer func() {
 		if err != nil {
-			if err := telClient.Failure(et, err); err != nil {
+			if err := telClient.Failure(ctx, et, err); err != nil {
 				pterm.Warning.Printfln("unable to send telemetry failure data: %s", err)
 			}
 		} else {
-			if err := telClient.Success(et); err != nil {
+			if err := telClient.Success(ctx, et); err != nil {
 				pterm.Warning.Printfln("unable to send telemetry success data: %s", err)
 			}
 		}

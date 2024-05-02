@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/airbytehq/abctl/cmd"
+	"github.com/airbytehq/abctl/internal/cmd"
 	"os"
 	"os/signal"
 	"syscall"
@@ -20,5 +20,6 @@ func main() {
 		cancel()
 	}()
 
-	cmd.Execute(ctx)
+	root := cmd.NewCmd()
+	cmd.Execute(ctx, root)
 }

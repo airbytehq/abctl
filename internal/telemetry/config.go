@@ -10,7 +10,7 @@ import (
 
 const (
 	// Welcome is displayed the first time the telemetry config is created.
-	Welcome = `Thanks you for using Airbyte!
+	Welcome = `Thanks for using Airbyte!
 Anonymous usage reporting is currently enabled. For more information, please see https://docs.airbyte.com/telemetry`
 )
 

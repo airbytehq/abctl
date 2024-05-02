@@ -17,7 +17,9 @@ func TestCmd_Output(t *testing.T) {
 		pterm.SetDefaultOutput(os.Stdout)
 	})
 
-	if err := Cmd.Execute(); err != nil {
+	cmd := NewCmdVersion()
+
+	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -47,7 +49,8 @@ func TestCmd_OutputOverride(t *testing.T) {
 
 	exp := fmt.Sprintf("version: %s\nrevision: %s\ntime: %s\nmodified: %t\n", build.Version, build.Revision, build.ModificationTime, build.Modified)
 
-	if err := Cmd.Execute(); err != nil {
+	cmd := NewCmdVersion()
+	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
 

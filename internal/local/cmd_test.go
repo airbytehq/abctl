@@ -233,22 +233,22 @@ func (m *mockK8sClient) GetServerVersion() (string, error) {
 var _ telemetry.Client = (*mockTelemetryClient)(nil)
 
 type mockTelemetryClient struct {
-	start   func(eventType telemetry.EventType) error
-	success func(eventType telemetry.EventType) error
-	failure func(eventType telemetry.EventType, err error) error
+	start   func(context.Context, telemetry.EventType) error
+	success func(context.Context, telemetry.EventType) error
+	failure func(context.Context, telemetry.EventType, error) error
 	attr    func(key, val string)
 }
 
-func (m *mockTelemetryClient) Start(eventType telemetry.EventType) error {
-	return m.start(eventType)
+func (m *mockTelemetryClient) Start(ctx context.Context, eventType telemetry.EventType) error {
+	return m.start(ctx, eventType)
 }
 
-func (m *mockTelemetryClient) Success(eventType telemetry.EventType) error {
-	return m.success(eventType)
+func (m *mockTelemetryClient) Success(ctx context.Context, eventType telemetry.EventType) error {
+	return m.success(ctx, eventType)
 }
 
-func (m *mockTelemetryClient) Failure(eventType telemetry.EventType, err error) error {
-	return m.failure(eventType, err)
+func (m *mockTelemetryClient) Failure(ctx context.Context, eventType telemetry.EventType, err error) error {
+	return m.failure(ctx, eventType, err)
 }
 
 func (m *mockTelemetryClient) Attr(key, val string) {
