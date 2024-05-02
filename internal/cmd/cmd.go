@@ -69,7 +69,7 @@ func NewCmd() *cobra.Command {
 		Short: pterm.LightBlue("Airbyte") + "'s command line tool",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if flagDNT {
-				pterm.Info.Println("telemetry collection disabled (--dnt)")
+				pterm.Info.Println("Telemetry collection disabled (--dnt)")
 			}
 		},
 	}

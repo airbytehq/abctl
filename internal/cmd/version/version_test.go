@@ -14,47 +14,81 @@ func TestCmd_Output(t *testing.T) {
 	b := bytes.NewBufferString("")
 	pterm.SetDefaultOutput(b)
 	t.Cleanup(func() {
+		fmt.Println("outer cleanup")
 		pterm.SetDefaultOutput(os.Stdout)
 	})
 
-	cmd := NewCmdVersion()
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name             string
+		version          string
+		revision         string
+		modificationTime string
+		modified         bool
+		expected         string
+	}{
+		{
+			name:     "version defined",
+			version:  "v0.0.0",
+			expected: "version: v0.0.0\nmodified: false\n",
+		},
+		{
+			name:     "revision defined",
+			version:  "v0.0.0",
+			revision: "d34db33f",
+			expected: "version: v0.0.0\nrevision: d34db33f\nmodified: false\n",
+		},
+		{
+			name:             "modification time defined",
+			version:          "v0.0.0",
+			modificationTime: "time-goes-here",
+			expected:         "version: v0.0.0\ntime: time-goes-here\nmodified: false\n",
+		},
+		{
+			name:     "modified defined",
+			version:  "v0.0.0",
+			modified: true,
+			expected: "version: v0.0.0\nmodified: true\n",
+		},
+		{
+			name:             "everything defined",
+			version:          "v0.0.0",
+			revision:         "d34db33f",
+			modificationTime: "time-goes-here",
+			modified:         true,
+			expected:         "version: v0.0.0\nrevision: d34db33f\ntime: time-goes-here\nmodified: true\n",
+		},
 	}
 
-	exp := fmt.Sprintf("version: %s\nrevision: %s\ntime: %s\nmodified: %t\n", build.Version, build.Revision, build.ModificationTime, build.Modified)
-
-	if d := cmp.Diff(exp, b.String()); d != "" {
-		t.Error("cmd mismatch (-want +got):\n", d)
-	}
-}
-
-func TestCmd_OutputOverride(t *testing.T) {
 	origVersion := build.Version
-	build.Version = "v12.15.82"
-	build.Revision = "revision"
-	build.Modified = true
-	build.ModificationTime = "20240401T00:00:00Z"
-	b := bytes.NewBufferString("")
-	pterm.SetDefaultOutput(b)
+	origRevision := build.Revision
+	origModification := build.ModificationTime
+	origModified := build.Modified
 
-	t.Cleanup(func() {
-		pterm.SetDefaultOutput(os.Stdout)
-		build.Version = origVersion
-		build.Revision = ""
-		build.Modified = false
-		build.ModificationTime = ""
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 
-	exp := fmt.Sprintf("version: %s\nrevision: %s\ntime: %s\nmodified: %t\n", build.Version, build.Revision, build.ModificationTime, build.Modified)
+			t.Cleanup(func() {
+				build.Version = origVersion
+				build.Revision = origRevision
+				build.ModificationTime = origModification
+				build.Modified = origModified
+				b.Reset()
+			})
 
-	cmd := NewCmdVersion()
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
-	}
+			build.Version = tt.version
+			build.Revision = tt.revision
+			build.ModificationTime = tt.modificationTime
+			build.Modified = tt.modified
 
-	if d := cmp.Diff(exp, b.String()); d != "" {
-		t.Error("cmd mismatch (-want +got):\n", d)
+			cmd := NewCmdVersion()
+
+			if err := cmd.Execute(); err != nil {
+				t.Fatal(err)
+			}
+
+			if d := cmp.Diff(tt.expected, b.String()); d != "" {
+				t.Error("cmd mismatch (-want +got):\n", d)
+			}
+		})
 	}
 }
