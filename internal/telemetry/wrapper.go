@@ -6,7 +6,7 @@ import (
 )
 
 // Wrapper wraps the function calls with the telemetry handlers
-func Wrapper(ctx context.Context, et EventType, f func() error) (err error) {
+func Wrapper(ctx context.Context, et EventType, f func() error) error {
 	cli := Get()
 
 	attemptSuccessFailure := true
@@ -16,21 +16,21 @@ func Wrapper(ctx context.Context, et EventType, f func() error) (err error) {
 		attemptSuccessFailure = false
 	}
 
-	defer func() {
-		if !attemptSuccessFailure {
-			return
-		}
-
-		if err != nil {
-			if err := cli.Failure(ctx, et, err); err != nil {
-				pterm.Debug.Printfln("Unable to send telemetry failure data: %s", err)
-			}
-		} else {
-			if err := cli.Success(ctx, et); err != nil {
-				pterm.Debug.Printfln("Unable to send telemetry success data: %s", err)
+	if err := f(); err != nil {
+		if attemptSuccessFailure {
+			if errTel := cli.Failure(ctx, et, err); errTel != nil {
+				pterm.Debug.Printfln("Unable to send telemetry failure data: %s", errTel)
 			}
 		}
-	}()
 
-	return f()
+		return err
+	}
+
+	if attemptSuccessFailure {
+		if err := cli.Success(ctx, et); err != nil {
+			pterm.Debug.Printfln("Unable to send telemetry success data: %s", err)
+		}
+	}
+
+	return nil
 }
