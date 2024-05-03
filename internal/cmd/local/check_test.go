@@ -31,49 +31,19 @@ func TestDockerInstalled(t *testing.T) {
 		},
 	}
 
-	err := dockerInstalled(context.Background(), telemetry.NoopClient{})
+	version, err := dockerInstalled(context.Background())
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
-}
 
-func TestDockerInstalled_TelemetryAttrs(t *testing.T) {
-	t.Cleanup(func() {
-		dockerClient = nil
-	})
-
-	platformName := "platform name"
-	version := "version"
-	arch := "arch"
-
-	dockerClient = &docker.Docker{
-		Client: mockDockerClient{
-			serverVersion: func(ctx context.Context) (types.Version, error) {
-				return types.Version{
-					Platform: struct{ Name string }{Name: platformName},
-					Version:  version,
-					Arch:     arch,
-				}, nil
-			},
-		},
+	expectedVersion := docker.Version{
+		Version:  "version",
+		Arch:     "arch",
+		Platform: "test",
 	}
 
-	attrs := map[string]string{}
-	telemetryClient := &mockTelemetryClient{attr: func(key, val string) {
-		attrs[key] = val
-	}}
-
-	err := dockerInstalled(context.Background(), telemetryClient)
-	if err != nil {
-		t.Error("unexpected error:", err)
-	}
-	expAttrs := map[string]string{
-		"docker_version":  version,
-		"docker_arch":     arch,
-		"docker_platform": platformName,
-	}
-	if d := cmp.Diff(expAttrs, attrs); d != "" {
-		t.Error("mismatched attributes:", d)
+	if d := cmp.Diff(expectedVersion, version); d != "" {
+		t.Error("unexpected version:", d)
 	}
 }
 
@@ -90,7 +60,7 @@ func TestDockerInstalled_Error(t *testing.T) {
 		},
 	}
 
-	err := dockerInstalled(context.Background(), telemetry.NoopClient{})
+	_, err := dockerInstalled(context.Background())
 	if err == nil {
 		t.Error("unexpected error:", err)
 	}

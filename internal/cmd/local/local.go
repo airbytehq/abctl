@@ -26,6 +26,7 @@ var (
 	flagPort int
 )
 
+// Port is the default port that Airbyte will deploy to.
 const Port = 8000
 
 // NewCmdLocal represents the local command.

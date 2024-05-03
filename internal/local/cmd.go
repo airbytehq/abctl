@@ -70,6 +70,7 @@ type Command struct {
 	helm     HelmClient
 	k8s      k8s.K8sClient
 	portHTTP int
+	spinner  *pterm.SpinnerPrinter
 	tel      telemetry.Client
 	launcher BrowserLauncher
 	userHome string
@@ -120,6 +121,12 @@ func WithUserHome(home string) Option {
 	}
 }
 
+func WithSpinner(spinner *pterm.SpinnerPrinter) Option {
+	return func(c *Command) {
+		c.spinner = spinner
+	}
+}
+
 // New creates a new Command
 func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) {
 	c := &Command{provider: provider, portHTTP: portHTTP}
@@ -161,6 +168,11 @@ func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) 
 	// set telemetry client, if not defined
 	if c.tel == nil {
 		c.tel = telemetry.NoopClient{}
+	}
+
+	// set spinner, if not defined
+	if c.spinner == nil {
+		c.spinner, _ = pterm.DefaultSpinner.Start()
 	}
 
 	// set the browser launcher, if not defined
@@ -219,6 +231,10 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		// If we timed out, there is a good chance it's due to an unavailable port, check if this is the case.
 		// As the kubernetes client doesn't return usable error types, have to check for a specific string value.
 		if strings.Contains(err.Error(), "client rate limiter Wait returned an error") {
+			pterm.Warning.Printfln("Encountered an error while installing the %s Helm Chart.\n"+
+				"This could be an indication that port %d is not available.\n"+
+				"If installation fails, please try again with a different port.", nginxChartName, c.portHTTP)
+
 			srv, err := c.k8s.GetService(ctx, nginxNamespace, "ingress-nginx-controller")
 			// If there is an error, we can ignore it as we only are checking for a missing ingress entry,
 			// and an error would indicate the inability to check for that entry.
@@ -233,89 +249,114 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		return fmt.Errorf("could not install nginx chart: %w", err)
 	}
 
-	spinnerIngress, _ := pterm.DefaultSpinner.Start("ingress - installing")
-
+	c.spinner.UpdateText("Configuring Basic-Auth")
 	// basic auth
 	if err := c.handleBasicAuthSecret(ctx, user, pass); err != nil {
 		return fmt.Errorf("could not create or update basic-auth secret: %w", err)
 	}
 
+	c.spinner.UpdateText("Checking for existing Ingress")
+
 	if c.k8s.ExistsIngress(ctx, airbyteNamespace, airbyteIngress) {
+		pterm.Success.Println("Found existing Ingress")
 		if err := c.k8s.UpdateIngress(ctx, airbyteNamespace, ingress()); err != nil {
-			spinnerIngress.Fail("ingress - failed to update")
+			pterm.Error.Printfln("Unable to update existing Ingress")
 			return fmt.Errorf("could not update existing ingress: %w", err)
 		}
-		spinnerIngress.Success("ingress - updated")
+		pterm.Success.Println("Updated existing Ingress")
 	} else {
+		pterm.Info.Println("No existing Ingress found, will create one")
 		if err := c.k8s.CreateIngress(ctx, airbyteNamespace, ingress()); err != nil {
-			spinnerIngress.Fail("ingress - failed to install")
+			pterm.Error.Println("Unable to create ingress")
 			return fmt.Errorf("could not create ingress: %w", err)
 		}
-		spinnerIngress.Success("ingress - installed")
+		pterm.Success.Println("Ingress created")
 	}
 
-	return c.openBrowser(ctx, fmt.Sprintf("http://localhost:%d", c.portHTTP))
+	c.spinner.UpdateText("Verifying ingress")
+	if err := c.openBrowser(ctx, fmt.Sprintf("http://localhost:%d", c.portHTTP)); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // handleBasicAuthSecret creates or updates the appropriate basic auth credentials for ingress.
 func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) error {
 	hashedPass, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 	if err != nil {
+		pterm.Error.Println("Basic Auth secret could not be hashed.\n" +
+			"This may indicate an issue with the username or password provided.\n" +
+			"Please provider different credentials and try again.")
+
 		return fmt.Errorf("could not hash basic auth password: %w", err)
 	}
 
 	data := map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))}
-	return c.k8s.CreateOrUpdateSecret(ctx, airbyteNamespace, "basic-auth", data)
+	if err := c.k8s.CreateOrUpdateSecret(ctx, airbyteNamespace, "basic-auth", data); err != nil {
+		pterm.Error.Println("Could not create Basic-Auth secret")
+	}
+	pterm.Success.Println("Basic-Auth secret created")
+	return nil
 }
 
 // Uninstall handles the uninstallation of Airbyte.
 func (c *Command) Uninstall(ctx context.Context) error {
 	{
-		spinnerAb, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling airbyte chart %s", airbyteChartRelease))
+		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", airbyteChartName))
 
 		airbyteChartExists := true
 		if _, err := c.helm.GetRelease(airbyteChartRelease); err != nil {
 			if !errors.Is(err, driver.ErrReleaseNotFound) {
-				spinnerAb.Fail("helm - airbyte chart failed to fetch release")
+				pterm.Error.Printfln("Could not verify installation status of %s Helm Chart failed", airbyteChartName)
 				return fmt.Errorf("could not fetch airbyte release: %w", err)
 			}
+
+			pterm.Success.Printfln("Helm Chart %s is not installed", airbyteChartName)
 			airbyteChartExists = false
+		} else {
+			pterm.Success.Printfln("Verified Helm Chart %s is installed", airbyteChartName)
 		}
+
 		if airbyteChartExists {
+			c.spinner.UpdateText(fmt.Sprintf("Uninstalling %s Helm Chart", airbyteChartName))
 			if err := c.helm.UninstallReleaseByName(airbyteChartRelease); err != nil {
-				spinnerAb.Fail("helm - airbyte chart failed to uninstall")
+				pterm.Error.Printfln("Could not uninstall %s Helm Chart", airbyteChartName)
 				return fmt.Errorf("could not uninstall airbyte chart: %w", err)
 			}
+			pterm.Success.Printfln("Uninstalled %s Helm Chart", airbyteChartName)
 		}
-		spinnerAb.Success()
 	}
 
 	{
-		spinnerNginx, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - uninstalling nginx chart %s", nginxChartRelease))
+		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", nginxChartName))
 
 		nginxChartExists := true
 		if _, err := c.helm.GetRelease(nginxChartRelease); err != nil {
 			if !errors.Is(err, driver.ErrReleaseNotFound) {
-				spinnerNginx.Fail("helm - nginx chart failed to fetch release")
+				pterm.Error.Printfln("Could not verify installation status of %s Helm Chart failed", nginxChartName)
 				return fmt.Errorf("could not fetch nginx release: %w", err)
 			}
+
+			pterm.Success.Printfln("Helm Chart %s is not installed", nginxChartName)
 			nginxChartExists = false
 		}
 
 		if nginxChartExists {
+			c.spinner.UpdateText(fmt.Sprintf("Uninstalling %s Helm Chart", nginxChartName))
 			if err := c.helm.UninstallReleaseByName(nginxChartRelease); err != nil {
-				spinnerNginx.Fail("helm - nginx chart failed to uninstall")
+				pterm.Error.Printfln("Could not uninstall %s Helm Chart", nginxChartName)
 				return fmt.Errorf("could not uninstall nginx chart: %w", err)
 			}
 		}
-		spinnerNginx.Success()
+		pterm.Success.Printfln("Uninstalled %s Helm Chart", nginxChartName)
 	}
 
-	spinnerNamespace, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("k8s - deleting namespace %s", airbyteNamespace))
+	c.spinner.UpdateText(fmt.Sprintf("Uninstalling Kubernetes namespace '%s'", airbyteNamespace))
 
 	if err := c.k8s.DeleteNamespace(ctx, airbyteNamespace); err != nil {
 		if !k8serrors.IsNotFound(err) {
-			spinnerNamespace.Fail()
+			pterm.Error.Printfln("Could not delete Kubernetes namespace '%s'", airbyteNamespace)
 			return fmt.Errorf("could not delete namespace: %w", err)
 		}
 	}
@@ -345,11 +386,11 @@ func (c *Command) Uninstall(ctx context.Context) error {
 	wg.Wait()
 
 	if !namespaceDeleted {
-		spinnerNamespace.Fail()
+		pterm.Error.Printfln("Could not delete Kubernetes namespace '%s'", airbyteNamespace)
 		return errors.New("could not delete namespace")
 	}
 
-	spinnerNamespace.Success()
+	pterm.Success.Printfln("Namespace '%s' deleted", airbyteNamespace)
 
 	return nil
 }
@@ -370,26 +411,26 @@ func (c *Command) handleChart(
 	ctx context.Context,
 	req chartRequest,
 ) error {
-	spinner, _ := pterm.DefaultSpinner.Start(fmt.Sprintf("helm - adding %s repository", req.name))
+	c.spinner.UpdateText(fmt.Sprintf("Configuring %s Helm repository", req.name))
 
 	if err := c.helm.AddOrUpdateChartRepo(repo.Entry{
 		Name: req.repoName,
 		URL:  req.repoURL,
 	}); err != nil {
-		spinner.Fail(fmt.Sprintf("helm - could not add repo %s", req.repoName))
+		pterm.Error.Printfln("Unable to configure %s Helm repository", req.repoName)
 		return fmt.Errorf("could not add %s chart repo: %w", req.name, err)
 	}
 
-	spinner.UpdateText(fmt.Sprintf("helm - fetching chart %s", req.chartName))
+	c.spinner.UpdateText(fmt.Sprintf("Fetching %s Helm Chart", req.chartName))
 	helmChart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{})
 	if err != nil {
-		spinner.Fail(fmt.Sprintf("helm - could not fetch chart %s", req.chartName))
+		pterm.Error.Printfln("Unable to fetch %s Helm Chart", req.chartName)
 		return fmt.Errorf("could not fetch chart %s: %w", req.chartName, err)
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
 
-	spinner.UpdateText(fmt.Sprintf("helm - installing chart %s (%s)", req.chartName, helmChart.Metadata.Version))
+	c.spinner.UpdateText(fmt.Sprintf("Installing '%s' (version: %s) Helm Chart", req.chartName, helmChart.Metadata.Version))
 	helmRelease, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
 		ReleaseName:     req.chartRelease,
 		ChartName:       req.chartName,
@@ -402,21 +443,19 @@ func (c *Command) handleChart(
 		&helmclient.GenericHelmOptions{},
 	)
 	if err != nil {
-		spinner.Fail(fmt.Sprintf("helm - failed to install chart %s (%s)", req.chartName, helmChart.Metadata.Version))
+		pterm.Error.Printfln("Failed to install %s Helm Chart", req.chartName)
 		return fmt.Errorf("could not install helm: %w", err)
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 
-	spinner.Success(fmt.Sprintf("helm - chart installed; name: %s, namespace: %s, version: %d", helmRelease.Name, helmRelease.Namespace, helmRelease.Version))
+	pterm.Success.Printfln("Installed Helm Chart %s:\n\tname: %s\n\tnamespace: %s\n\tversion: %d", req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Version)
 	return nil
 }
 
 // openBrowser will open the url in the user's browser but only if the url returns a 200 response code first
 // TODO: clean up this method, make it testable
 func (c *Command) openBrowser(ctx context.Context, url string) error {
-	spinner, _ := pterm.DefaultSpinner.Start("browser - waiting for ingress")
-
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -448,24 +487,26 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 
 	select {
 	case <-ctx.Done():
-		spinner.Fail("browser - timed out")
+		pterm.Error.Println("Timed out waiting for ingress")
 		return fmt.Errorf("browser liveness check failed: %w", ctx.Err())
 	case err := <-alive:
 		if err != nil {
-			spinner.Fail("browser - failed liveness check")
+			pterm.Error.Println("Ingress verification failed")
 			return fmt.Errorf("browser failed liveness check: %w", err)
 		}
 	}
 	// if we're here, then no errors occurred
 
-	spinner.UpdateText("browser - launching")
+	c.spinner.UpdateText(fmt.Sprintf("Attempting to launch web-browser for %s", url))
 
 	if err := c.launcher(url); err != nil {
-		spinner.Fail(fmt.Sprintf("browser - failed to launch browser; please access %s directly", url))
+		pterm.Warning.Printfln("Failed to launch web-browser.\n"+
+			"Please launch your web-browser to access %s", url)
 		return fmt.Errorf("could not launch browser: %w", err)
 	}
 
-	spinner.Success(fmt.Sprintf("browser - launched (%s)", url))
+	pterm.Success.Println("Launched web-browser successfully")
+
 	return nil
 }
 
