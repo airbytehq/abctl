@@ -308,7 +308,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 		airbyteChartExists := true
 		if _, err := c.helm.GetRelease(airbyteChartRelease); err != nil {
 			if !errors.Is(err, driver.ErrReleaseNotFound) {
-				pterm.Error.Printfln("Could not verify installation status of %s Helm Chart failed", airbyteChartName)
+				pterm.Error.Printfln("Could not verify installation status of %s Helm Chart", airbyteChartName)
 				return fmt.Errorf("could not fetch airbyte release: %w", err)
 			}
 
@@ -334,7 +334,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 		nginxChartExists := true
 		if _, err := c.helm.GetRelease(nginxChartRelease); err != nil {
 			if !errors.Is(err, driver.ErrReleaseNotFound) {
-				pterm.Error.Printfln("Could not verify installation status of %s Helm Chart failed", nginxChartName)
+				pterm.Error.Printfln("Could not verify installation status of %s Helm Chart", nginxChartName)
 				return fmt.Errorf("could not fetch nginx release: %w", err)
 			}
 
@@ -352,7 +352,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 		pterm.Success.Printfln("Uninstalled %s Helm Chart", nginxChartName)
 	}
 
-	c.spinner.UpdateText(fmt.Sprintf("Uninstalling Kubernetes namespace '%s'", airbyteNamespace))
+	c.spinner.UpdateText(fmt.Sprintf("Deleting Kubernetes namespace '%s'", airbyteNamespace))
 
 	if err := c.k8s.DeleteNamespace(ctx, airbyteNamespace); err != nil {
 		if !k8serrors.IsNotFound(err) {

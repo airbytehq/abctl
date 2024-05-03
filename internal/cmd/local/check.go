@@ -55,7 +55,7 @@ var httpClient doer = &http.Client{Timeout: 3 * time.Second}
 func portAvailable(ctx context.Context, port int) error {
 	if port < 1024 {
 		pterm.Warning.Printfln(
-			"Availability of port %d  cannot be determined, as this is a privileged port (less than 1024).\n"+
+			"Availability of port %d cannot be determined, as this is a privileged port (less than 1024).\n"+
 				"Installation may not complete successfully",
 			port)
 		return nil

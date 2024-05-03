@@ -85,7 +85,7 @@ func NewCmdInstall() *cobra.Command {
 
 					pterm.Success.Printfln("Cluster '%s' validation complete", provider.ClusterName)
 				} else {
-					// no existing cluster, need to creat one
+					// no existing cluster, need to create one
 					pterm.Info.Println(fmt.Sprintf("No existing cluster found, cluster '%s' will be created", provider.ClusterName))
 					spinner.UpdateText(fmt.Sprintf("Creating cluster '%s'", provider.ClusterName))
 					if err := cluster.Create(flagPort); err != nil {
