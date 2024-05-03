@@ -1,9 +1,11 @@
 package version
 
 import (
+	"fmt"
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"strings"
 )
 
 // NewCmdVersion returns a cobra command for printing the version information.
@@ -13,10 +15,15 @@ func NewCmdVersion() *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			pterm.Printfln(`version: %s
-revision: %s
-time: %s
-modified: %t`, build.Version, build.Revision, build.ModificationTime, build.Modified)
+			parts := []string{fmt.Sprintf("version: %s", build.Version)}
+			if build.Revision != "" {
+				parts = append(parts, fmt.Sprintf("revision: %s", build.Revision))
+			}
+			if build.ModificationTime != "" {
+				parts = append(parts, fmt.Sprintf("time: %s", build.ModificationTime))
+			}
+			parts = append(parts, fmt.Sprintf("modified: %t", build.Modified))
+			pterm.Println(strings.Join(parts, "\n"))
 		},
 	}
 }

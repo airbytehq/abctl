@@ -58,19 +58,28 @@ func Execute(ctx context.Context, cmd *cobra.Command) {
 	}
 }
 
-// NewCmd returns the abctl cobra command.
+// NewCmd returns the abctl root cobra command.
 func NewCmd() *cobra.Command {
 	cobra.EnableTraverseRunHooks = true
 
-	var flagDNT bool
+	var (
+		flagDNT     bool
+		flagVerbose bool
+	)
 
 	cmd := &cobra.Command{
 		Use:   "abctl",
 		Short: pterm.LightBlue("Airbyte") + "'s command line tool",
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if flagDNT {
-				pterm.Info.Println("telemetry collection disabled (--dnt)")
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if flagVerbose {
+				pterm.EnableDebugMessages()
 			}
+
+			if flagDNT {
+				pterm.Info.Println("Telemetry collection disabled (--dnt)")
+			}
+
+			return nil
 		},
 	}
 
@@ -79,6 +88,7 @@ func NewCmd() *cobra.Command {
 	cmd.CompletionOptions.DisableDefaultCmd = true
 
 	cmd.PersistentFlags().BoolVar(&flagDNT, "dnt", false, "opt out of telemetry data collection")
+	cmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "enable verbose output")
 
 	cmd.AddCommand(version.NewCmdVersion())
 	cmd.AddCommand(local.NewCmdLocal())

@@ -26,6 +26,7 @@ var (
 	flagPort int
 )
 
+// Port is the default port that Airbyte will deploy to.
 const Port = 8000
 
 // NewCmdLocal represents the local command.
@@ -80,6 +81,5 @@ func NewCmdLocal() *cobra.Command {
 func printK8sProvider(p k8s.Provider) {
 	userHome, _ := os.UserHomeDir()
 	configPath := filepath.Join(userHome, p.Kubeconfig)
-	pterm.Info.Printfln("using kubernetes provider:\n  provider name: %s\n  kubeconfig: %s\n  context: %s",
-		p.Name, configPath, p.Context)
+	pterm.Info.Printfln("Using Kubernetes provider:\n\tProvider: %s\n\tKubeconfig: %s\n\tContext: %s", p.Name, configPath, p.Context)
 }
