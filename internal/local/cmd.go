@@ -449,7 +449,9 @@ func (c *Command) handleChart(
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 
-	pterm.Success.Printfln("Installed Helm Chart %s:\n\tname: %s\n\tnamespace: %s\n\tversion: %d", req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Version)
+	pterm.Success.Printfln(
+		"Installed Helm Chart %s:\n\tname: %s\n\tnamespace: %s\n\tversion: %s\n\trelease: %d",
+		req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Chart.Metadata.Version, helmRelease.Version)
 	return nil
 }
 
