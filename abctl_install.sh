@@ -131,8 +131,6 @@ _event() {
     # ensure we don't log the same event twice
     echo "$TELEMETRY_LOG" | grep -q "$event-$state" && return 0
 
-    echo "Sending $event ($state, instance: '$TELEMETRY_INSTANCE_ID', session: '$TELEMETRY_SESSION_ID' msg: '$message')"
-
     local telemetry_request=$(cat <<EOF
 {
     "anonymousId":"$TELEMETRY_INSTANCE_ID",
