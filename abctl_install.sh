@@ -4,6 +4,12 @@ set -Eeu
 
 VERSION=0.1
 
+# Logging
+# Automatically logs everything that goes to stdout into a file 
+# at the same time
+DIR_TMP=${DIR_TMP:-$(mktemp -d -t "abctl_install.XXXX")}
+exec > >(tee "$DIR_TMP/output.log") 2>&1
+
 # Debug
 DEBUG=${DEBUG:-""}
 if ! [ -z "$DEBUG" ]; then
@@ -12,11 +18,10 @@ if ! [ -z "$DEBUG" ]; then
 fi
 
 # Trap config
-TRAP_MESSAGE=
 _trap() {
     local rv=$?
     if [ "$rv" -ne 0 ]; then
-        _event abctl_install failed "$TRAP_MESSAGE"
+        _event abctl_install failed "$(tail -n 1 "$DIR_TMP/output.log")"
     else
         _event abctl_install succeeded
     fi
@@ -38,7 +43,6 @@ TELEMETRY_LOG=""
 
 RELEASE_TAG=${RELEASE_TAG:-""}
 
-DIR_TMP=${DIR_TMP:-$(mktemp -d -t "abctl_install.XXXX")}
 DIR_INSTALL=${DIR_INSTALL:-/usr/local/bin}
 
 # Consts
