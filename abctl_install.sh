@@ -203,6 +203,7 @@ _get_arch() {
 _install_linux() {
     echo "Installing for Linux..."
 
+    # We should probably handle yum & deb packages instead of installing the binary directly
     _install_binary linux "$(_get_arch)"
 }
 
