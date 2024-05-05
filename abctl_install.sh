@@ -94,7 +94,9 @@ _extract_value() {
 
 _unique_id() {
     # does it need to be ulid?
-    LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 36
+    local time="$(date +"%s")"
+    local rand="$(LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 36)"
+    echo "${time}${rand}" | head -c 36
 }
 
 _init_telemetry() {
@@ -168,6 +170,7 @@ _install_binary() {
         tar zxf "${release_filename}" -C release
         local binary=$(ls -1 release/*/abctl | head -n 1)
         echo "Installing '$binary' to ${DIR_INSTALL}"
+        chmod +x "$binary"
         _sudo cp "$binary" "${DIR_INSTALL}"
     )
 }
@@ -204,7 +207,7 @@ _install_linux() {
 _install_darwin() {
     echo "Installing for Darwin..."
 
-    if ! _exists abrew; then
+    if ! _exists brew; then
         _install_binary darwin "$(_get_arch)"
     elif brew ls --version abctl > /dev/null; then
         brew upgrade abctl
