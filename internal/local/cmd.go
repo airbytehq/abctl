@@ -184,8 +184,23 @@ func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) 
 				cmd = exec.Command("open", url)
 			case "windows":
 				cmd = exec.Command("cmd", "/c", "start", url)
+			case "linux":
+				if _, err := exec.LookPath("xdg-open"); err == nil {
+					cmd = exec.Command("xdg-open", url)
+				} else if _, err := exec.LookPath("sensible-browser"); err == nil {
+					cmd = exec.Command("sensible-browser", url)
+				} else if _, err := exec.LookPath("x-www-browser"); err == nil {
+					cmd = exec.Command("x-www-browser", url)
+				} else if _, err := exec.LookPath("gnome-open"); err == nil {
+					cmd = exec.Command("gnome-open", url)
+				} else if _, err := exec.LookPath("open"); err == nil {
+					cmd = exec.Command("open", url)
+				} else {
+					return errors.New("unable to determine executable to launch web-browser")
+				}
+
 			default:
-				cmd = exec.Command("xdg-open", url)
+				return fmt.Errorf("unsupported platform '%s'", runtime.GOOS)
 			}
 			return cmd.Run()
 		}
@@ -504,7 +519,8 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 	if err := c.launcher(url); err != nil {
 		pterm.Warning.Printfln("Failed to launch web-browser.\n"+
 			"Please launch your web-browser to access %s", url)
-		return fmt.Errorf("could not launch browser: %w", err)
+		pterm.Debug.Printfln("failed to launch web-browser: %s", err.Error())
+		// don't consider a failed web-browser to be a failed installation
 	}
 
 	pterm.Success.Println("Launched web-browser successfully")
