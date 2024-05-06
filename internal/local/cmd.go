@@ -7,6 +7,7 @@ import (
 	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
+	"github.com/cli/browser"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
@@ -23,9 +24,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -177,33 +176,7 @@ func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) 
 
 	// set the browser launcher, if not defined
 	if c.launcher == nil {
-		c.launcher = func(url string) error {
-			var cmd *exec.Cmd
-			switch runtime.GOOS {
-			case "darwin":
-				cmd = exec.Command("open", url)
-			case "windows":
-				cmd = exec.Command("cmd", "/c", "start", url)
-			case "linux":
-				if _, err := exec.LookPath("xdg-open"); err == nil {
-					cmd = exec.Command("xdg-open", url)
-				} else if _, err := exec.LookPath("sensible-browser"); err == nil {
-					cmd = exec.Command("sensible-browser", url)
-				} else if _, err := exec.LookPath("x-www-browser"); err == nil {
-					cmd = exec.Command("x-www-browser", url)
-				} else if _, err := exec.LookPath("gnome-open"); err == nil {
-					cmd = exec.Command("gnome-open", url)
-				} else if _, err := exec.LookPath("open"); err == nil {
-					cmd = exec.Command("open", url)
-				} else {
-					return errors.New("unable to determine executable to launch web-browser")
-				}
-
-			default:
-				return fmt.Errorf("unsupported platform '%s'", runtime.GOOS)
-			}
-			return cmd.Run()
-		}
+		c.launcher = browser.OpenURL
 	}
 
 	// fetch k8s version information

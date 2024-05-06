@@ -3,6 +3,7 @@ module github.com/airbytehq/abctl
 go 1.21.9
 
 require (
+	github.com/cli/browser v1.3.0
 	github.com/docker/docker v26.1.0+incompatible
 	github.com/google/go-cmp v0.6.0
 	github.com/mittwald/go-helm-client v0.12.9
