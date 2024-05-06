@@ -21,9 +21,10 @@ fi
 _trap() {
     local rv=$?
     if [ "$rv" -ne 0 ]; then
-        _event abctl_install failed "$(tail -n 1 "$DIR_TMP/output.log")"
+        [ -z "$TELEMETRY_MSG" ] && TELEMETRY_MSG=$(tail -n 1 "$DIR_TMP/output.log")
+        _event abctl_install failed "$TELEMETRY_MSG"
     else
-        _event abctl_install succeeded
+        _event abctl_install succeeded "$TELEMETRY_MSG"
     fi
     exit "$rv"
 }
@@ -39,7 +40,8 @@ TELEMETRY_STORE=${TELEMETRY_STORE:-~/.airbyte/analytics.yml}
 TELEMETRY_KEY=${TELEMETRY_KEY:-"kpYsVGLgxEqD5OuSZAQ9zWmdgBlyiaej"}
 TELEMETRY_INSTANCE_ID=${TELEMETRY_INSTANCE_ID:-""}
 TELEMETRY_SESSION_ID=${TELEMETRY_SESSION_ID:-""}
-TELEMETRY_LOG=""
+TELEMETRY_LOG=
+TELEMETRY_MSG=
 
 RELEASE_TAG=${RELEASE_TAG:-""}
 
@@ -51,7 +53,7 @@ DIR_INSTALL=${DIR_INSTALL:-/usr/local/bin}
 _error() {
     local rv=$?
     
-    TRAP_MESSAGE="$1"
+    TELEMETRY_MSG="$1"
     echo "$@" 1>&2
     
     exit "$rv"
@@ -97,10 +99,10 @@ _extract_value() {
 }
 
 _unique_id() {
-    # does it need to be ulid?
-    local time="$(date +"%s")"
-    local rand="$(LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 36)"
-    echo "${time}${rand}" | head -c 36
+    # looks like a ulid but the time piece is in ascii instead of 48 bits encoded
+    local time="$(date +"%s000" | head -c 10)"
+    local rand="$(LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 16)"
+    echo "${time}${rand}" | head -c 26
 }
 
 _init_telemetry() {
@@ -225,6 +227,10 @@ _install_windows() {
     echo "Unsupported"
 }
 
+_test_binary() {
+    abctl --help > /dev/null
+}
+
 main() {
     [ -z "${FORCE_FUN}" ] || { "$@"; exit 0; }
 
@@ -233,6 +239,8 @@ main() {
     _event abctl_install started
 
     "_install_$(_get_os)" "$@"
+
+    _test_binary
 }
 
 main "$@"
