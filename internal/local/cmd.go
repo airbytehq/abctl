@@ -582,7 +582,7 @@ func defaultHelm(kubecfg, kubectx string) (HelmClient, error) {
 		RestConfig: restCfg,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("coud not create helm client: %w", err)
+		return nil, fmt.Errorf("could not create helm client: %w", err)
 	}
 
 	return helm, nil

@@ -23,7 +23,7 @@ var dockerClient *docker.Docker
 func dockerInstalled(ctx context.Context) (docker.Version, error) {
 	var err error
 	if dockerClient == nil {
-		if dockerClient, err = docker.New(); err != nil {
+		if dockerClient, err = docker.New(ctx); err != nil {
 			pterm.Error.Println("Could not create Docker client")
 			return docker.Version{}, fmt.Errorf("%w: could not create client: %w", localerr.ErrDocker, err)
 		}

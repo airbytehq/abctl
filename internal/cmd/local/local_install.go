@@ -62,7 +62,7 @@ func NewCmdInstall() *cobra.Command {
 					// only for kind do we need to check the existing port
 					if provider.Name == k8s.Kind {
 						if dockerClient == nil {
-							dockerClient, err = docker.New()
+							dockerClient, err = docker.New(cmd.Context())
 							if err != nil {
 								pterm.Error.Printfln("Could not connect to Docker daemon")
 								return fmt.Errorf("could not connect to docker: %w", err)
