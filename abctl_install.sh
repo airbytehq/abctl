@@ -101,7 +101,7 @@ _extract_value() {
 _unique_id() {
     # looks like a ulid but the time piece is in ascii instead of 48 bits encoded
     local time="$(date +"%s000" | head -c 10)"
-    local rand="$(LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 16)"
+    local rand="$(LC_ALL=C tr -dc 0123456789ABCDEFGHJKMNPQRSTVWXYZ </dev/urandom | head -c 16)"
     echo "${time}${rand}" | head -c 26
 }
 
