@@ -36,7 +36,7 @@ type Docker struct {
 }
 
 // New returns a new Docker type with a default Client implementation.
-func New() (*Docker, error) {
+func New(ctx context.Context) (*Docker, error) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("could not determine user home directory: %w", err)
@@ -48,20 +48,21 @@ func New() (*Docker, error) {
 	switch runtime.GOOS {
 	case "darwin":
 		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
-		dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost("unix:///var/run/docker.sock"))...)
+		dockerCli, err = createAndPing(ctx, "unix:///var/run/docker.sock", dockerOpts)
 		if err != nil {
-			// keep the original error, as we'll join with the next error (if another error occurs)
-			outerErr := err
-			// this works as the last WithHost call will win
-			dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", userHome)))...)
-			if err != nil {
-				err = fmt.Errorf("%w: %w", err, outerErr)
+			var err2 error
+			dockerCli, err2 = createAndPing(ctx, fmt.Sprintf("unix://%s/.docker/run/docker.sock", userHome), dockerOpts)
+			if err2 != nil {
+				return nil, fmt.Errorf("%w: could not create docker client: (%w, %w)", localerr.ErrDocker, err, err2)
 			}
+			// if we made it here, clear out the original error,
+			// as we were able to successfully connect on the second attempt
+			err = nil
 		}
 	case "windows":
-		dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost("npipe:////./pipe/docker_engine"))...)
+		dockerCli, err = createAndPing(ctx, "npipe:////./pipe/docker_engine", dockerOpts)
 	default:
-		dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost("unix:///var/run/docker.sock"))...)
+		dockerCli, err = createAndPing(ctx, "unix:///var/run/docker.sock", dockerOpts)
 	}
 
 	if err != nil {
@@ -69,6 +70,20 @@ func New() (*Docker, error) {
 	}
 
 	return &Docker{Client: dockerCli}, nil
+}
+
+// createAndPing attempts to create a docker client and ping it to ensure we can communicate
+func createAndPing(ctx context.Context, host string, opts []client.Opt) (*client.Client, error) {
+	dockerCli, err := client.NewClientWithOpts(append(opts, client.WithHost(host))...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create docker client: %w", err)
+	}
+
+	if _, err := dockerCli.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("could not ping docker client: %w", err)
+	}
+
+	return dockerCli, nil
 }
 
 // Version returns the version information from the underlying docker process.
