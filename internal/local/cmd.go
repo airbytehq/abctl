@@ -562,6 +562,26 @@ func defaultK8s(kubecfg, kubectx string) (k8s.K8sClient, error) {
 		return nil, fmt.Errorf("%w: could not create clientset: %w", localerr.ErrKubernetes, err)
 	}
 
+	go func() {
+		pterm.Info.Println("XXX: starting background thread")
+		inter, err := k8sClient.EventsV1().Events("airbyte-abctl").Watch(context.Background(), v1.ListOptions{FieldSelector: "type=Warning"})
+		if err != nil {
+			pterm.Info.Printfln("XXX: could not watch events: %s", err)
+			return
+		}
+
+		for {
+			val, ok := <-inter.ResultChan()
+			if !ok {
+				pterm.Info.Println("XXX: done listening to watch events")
+				return
+			}
+			pterm.Info.Printfln("XXX: event: %+v", val)
+			pterm.Info.Printfln("XXX: kind: %s", val.Object.GetObjectKind().GroupVersionKind().Kind)
+			pterm.Info.Printfln("XXX: type: %s", val.Type)
+		}
+	}()
+
 	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
 }
 
