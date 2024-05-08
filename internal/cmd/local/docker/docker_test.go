@@ -3,7 +3,7 @@ package docker
 import (
 	"context"
 	"errors"
-	"github.com/airbytehq/abctl/internal/local/localerr"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"

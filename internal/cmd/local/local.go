@@ -1,7 +1,7 @@
 package local
 
 import (
-	"github.com/airbytehq/abctl/internal/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"

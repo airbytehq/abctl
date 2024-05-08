@@ -2,9 +2,9 @@ package local
 
 import (
 	"fmt"
+	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	k8s2 "github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/local"
-	"github.com/airbytehq/abctl/internal/local/docker"
-	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -48,7 +48,7 @@ func NewCmdInstall() *cobra.Command {
 			return telemetry.Wrapper(cmd.Context(), telemetry.Install, func() error {
 				spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
-				cluster, err := k8s.NewCluster(provider)
+				cluster, err := k8s2.NewCluster(provider)
 				if err != nil {
 					pterm.Error.Printfln("Could not determine status of any existing '%s' cluster", provider.ClusterName)
 					return err
@@ -60,7 +60,7 @@ func NewCmdInstall() *cobra.Command {
 					spinner.UpdateText(fmt.Sprintf("Validating existing cluster '%s'", provider.ClusterName))
 
 					// only for kind do we need to check the existing port
-					if provider.Name == k8s.Kind {
+					if provider.Name == k8s2.Kind {
 						if dockerClient == nil {
 							dockerClient, err = docker.New(cmd.Context())
 							if err != nil {
