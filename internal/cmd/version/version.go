@@ -22,7 +22,9 @@ func NewCmdVersion() *cobra.Command {
 			if build.ModificationTime != "" {
 				parts = append(parts, fmt.Sprintf("time: %s", build.ModificationTime))
 			}
-			parts = append(parts, fmt.Sprintf("modified: %t", build.Modified))
+			if build.Modified {
+				parts = append(parts, fmt.Sprintf("modified: %t", build.Modified))
+			}
 			pterm.Println(strings.Join(parts, "\n"))
 		},
 	}
