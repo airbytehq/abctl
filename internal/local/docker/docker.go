@@ -28,40 +28,71 @@ type Client interface {
 	ServerVersion(context.Context) (types.Version, error)
 }
 
+var _ Client = (*client.Client)(nil)
+
 // Docker for handling communication with the docker processes.
-// Can be created with default settings by calling New or with a custom Client by manually
-// instantiating this type.
+// Can be created with default settings by calling New or with a custom Client by manually instantiating this type.
 type Docker struct {
 	Client Client
 }
 
 // New returns a new Docker type with a default Client implementation.
-func New() (*Docker, error) {
+func New(ctx context.Context) (*Docker, error) {
+	// convert the client.NewClientWithOpts to a newPing function
+	f := func(opts ...client.Opt) (pinger, error) {
+		var p pinger
+		var err error
+		p, err = client.NewClientWithOpts(opts...)
+		if err != nil {
+			return nil, err
+		}
+		return p, nil
+	}
+
+	return newWithOptions(ctx, f, runtime.GOOS)
+}
+
+// newPing exists for testing purposes.
+// This allows a mock docker client (client.Client) to be injected for tests
+type newPing func(...client.Opt) (pinger, error)
+
+// pinger interface for testing purposes.
+// Adds the Ping method to the Client interface which is used by the New function.
+type pinger interface {
+	Client
+	Ping(ctx context.Context) (types.Ping, error)
+}
+
+var _ pinger = (*client.Client)(nil)
+
+// newWithOptions allows for the docker client to be injected for testing purposes.
+func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker, error) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("could not determine user home directory: %w", err)
 	}
 
-	var dockerCli *client.Client
+	var dockerCli Client
 	dockerOpts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
 
-	switch runtime.GOOS {
+	switch goos {
 	case "darwin":
 		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
-		dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost("unix:///var/run/docker.sock"))...)
+		dockerCli, err = createAndPing(ctx, newPing, "unix:///var/run/docker.sock", dockerOpts)
 		if err != nil {
-			// keep the original error, as we'll join with the next error (if another error occurs)
-			outerErr := err
-			// this works as the last WithHost call will win
-			dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost(fmt.Sprintf("unix:///%s/.docker/run/docker.sock", userHome)))...)
-			if err != nil {
-				err = fmt.Errorf("%w: %w", err, outerErr)
+			var err2 error
+			dockerCli, err2 = createAndPing(ctx, newPing, fmt.Sprintf("unix://%s/.docker/run/docker.sock", userHome), dockerOpts)
+			if err2 != nil {
+				return nil, fmt.Errorf("%w: could not create docker client: (%w, %w)", localerr.ErrDocker, err, err2)
 			}
+			// if we made it here, clear out the original error,
+			// as we were able to successfully connect on the second attempt
+			err = nil
 		}
 	case "windows":
-		dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost("npipe:////./pipe/docker_engine"))...)
+		dockerCli, err = createAndPing(ctx, newPing, "npipe:////./pipe/docker_engine", dockerOpts)
 	default:
-		dockerCli, err = client.NewClientWithOpts(append(dockerOpts, client.WithHost("unix:///var/run/docker.sock"))...)
+		dockerCli, err = createAndPing(ctx, newPing, "unix:///var/run/docker.sock", dockerOpts)
 	}
 
 	if err != nil {
@@ -69,6 +100,20 @@ func New() (*Docker, error) {
 	}
 
 	return &Docker{Client: dockerCli}, nil
+}
+
+// createAndPing attempts to create a docker client and ping it to ensure we can communicate
+func createAndPing(ctx context.Context, newPing newPing, host string, opts []client.Opt) (Client, error) {
+	cli, err := newPing(append(opts, client.WithHost(host))...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create docker client: %w", err)
+	}
+
+	if _, err := cli.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("could not ping docker client: %w", err)
+	}
+
+	return cli, nil
 }
 
 // Version returns the version information from the underlying docker process.

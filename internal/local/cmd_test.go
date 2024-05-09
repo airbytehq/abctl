@@ -46,6 +46,7 @@ func TestCommand_Install(t *testing.T) {
 				Timeout:         10 * time.Minute,
 			},
 			release: release.Release{
+				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
 				Name:      airbyteChartRelease,
 				Namespace: airbyteNamespace,
 				Version:   0,
@@ -62,6 +63,7 @@ func TestCommand_Install(t *testing.T) {
 				ValuesOptions:   values.Options{Values: []string{fmt.Sprintf("controller.service.ports.http=%d", portTest)}},
 			},
 			release: release.Release{
+				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "4.3.2.1"}},
 				Name:      nginxChartRelease,
 				Namespace: nginxNamespace,
 				Version:   0,

@@ -7,6 +7,7 @@ import (
 	"github.com/airbytehq/abctl/internal/local/k8s"
 	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
+	"github.com/cli/browser"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
@@ -23,9 +24,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -177,18 +176,7 @@ func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) 
 
 	// set the browser launcher, if not defined
 	if c.launcher == nil {
-		c.launcher = func(url string) error {
-			var cmd *exec.Cmd
-			switch runtime.GOOS {
-			case "darwin":
-				cmd = exec.Command("open", url)
-			case "windows":
-				cmd = exec.Command("cmd", "/c", "start", url)
-			default:
-				cmd = exec.Command("xdg-open", url)
-			}
-			return cmd.Run()
-		}
+		c.launcher = browser.OpenURL
 	}
 
 	// fetch k8s version information
@@ -449,7 +437,9 @@ func (c *Command) handleChart(
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 
-	pterm.Success.Printfln("Installed Helm Chart %s:\n\tname: %s\n\tnamespace: %s\n\tversion: %d", req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Version)
+	pterm.Success.Printfln(
+		"Installed Helm Chart %s:\n\tname: %s\n\tnamespace: %s\n\tversion: %s\n\trelease: %d",
+		req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Chart.Metadata.Version, helmRelease.Version)
 	return nil
 }
 
@@ -502,7 +492,8 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 	if err := c.launcher(url); err != nil {
 		pterm.Warning.Printfln("Failed to launch web-browser.\n"+
 			"Please launch your web-browser to access %s", url)
-		return fmt.Errorf("could not launch browser: %w", err)
+		pterm.Debug.Printfln("failed to launch web-browser: %s", err.Error())
+		// don't consider a failed web-browser to be a failed installation
 	}
 
 	pterm.Success.Println("Launched web-browser successfully")
@@ -591,7 +582,7 @@ func defaultHelm(kubecfg, kubectx string) (HelmClient, error) {
 		RestConfig: restCfg,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("coud not create helm client: %w", err)
+		return nil, fmt.Errorf("could not create helm client: %w", err)
 	}
 
 	return helm, nil
