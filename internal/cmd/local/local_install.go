@@ -21,6 +21,8 @@ const (
 func NewCmdInstall() *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
+	var flagHelmChartVersion string
+
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install Airbyte locally",
@@ -95,7 +97,8 @@ func NewCmdInstall() *cobra.Command {
 					pterm.Success.Printfln("Cluster '%s' created", provider.ClusterName)
 				}
 
-				lc, err := local.New(provider, flagPort, local.WithTelemetryClient(telClient), local.WithSpinner(spinner))
+				lc, err := local.New(provider, flagPort,
+					local.WithTelemetryClient(telClient), local.WithSpinner(spinner), local.WithHelmChartVersion(flagHelmChartVersion))
 				if err != nil {
 					pterm.Error.Printfln("Failed to initialize 'local' command")
 					return fmt.Errorf("could not initialize local command: %w", err)
@@ -123,6 +126,8 @@ func NewCmdInstall() *cobra.Command {
 
 	cmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	cmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
+
+	cmd.Flags().StringVar(&flagHelmChartVersion, "helm-chart-version", "latest", "specify the specific Airbyte helm-chart-version to install")
 
 	return cmd
 }

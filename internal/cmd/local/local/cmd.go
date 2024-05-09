@@ -63,16 +63,17 @@ type BrowserLauncher func(url string) error
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
-	provider k8s2.Provider
-	cluster  k8s2.Cluster
-	http     HTTPClient
-	helm     HelmClient
-	k8s      k8s2.K8sClient
-	portHTTP int
-	spinner  *pterm.SpinnerPrinter
-	tel      telemetry.Client
-	launcher BrowserLauncher
-	userHome string
+	provider         k8s2.Provider
+	cluster          k8s2.Cluster
+	http             HTTPClient
+	helm             HelmClient
+	k8s              k8s2.K8sClient
+	portHTTP         int
+	spinner          *pterm.SpinnerPrinter
+	tel              telemetry.Client
+	launcher         BrowserLauncher
+	userHome         string
+	helmChartVersion string
 }
 
 // Option for configuring the Command, primarily exists for testing
@@ -123,6 +124,12 @@ func WithUserHome(home string) Option {
 func WithSpinner(spinner *pterm.SpinnerPrinter) Option {
 	return func(c *Command) {
 		c.spinner = spinner
+	}
+}
+
+func WithHelmChartVersion(version string) Option {
+	return func(c *Command) {
+		c.helmChartVersion = version
 	}
 }
 
@@ -179,6 +186,10 @@ func New(provider k8s2.Provider, portHTTP int, opts ...Option) (*Command, error)
 		c.launcher = browser.OpenURL
 	}
 
+	if c.helmChartVersion == "latest" {
+		c.helmChartVersion = ""
+	}
+
 	// fetch k8s version information
 	{
 		k8sVersion, err := c.k8s.GetServerVersion()
@@ -202,6 +213,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		repoURL:      airbyteRepoURL,
 		chartName:    airbyteChartName,
 		chartRelease: airbyteChartRelease,
+		chartVersion: c.helmChartVersion,
 		namespace:    airbyteNamespace,
 	}); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)
@@ -390,6 +402,7 @@ type chartRequest struct {
 	repoURL      string
 	chartName    string
 	chartRelease string
+	chartVersion string
 	namespace    string
 	values       []string
 }
@@ -410,7 +423,7 @@ func (c *Command) handleChart(
 	}
 
 	c.spinner.UpdateText(fmt.Sprintf("Fetching %s Helm Chart", req.chartName))
-	helmChart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{})
+	helmChart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{Version: req.chartVersion})
 	if err != nil {
 		pterm.Error.Printfln("Unable to fetch %s Helm Chart", req.chartName)
 		return fmt.Errorf("could not fetch chart %s: %w", req.chartName, err)
@@ -427,6 +440,7 @@ func (c *Command) handleChart(
 		Wait:            true,
 		Timeout:         10 * time.Minute,
 		ValuesOptions:   values.Options{Values: req.values},
+		Version:         req.chartVersion,
 	},
 		&helmclient.GenericHelmOptions{},
 	)
