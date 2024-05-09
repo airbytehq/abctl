@@ -166,7 +166,7 @@ _install_binary() {
     local release_url=$(echo "$release_data" | grep "$os-$arch" | _extract_value browser_download_url)
     local release_filename=$(echo "$release_data" | grep "$os-$arch" | _extract_value name)
     
-    echo "Downloading binary from $release_url"
+    echo "Downloading abctl from $release_url"
 
     _curl "$release_url" > "${DIR_TMP}/$release_filename"
 
