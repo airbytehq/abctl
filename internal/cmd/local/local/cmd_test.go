@@ -135,7 +135,7 @@ func TestCommand_Install(t *testing.T) {
 
 	c, err := New(
 		k8s2.TestProvider,
-		portTest,
+		WithPortHTTP(portTest),
 		WithHelmClient(&helm),
 		WithK8sClient(&k8sClient),
 		WithTelemetryClient(&tel),

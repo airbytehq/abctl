@@ -2,6 +2,7 @@ package local
 
 import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -26,15 +27,10 @@ var (
 	flagPort int
 )
 
-// Port is the default port that Airbyte will deploy to.
-const Port = 8000
-
 // NewCmdLocal represents the local command.
 func NewCmdLocal() *cobra.Command {
 	var (
-		flagProvider    string
-		flagKubeconfig  string
-		flagKubeContext string
+		flagProvider string
 	)
 
 	cmd := &cobra.Command{
@@ -69,9 +65,7 @@ func NewCmdLocal() *cobra.Command {
 
 	pf := cmd.PersistentFlags()
 	pf.StringVarP(&flagProvider, "k8s-provider", "k", k8s.KindProvider.Name, "kubernetes provider to use")
-	pf.StringVarP(&flagKubeconfig, "kubeconfig", "", "", "kubernetes config file to use")
-	pf.StringVarP(&flagKubeContext, "kubecontext", "", "", "kubernetes context to use")
-	pf.IntVarP(&flagPort, "port", "", Port, "ingress http port")
+	pf.IntVarP(&flagPort, "port", "", local.Port, "ingress http port")
 
 	cmd.AddCommand(NewCmdInstall(), NewCmdUninstall())
 

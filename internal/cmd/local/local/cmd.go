@@ -45,6 +45,9 @@ const (
 	nginxRepoURL        = "https://kubernetes.github.io/ingress-nginx"
 )
 
+// Port is the default port that Airbyte will deploy to.
+const Port = 8000
+
 // HelmClient primarily for testing purposes
 type HelmClient interface {
 	AddOrUpdateChartRepo(entry repo.Entry) error
@@ -133,9 +136,15 @@ func WithHelmChartVersion(version string) Option {
 	}
 }
 
+func WithPortHTTP(port int) Option {
+	return func(c *Command) {
+		c.portHTTP = port
+	}
+}
+
 // New creates a new Command
-func New(provider k8s2.Provider, portHTTP int, opts ...Option) (*Command, error) {
-	c := &Command{provider: provider, portHTTP: portHTTP}
+func New(provider k8s2.Provider, opts ...Option) (*Command, error) {
+	c := &Command{provider: provider}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -151,6 +160,10 @@ func New(provider k8s2.Provider, portHTTP int, opts ...Option) (*Command, error)
 	// set http client, if not defined
 	if c.http == nil {
 		c.http = &http.Client{Timeout: 10 * time.Second}
+	}
+
+	if c.portHTTP == 0 {
+		c.portHTTP = Port
 	}
 
 	// set k8s client, if not defined

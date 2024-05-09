@@ -97,7 +97,7 @@ func NewCmdInstall() *cobra.Command {
 					pterm.Success.Printfln("Cluster '%s' created", provider.ClusterName)
 				}
 
-				lc, err := local.New(provider, flagPort,
+				lc, err := local.New(provider, local.WithPortHTTP(flagPort),
 					local.WithTelemetryClient(telClient), local.WithSpinner(spinner), local.WithHelmChartVersion(flagHelmChartVersion))
 				if err != nil {
 					pterm.Error.Printfln("Failed to initialize 'local' command")
