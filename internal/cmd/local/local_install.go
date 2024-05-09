@@ -21,7 +21,11 @@ const (
 func NewCmdInstall() *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
-	var flagHelmChartVersion string
+	var (
+		flagHelmChartVersion string
+		flagUsername         string
+		flagPassword         string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "install",

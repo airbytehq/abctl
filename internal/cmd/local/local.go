@@ -19,10 +19,6 @@ var telClient telemetry.Client
 var provider k8s.Provider
 
 var (
-	// TODO: move to NewCmdInstall
-	flagUsername string
-	// TODO: move to NewCmdInstall
-	flagPassword string
 	// TODO: move to NewCmdLocal
 	flagPort int
 )
