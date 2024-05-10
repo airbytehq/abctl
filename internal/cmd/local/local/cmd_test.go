@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	k8s2 "github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
 	helmclient "github.com/mittwald/go-helm-client"
@@ -134,7 +134,7 @@ func TestCommand_Install(t *testing.T) {
 	}}
 
 	c, err := New(
-		k8s2.TestProvider,
+		k8s.TestProvider,
 		WithPortHTTP(portTest),
 		WithHelmClient(&helm),
 		WithK8sClient(&k8sClient),
@@ -187,7 +187,7 @@ func (m *mockHelmClient) UninstallReleaseByName(s string) error {
 	return m.uninstallReleaseByName(s)
 }
 
-var _ k8s2.K8sClient = (*mockK8sClient)(nil)
+var _ k8s.K8sClient = (*mockK8sClient)(nil)
 
 type mockK8sClient struct {
 	createIngress        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error

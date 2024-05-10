@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	k8s2 "github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/cli/browser"
@@ -66,11 +66,11 @@ type BrowserLauncher func(url string) error
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
-	provider         k8s2.Provider
-	cluster          k8s2.Cluster
+	provider         k8s.Provider
+	cluster          k8s.Cluster
 	http             HTTPClient
 	helm             HelmClient
-	k8s              k8s2.K8sClient
+	k8s              k8s.K8sClient
 	portHTTP         int
 	spinner          *pterm.SpinnerPrinter
 	tel              telemetry.Client
@@ -104,7 +104,7 @@ func WithHelmClient(client HelmClient) Option {
 }
 
 // WithK8sClient define the k8s client for this command.
-func WithK8sClient(client k8s2.K8sClient) Option {
+func WithK8sClient(client k8s.K8sClient) Option {
 	return func(c *Command) {
 		c.k8s = client
 	}
@@ -143,7 +143,7 @@ func WithPortHTTP(port int) Option {
 }
 
 // New creates a new Command
-func New(provider k8s2.Provider, opts ...Option) (*Command, error) {
+func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	c := &Command{provider: provider}
 	for _, opt := range opts {
 		opt(c)
@@ -574,7 +574,7 @@ func ingress() *networkingv1.Ingress {
 }
 
 // defaultK8s returns the default k8s client
-func defaultK8s(kubecfg, kubectx string) (k8s2.K8sClient, error) {
+func defaultK8s(kubecfg, kubectx string) (k8s.K8sClient, error) {
 	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
@@ -589,7 +589,7 @@ func defaultK8s(kubecfg, kubectx string) (k8s2.K8sClient, error) {
 		return nil, fmt.Errorf("%w: could not create clientset: %w", localerr.ErrKubernetes, err)
 	}
 
-	return &k8s2.DefaultK8sClient{ClientSet: k8sClient}, nil
+	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
 }
 
 // defaultHelm returns the default helm client
