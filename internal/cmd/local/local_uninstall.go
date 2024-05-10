@@ -2,7 +2,6 @@ package local
 
 import (
 	"fmt"
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
@@ -35,7 +34,7 @@ func NewCmdUninstall() *cobra.Command {
 			return telemetry.Wrapper(cmd.Context(), telemetry.Uninstall, func() error {
 				spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
-				cluster, err := k8s.NewCluster(provider)
+				cluster, err := provider.Cluster() // k8s.NewCluster(provider)
 				if err != nil {
 					pterm.Error.Printfln("Could not determine if the cluster '%s' exists", provider.ClusterName)
 					return err

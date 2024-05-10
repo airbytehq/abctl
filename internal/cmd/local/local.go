@@ -37,7 +37,7 @@ func NewCmdLocal() *cobra.Command {
 			// TODO: cleanup
 			{
 				provider = k8s.KindProvider
-				printK8sProvider(provider)
+				printProviderDetails(provider)
 			}
 
 			return nil
@@ -49,7 +49,7 @@ func NewCmdLocal() *cobra.Command {
 	return cmd
 }
 
-func printK8sProvider(p k8s.Provider) {
+func printProviderDetails(p k8s.Provider) {
 	userHome, _ := os.UserHomeDir()
 	configPath := filepath.Join(userHome, p.Kubeconfig)
 	pterm.Info.Printfln("Using Kubernetes provider:\n\tProvider: %s\n\tKubeconfig: %s\n\tContext: %s", p.Name, configPath, p.Context)

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"sigs.k8s.io/kind/pkg/cluster"
 )
 
 var Providers = map[string]Provider{
@@ -31,10 +31,9 @@ type Provider struct {
 	HelmNginx []string
 }
 
-// MkDirs creates the directories for this providers kubeconfig.
+// mkDirs creates the directories for this providers kubeconfig.
 // The kubeconfigs are always scoped to the user's home directory.
-// TODO: rename to something more clear
-func (p Provider) MkDirs(userHome string) error {
+func (p Provider) mkDirs(userHome string) error {
 	const permissions = 0700
 	kubeconfig := filepath.Join(userHome, p.Kubeconfig)
 	if err := os.MkdirAll(filepath.Dir(kubeconfig), permissions); err != nil {
@@ -42,6 +41,24 @@ func (p Provider) MkDirs(userHome string) error {
 	}
 
 	return nil
+}
+
+// Cluster returns a kubernetes cluster for this provider.
+func (p Provider) Cluster() (Cluster, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine user home directory: %w", err)
+	}
+
+	if err := p.mkDirs(home); err != nil {
+		return nil, fmt.Errorf("could not create directory %s: %w", home, err)
+	}
+
+	return &KindCluster{
+		p:           cluster.NewProvider(),
+		kubeconfig:  filepath.Join(home, p.Kubeconfig),
+		clusterName: p.ClusterName,
+	}, nil
 }
 
 var (
@@ -67,16 +84,3 @@ var (
 		HelmNginx:   []string{},
 	}
 )
-
-// ProviderFromString returns a provider from the given string s.
-// If no provider is found, an error is returned.
-func ProviderFromString(s string) (Provider, error) {
-	switch strings.ToLower(s) {
-	case Kind:
-		return KindProvider, nil
-	case Test:
-		return TestProvider, nil
-	}
-
-	return Provider{}, fmt.Errorf("unknown provider: %s", s)
-}

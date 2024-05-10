@@ -2,8 +2,6 @@ package k8s
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"sigs.k8s.io/kind/pkg/cluster"
 	"time"
 )
@@ -16,29 +14,6 @@ type Cluster interface {
 	Delete() error
 	// Exists returns true if the cluster exists, false otherwise.
 	Exists() bool
-}
-
-// NewCluster returns a Cluster implementation for the provider.
-func NewCluster(provider Provider) (Cluster, error) {
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("could not determine user home directory: %w", err)
-	}
-
-	if err := provider.MkDirs(userHome); err != nil {
-		return nil, fmt.Errorf("could not create directory: %w", err)
-	}
-
-	switch provider.Name {
-	case KindProvider.Name:
-		return &KindCluster{
-			p:           cluster.NewProvider(),
-			kubeconfig:  filepath.Join(userHome, provider.Kubeconfig),
-			clusterName: provider.ClusterName,
-		}, nil
-	}
-
-	return nil, fmt.Errorf("unsupported provider %s", provider)
 }
 
 // interface sanity check
