@@ -23,8 +23,16 @@ _trap() {
     if [ "$rv" -ne 0 ]; then
         [ -z "$TELEMETRY_MSG" ] && TELEMETRY_MSG=$(tail -n 1 "$DIR_TMP/output.log")
         _event abctl_install failed "$TELEMETRY_MSG"
+        echo
+        echo "abctl install failed: $TELEMETRY_MSG"
     else
         _event abctl_install succeeded "$TELEMETRY_MSG"
+        echo
+        echo "abctl install succeeded. Run:"
+        echo
+        echo "   abctl --help"
+        echo
+        echo "to get started! (You might need to sudo, depending on your docker setup)"
     fi
     exit "$rv"
 }
