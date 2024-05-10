@@ -18,7 +18,7 @@ const (
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
 )
 
-func NewCmdInstall(provider k8s.Provider, telClient telemetry.Client) *cobra.Command {
+func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
 	var (

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdUninstall(provider k8s.Provider, telClient telemetry.Client) *cobra.Command {
+func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
 	cmd := &cobra.Command{
