@@ -2,7 +2,6 @@ package local
 
 import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
-	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -18,17 +17,8 @@ var telClient telemetry.Client
 // This will be set in the persistentPreRunLocal method which runs prior to any commands being executed.
 var provider k8s.Provider
 
-var (
-	// TODO: move to NewCmdLocal
-	flagPort int
-)
-
 // NewCmdLocal represents the local command.
 func NewCmdLocal() *cobra.Command {
-	var (
-		flagProvider string
-	)
-
 	cmd := &cobra.Command{
 		Use: "local",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
@@ -44,13 +34,9 @@ func NewCmdLocal() *cobra.Command {
 				telClient = telemetry.Get(telOpts...)
 			}
 			// provider configuration
+			// TODO: cleanup
 			{
-				var err error
-				provider, err = k8s.ProviderFromString(flagProvider)
-				if err != nil {
-					return err
-				}
-
+				provider = k8s.KindProvider
 				printK8sProvider(provider)
 			}
 
@@ -58,11 +44,6 @@ func NewCmdLocal() *cobra.Command {
 		},
 		Short: "Manages local Airbyte installations",
 	}
-
-	pf := cmd.PersistentFlags()
-	pf.StringVarP(&flagProvider, "k8s-provider", "k", k8s.KindProvider.Name, "kubernetes provider to use")
-	pf.IntVarP(&flagPort, "port", "", local.Port, "ingress http port")
-
 	cmd.AddCommand(NewCmdInstall(), NewCmdUninstall())
 
 	return cmd

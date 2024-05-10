@@ -25,6 +25,7 @@ func NewCmdInstall() *cobra.Command {
 		flagHelmChartVersion string
 		flagUsername         string
 		flagPassword         string
+		flagPort             int
 	)
 
 	cmd := &cobra.Command{
@@ -130,6 +131,7 @@ func NewCmdInstall() *cobra.Command {
 
 	cmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	cmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
+	cmd.Flags().IntVarP(&flagPort, "port", "", local.Port, "ingress http port")
 
 	cmd.Flags().StringVar(&flagHelmChartVersion, "helm-chart-version", "latest", "specify the specific Airbyte helm-chart-version to install")
 

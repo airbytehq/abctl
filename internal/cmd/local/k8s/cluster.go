@@ -2,9 +2,6 @@ package k8s
 
 import (
 	"fmt"
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"os"
 	"path/filepath"
 	"sigs.k8s.io/kind/pkg/cluster"
@@ -33,16 +30,6 @@ func NewCluster(provider Provider) (Cluster, error) {
 	}
 
 	switch provider.Name {
-	case DockerDesktopProvider.Name:
-		kubeCfg := filepath.Join(userHome, provider.Kubeconfig)
-		return &DockerDesktopCluster{
-			clientCfg: clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-				&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeCfg},
-				&clientcmd.ConfigOverrides{CurrentContext: provider.Context},
-			),
-			kubeCfg:     filepath.Join(userHome, provider.Kubeconfig),
-			clusterName: provider.ClusterName,
-		}, nil
 	case KindProvider.Name:
 		return &KindCluster{
 			p:           cluster.NewProvider(),
@@ -52,41 +39,6 @@ func NewCluster(provider Provider) (Cluster, error) {
 	}
 
 	return nil, fmt.Errorf("unsupported provider %s", provider)
-}
-
-// interface sanity check
-var _ Cluster = (*DockerDesktopCluster)(nil)
-
-// DockerDesktopCluster is a Cluster that represents a docker-desktop cluster
-type DockerDesktopCluster struct {
-	clientCfg   clientcmd.ClientConfig
-	kubeCfg     string
-	clusterName string
-}
-
-func (d DockerDesktopCluster) Create(_ int) error {
-	return fmt.Errorf("%w: docker-desktop cluster should already exist", localerr.ErrKubernetes)
-}
-
-func (d DockerDesktopCluster) Delete() error {
-	return nil
-}
-
-func (d DockerDesktopCluster) Exists() bool {
-	restCfg, err := d.clientCfg.ClientConfig()
-	if err != nil {
-		return false
-	}
-	cli, err := kubernetes.NewForConfig(restCfg)
-	if err != nil {
-		return false
-	}
-	v, err := cli.ServerVersion()
-	if err != nil || v.Platform == "" {
-		return false
-	}
-
-	return true
 }
 
 // interface sanity check

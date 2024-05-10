@@ -7,11 +7,14 @@ import (
 	"strings"
 )
 
-// TODO: add supported map
+var Providers = map[string]Provider{
+	Kind: KindProvider,
+	Test: TestProvider,
+}
+
 const (
-	DockerDesktop = "docker-desktop"
-	Kind          = "kind"
-	Test          = "test"
+	Kind = "kind"
+	Test = "test"
 )
 
 // Provider represents a k8s provider.
@@ -42,17 +45,6 @@ func (p Provider) MkDirs(userHome string) error {
 }
 
 var (
-	// DockerDesktopProvider represents the docker-desktop provider.
-	DockerDesktopProvider = Provider{
-		Name:        DockerDesktop,
-		ClusterName: "docker-desktop",
-		Context:     "docker-desktop",
-		Kubeconfig:  filepath.Join(".kube", "config"),
-		HelmNginx: []string{
-			"controller.service.httpsPort.enable=false",
-		},
-	}
-
 	// KindProvider represents the kind (https://kind.sigs.k8s.io/) provider.
 	KindProvider = Provider{
 		Name:        Kind,
@@ -80,8 +72,6 @@ var (
 // If no provider is found, an error is returned.
 func ProviderFromString(s string) (Provider, error) {
 	switch strings.ToLower(s) {
-	case DockerDesktop:
-		return DockerDesktopProvider, nil
 	case Kind:
 		return KindProvider, nil
 	case Test:

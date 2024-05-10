@@ -49,7 +49,7 @@ func NewCmdUninstall() *cobra.Command {
 
 				pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
 
-				lc, err := local.New(provider, local.WithPortHTTP(flagPort), local.WithTelemetryClient(telClient), local.WithSpinner(spinner))
+				lc, err := local.New(provider, local.WithTelemetryClient(telClient), local.WithSpinner(spinner))
 				if err != nil {
 					pterm.Warning.Printfln("Failed to initialize 'local' command\nUninstallation attempt will continue")
 					pterm.Debug.Printfln("Initialization of 'local' failed with %s", err.Error())

@@ -16,8 +16,10 @@
 ## Getting Started
 
 ### Prerequisites
-1. `Docker Desktop` installed (see [instructions](https://docs.docker.com/desktop/install/mac-install/))
-2. `Kubernetes` enabled (see [instructions](https://docs.docker.com/desktop/kubernetes/))
+1. `Docker` installed
+    - [Mac instructions](https://docs.docker.com/desktop/install/mac-install/)
+    - [Windows instructions](https://docs.docker.com/desktop/install/windows-install/)
+    - [Linux instructions](https://docs.docker.com/desktop/install/linux-install/)
 
 ### Installation
 Do one of the following:
