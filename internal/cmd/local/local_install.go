@@ -18,7 +18,7 @@ const (
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
 )
 
-func NewCmdInstall() *cobra.Command {
+func NewCmdInstall(provider k8s.Provider, telClient telemetry.Client) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
 	var (
@@ -55,7 +55,7 @@ func NewCmdInstall() *cobra.Command {
 			return telemetry.Wrapper(cmd.Context(), telemetry.Install, func() error {
 				spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
-				cluster, err := provider.Cluster() // k8s.NewCluster(provider)
+				cluster, err := provider.Cluster()
 				if err != nil {
 					pterm.Error.Printfln("Could not determine status of any existing '%s' cluster", provider.ClusterName)
 					return err

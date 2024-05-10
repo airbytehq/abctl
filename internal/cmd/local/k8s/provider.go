@@ -7,11 +7,6 @@ import (
 	"sigs.k8s.io/kind/pkg/cluster"
 )
 
-var Providers = map[string]Provider{
-	Kind: KindProvider,
-	Test: TestProvider,
-}
-
 const (
 	Kind = "kind"
 	Test = "test"
@@ -54,7 +49,7 @@ func (p Provider) Cluster() (Cluster, error) {
 		return nil, fmt.Errorf("could not create directory %s: %w", home, err)
 	}
 
-	return &KindCluster{
+	return &kindCluster{
 		p:           cluster.NewProvider(),
 		kubeconfig:  filepath.Join(home, p.Kubeconfig),
 		clusterName: p.ClusterName,
@@ -62,8 +57,8 @@ func (p Provider) Cluster() (Cluster, error) {
 }
 
 var (
-	// KindProvider represents the kind (https://kind.sigs.k8s.io/) provider.
-	KindProvider = Provider{
+	// DefaultProvider represents the kind (https://kind.sigs.k8s.io/) provider.
+	DefaultProvider = Provider{
 		Name:        Kind,
 		ClusterName: "airbyte-abctl",
 		Context:     "kind-airbyte-abctl",

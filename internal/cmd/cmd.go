@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/airbytehq/abctl/internal/cmd/local"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/version"
 	"github.com/pterm/pterm"
@@ -90,7 +91,7 @@ func NewCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "enable verbose output")
 
 	cmd.AddCommand(version.NewCmdVersion())
-	cmd.AddCommand(local.NewCmdLocal())
+	cmd.AddCommand(local.NewCmdLocal(k8s.DefaultProvider))
 
 	return cmd
 }

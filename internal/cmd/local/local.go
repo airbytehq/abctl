@@ -9,16 +9,10 @@ import (
 	"path/filepath"
 )
 
-// telClient is the telemetry telClient to use.
-// This will be set in the persistentPreRunLocal method which runs prior to any commands being executed.
-var telClient telemetry.Client
-
-// provider is which provider is being used.
-// This will be set in the persistentPreRunLocal method which runs prior to any commands being executed.
-var provider k8s.Provider
-
 // NewCmdLocal represents the local command.
-func NewCmdLocal() *cobra.Command {
+func NewCmdLocal(provider k8s.Provider) *cobra.Command {
+	var telClient telemetry.Client
+
 	cmd := &cobra.Command{
 		Use: "local",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
@@ -33,18 +27,14 @@ func NewCmdLocal() *cobra.Command {
 
 				telClient = telemetry.Get(telOpts...)
 			}
-			// provider configuration
-			// TODO: cleanup
-			{
-				provider = k8s.KindProvider
-				printProviderDetails(provider)
-			}
+			printProviderDetails(provider)
 
 			return nil
 		},
 		Short: "Manages local Airbyte installations",
 	}
-	cmd.AddCommand(NewCmdInstall(), NewCmdUninstall())
+
+	cmd.AddCommand(NewCmdInstall(provider, telClient), NewCmdUninstall(provider, telClient))
 
 	return cmd
 }

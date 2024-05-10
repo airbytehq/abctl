@@ -17,10 +17,10 @@ type Cluster interface {
 }
 
 // interface sanity check
-var _ Cluster = (*KindCluster)(nil)
+var _ Cluster = (*kindCluster)(nil)
 
-// KindCluster is a Cluster implementation for kind (https://kind.sigs.k8s.io/).
-type KindCluster struct {
+// kindCluster is a Cluster implementation for kind (https://kind.sigs.k8s.io/).
+type kindCluster struct {
 	// p is the kind provider, not the abctl provider
 	p *cluster.Provider
 	// kubeconfig is the full path to the kubeconfig file kind is using
@@ -30,7 +30,7 @@ type KindCluster struct {
 
 const k8sVersion = "v1.29.1"
 
-func (k *KindCluster) Create(port int) error {
+func (k *kindCluster) Create(port int) error {
 	// see https://kind.sigs.k8s.io/docs/user/ingress/#create-cluster
 	rawCfg := fmt.Sprintf(`kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -62,7 +62,7 @@ nodes:
 	return nil
 }
 
-func (k *KindCluster) Delete() error {
+func (k *kindCluster) Delete() error {
 	if err := k.p.Delete(k.clusterName, k.kubeconfig); err != nil {
 		return fmt.Errorf("unable to delete kind cluster: %w", err)
 	}
@@ -70,7 +70,7 @@ func (k *KindCluster) Delete() error {
 	return nil
 }
 
-func (k *KindCluster) Exists() bool {
+func (k *kindCluster) Exists() bool {
 	clusters, _ := k.p.List()
 	for _, c := range clusters {
 		if c == k.clusterName {
