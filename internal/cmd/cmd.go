@@ -19,9 +19,10 @@ const (
 Ensure that Docker is running and is accessible.  You may need to upgrade to a newer version of Docker.
 For additional help please visit https://docs.docker.com/get-docker/`
 
-	// TODO rewrite this
 	// helpKubernetes is displayed if ErrKubernetes is ever returned
-	helpKubernetes = `An error occurred while communicating with the Kubernetes cluster.`
+	helpKubernetes = `An error occurred while communicating with the Kubernetes cluster.
+If this error persists, you may need to run the uninstall command before attempting to run
+the install command again.`
 
 	// helpIngress is displayed if ErrIngress is ever returned
 	helpIngress = `An error occurred while configuring ingress.
