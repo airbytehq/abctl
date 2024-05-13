@@ -3,8 +3,8 @@ package local
 import (
 	"context"
 	"errors"
-	"github.com/airbytehq/abctl/internal/local/docker"
-	"github.com/airbytehq/abctl/internal/local/localerr"
+	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
 	"github.com/google/go-cmp/cmp"

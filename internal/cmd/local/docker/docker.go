@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/airbytehq/abctl/internal/local/localerr"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"os"
