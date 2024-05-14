@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/airbytehq/abctl/internal/local/k8s"
-	"github.com/airbytehq/abctl/internal/local/localerr"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/cli/browser"
 	helmclient "github.com/mittwald/go-helm-client"
@@ -45,6 +45,9 @@ const (
 	nginxRepoURL        = "https://kubernetes.github.io/ingress-nginx"
 )
 
+// Port is the default port that Airbyte will deploy to.
+const Port = 8000
+
 // HelmClient primarily for testing purposes
 type HelmClient interface {
 	AddOrUpdateChartRepo(entry repo.Entry) error
@@ -63,16 +66,17 @@ type BrowserLauncher func(url string) error
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
-	provider k8s.Provider
-	cluster  k8s.Cluster
-	http     HTTPClient
-	helm     HelmClient
-	k8s      k8s.K8sClient
-	portHTTP int
-	spinner  *pterm.SpinnerPrinter
-	tel      telemetry.Client
-	launcher BrowserLauncher
-	userHome string
+	provider         k8s.Provider
+	cluster          k8s.Cluster
+	http             HTTPClient
+	helm             HelmClient
+	k8s              k8s.Client
+	portHTTP         int
+	spinner          *pterm.SpinnerPrinter
+	tel              telemetry.Client
+	launcher         BrowserLauncher
+	userHome         string
+	helmChartVersion string
 }
 
 // Option for configuring the Command, primarily exists for testing
@@ -100,7 +104,7 @@ func WithHelmClient(client HelmClient) Option {
 }
 
 // WithK8sClient define the k8s client for this command.
-func WithK8sClient(client k8s.K8sClient) Option {
+func WithK8sClient(client k8s.Client) Option {
 	return func(c *Command) {
 		c.k8s = client
 	}
@@ -126,9 +130,21 @@ func WithSpinner(spinner *pterm.SpinnerPrinter) Option {
 	}
 }
 
+func WithHelmChartVersion(version string) Option {
+	return func(c *Command) {
+		c.helmChartVersion = version
+	}
+}
+
+func WithPortHTTP(port int) Option {
+	return func(c *Command) {
+		c.portHTTP = port
+	}
+}
+
 // New creates a new Command
-func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) {
-	c := &Command{provider: provider, portHTTP: portHTTP}
+func New(provider k8s.Provider, opts ...Option) (*Command, error) {
+	c := &Command{provider: provider}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -144,6 +160,10 @@ func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) 
 	// set http client, if not defined
 	if c.http == nil {
 		c.http = &http.Client{Timeout: 10 * time.Second}
+	}
+
+	if c.portHTTP == 0 {
+		c.portHTTP = Port
 	}
 
 	// set k8s client, if not defined
@@ -179,9 +199,13 @@ func New(provider k8s.Provider, portHTTP int, opts ...Option) (*Command, error) 
 		c.launcher = browser.OpenURL
 	}
 
+	if c.helmChartVersion == "latest" {
+		c.helmChartVersion = ""
+	}
+
 	// fetch k8s version information
 	{
-		k8sVersion, err := c.k8s.GetServerVersion()
+		k8sVersion, err := c.k8s.ServerVersionGet()
 		if err != nil {
 			return nil, fmt.Errorf("%w: could not fetch kubernetes server version: %w", localerr.ErrKubernetes, err)
 		}
@@ -202,6 +226,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		repoURL:      airbyteRepoURL,
 		chartName:    airbyteChartName,
 		chartRelease: airbyteChartRelease,
+		chartVersion: c.helmChartVersion,
 		namespace:    airbyteNamespace,
 	}); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)
@@ -223,7 +248,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 				"This could be an indication that port %d is not available.\n"+
 				"If installation fails, please try again with a different port.", nginxChartName, c.portHTTP)
 
-			srv, err := c.k8s.GetService(ctx, nginxNamespace, "ingress-nginx-controller")
+			srv, err := c.k8s.ServiceGet(ctx, nginxNamespace, "ingress-nginx-controller")
 			// If there is an error, we can ignore it as we only are checking for a missing ingress entry,
 			// and an error would indicate the inability to check for that entry.
 			if err == nil {
@@ -245,16 +270,16 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 
 	c.spinner.UpdateText("Checking for existing Ingress")
 
-	if c.k8s.ExistsIngress(ctx, airbyteNamespace, airbyteIngress) {
+	if c.k8s.IngressExists(ctx, airbyteNamespace, airbyteIngress) {
 		pterm.Success.Println("Found existing Ingress")
-		if err := c.k8s.UpdateIngress(ctx, airbyteNamespace, ingress()); err != nil {
+		if err := c.k8s.IngressUpdate(ctx, airbyteNamespace, ingress()); err != nil {
 			pterm.Error.Printfln("Unable to update existing Ingress")
 			return fmt.Errorf("could not update existing ingress: %w", err)
 		}
 		pterm.Success.Println("Updated existing Ingress")
 	} else {
 		pterm.Info.Println("No existing Ingress found, will create one")
-		if err := c.k8s.CreateIngress(ctx, airbyteNamespace, ingress()); err != nil {
+		if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress()); err != nil {
 			pterm.Error.Println("Unable to create ingress")
 			return fmt.Errorf("could not create ingress: %w", err)
 		}
@@ -281,7 +306,7 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 	}
 
 	data := map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))}
-	if err := c.k8s.CreateOrUpdateSecret(ctx, airbyteNamespace, "basic-auth", data); err != nil {
+	if err := c.k8s.SecretCreateOrUpdate(ctx, airbyteNamespace, "basic-auth", data); err != nil {
 		pterm.Error.Println("Could not create Basic-Auth secret")
 	}
 	pterm.Success.Println("Basic-Auth secret created")
@@ -342,7 +367,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 
 	c.spinner.UpdateText(fmt.Sprintf("Deleting Kubernetes namespace '%s'", airbyteNamespace))
 
-	if err := c.k8s.DeleteNamespace(ctx, airbyteNamespace); err != nil {
+	if err := c.k8s.NamespaceDelete(ctx, airbyteNamespace); err != nil {
 		if !k8serrors.IsNotFound(err) {
 			pterm.Error.Printfln("Could not delete Kubernetes namespace '%s'", airbyteNamespace)
 			return fmt.Errorf("could not delete namespace: %w", err)
@@ -360,7 +385,7 @@ func (c *Command) Uninstall(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				if !c.k8s.ExistsNamespace(ctx, airbyteNamespace) {
+				if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
 					namespaceDeleted = true
 					return
 				}
@@ -390,6 +415,7 @@ type chartRequest struct {
 	repoURL      string
 	chartName    string
 	chartRelease string
+	chartVersion string
 	namespace    string
 	values       []string
 }
@@ -410,7 +436,7 @@ func (c *Command) handleChart(
 	}
 
 	c.spinner.UpdateText(fmt.Sprintf("Fetching %s Helm Chart", req.chartName))
-	helmChart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{})
+	helmChart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{Version: req.chartVersion})
 	if err != nil {
 		pterm.Error.Printfln("Unable to fetch %s Helm Chart", req.chartName)
 		return fmt.Errorf("could not fetch chart %s: %w", req.chartName, err)
@@ -427,6 +453,7 @@ func (c *Command) handleChart(
 		Wait:            true,
 		Timeout:         10 * time.Minute,
 		ValuesOptions:   values.Options{Values: req.values},
+		Version:         req.chartVersion,
 	},
 		&helmclient.GenericHelmOptions{},
 	)
@@ -547,7 +574,7 @@ func ingress() *networkingv1.Ingress {
 }
 
 // defaultK8s returns the default k8s client
-func defaultK8s(kubecfg, kubectx string) (k8s.K8sClient, error) {
+func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)

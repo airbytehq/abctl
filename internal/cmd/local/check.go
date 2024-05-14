@@ -3,8 +3,8 @@ package local
 import (
 	"context"
 	"fmt"
-	"github.com/airbytehq/abctl/internal/local/docker"
-	"github.com/airbytehq/abctl/internal/local/localerr"
+	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/pterm/pterm"
 	"net"
 	"net/http"

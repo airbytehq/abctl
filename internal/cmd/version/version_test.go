@@ -29,19 +29,19 @@ func TestCmd_Output(t *testing.T) {
 		{
 			name:     "version defined",
 			version:  "v0.0.0",
-			expected: "version: v0.0.0\nmodified: false\n",
+			expected: "version: v0.0.0\n",
 		},
 		{
 			name:     "revision defined",
 			version:  "v0.0.0",
 			revision: "d34db33f",
-			expected: "version: v0.0.0\nrevision: d34db33f\nmodified: false\n",
+			expected: "version: v0.0.0\nrevision: d34db33f\n",
 		},
 		{
 			name:             "modification time defined",
 			version:          "v0.0.0",
 			modificationTime: "time-goes-here",
-			expected:         "version: v0.0.0\ntime: time-goes-here\nmodified: false\n",
+			expected:         "version: v0.0.0\ntime: time-goes-here\n",
 		},
 		{
 			name:     "modified defined",

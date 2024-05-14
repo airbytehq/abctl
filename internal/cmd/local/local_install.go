@@ -2,9 +2,9 @@ package local
 
 import (
 	"fmt"
-	"github.com/airbytehq/abctl/internal/local"
-	"github.com/airbytehq/abctl/internal/local/docker"
-	"github.com/airbytehq/abctl/internal/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -18,8 +18,15 @@ const (
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
 )
 
-func NewCmdInstall() *cobra.Command {
+func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
+
+	var (
+		flagChartVersion string
+		flagUsername     string
+		flagPassword     string
+		flagPort         int
+	)
 
 	cmd := &cobra.Command{
 		Use:   "install",
@@ -48,7 +55,7 @@ func NewCmdInstall() *cobra.Command {
 			return telemetry.Wrapper(cmd.Context(), telemetry.Install, func() error {
 				spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
-				cluster, err := k8s.NewCluster(provider)
+				cluster, err := provider.Cluster()
 				if err != nil {
 					pterm.Error.Printfln("Could not determine status of any existing '%s' cluster", provider.ClusterName)
 					return err
@@ -95,7 +102,12 @@ func NewCmdInstall() *cobra.Command {
 					pterm.Success.Printfln("Cluster '%s' created", provider.ClusterName)
 				}
 
-				lc, err := local.New(provider, flagPort, local.WithTelemetryClient(telClient), local.WithSpinner(spinner))
+				lc, err := local.New(provider,
+					local.WithPortHTTP(flagPort),
+					local.WithTelemetryClient(telClient),
+					local.WithSpinner(spinner),
+					local.WithHelmChartVersion(flagChartVersion),
+				)
 				if err != nil {
 					pterm.Error.Printfln("Failed to initialize 'local' command")
 					return fmt.Errorf("could not initialize local command: %w", err)
@@ -123,6 +135,9 @@ func NewCmdInstall() *cobra.Command {
 
 	cmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	cmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
+	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
+
+	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the specific Airbyte helm chart version to install")
 
 	return cmd
 }

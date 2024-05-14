@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"sigs.k8s.io/kind/pkg/cluster"
 )
 
-// TODO: add supported map
 const (
-	DockerDesktop = "docker-desktop"
-	Kind          = "kind"
-	Test          = "test"
+	Kind = "kind"
+	Test = "test"
 )
 
 // Provider represents a k8s provider.
@@ -28,10 +26,9 @@ type Provider struct {
 	HelmNginx []string
 }
 
-// MkDirs creates the directories for this providers kubeconfig.
+// mkDirs creates the directories for this providers kubeconfig.
 // The kubeconfigs are always scoped to the user's home directory.
-// TODO: rename to something more clear
-func (p Provider) MkDirs(userHome string) error {
+func (p Provider) mkDirs(userHome string) error {
 	const permissions = 0700
 	kubeconfig := filepath.Join(userHome, p.Kubeconfig)
 	if err := os.MkdirAll(filepath.Dir(kubeconfig), permissions); err != nil {
@@ -41,20 +38,27 @@ func (p Provider) MkDirs(userHome string) error {
 	return nil
 }
 
-var (
-	// DockerDesktopProvider represents the docker-desktop provider.
-	DockerDesktopProvider = Provider{
-		Name:        DockerDesktop,
-		ClusterName: "docker-desktop",
-		Context:     "docker-desktop",
-		Kubeconfig:  filepath.Join(".kube", "config"),
-		HelmNginx: []string{
-			"controller.service.httpsPort.enable=false",
-		},
+// Cluster returns a kubernetes cluster for this provider.
+func (p Provider) Cluster() (Cluster, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine user home directory: %w", err)
 	}
 
-	// KindProvider represents the kind (https://kind.sigs.k8s.io/) provider.
-	KindProvider = Provider{
+	if err := p.mkDirs(home); err != nil {
+		return nil, fmt.Errorf("could not create directory %s: %w", home, err)
+	}
+
+	return &kindCluster{
+		p:           cluster.NewProvider(),
+		kubeconfig:  filepath.Join(home, p.Kubeconfig),
+		clusterName: p.ClusterName,
+	}, nil
+}
+
+var (
+	// DefaultProvider represents the kind (https://kind.sigs.k8s.io/) provider.
+	DefaultProvider = Provider{
 		Name:        Kind,
 		ClusterName: "airbyte-abctl",
 		Context:     "kind-airbyte-abctl",
@@ -75,18 +79,3 @@ var (
 		HelmNginx:   []string{},
 	}
 )
-
-// ProviderFromString returns a provider from the given string s.
-// If no provider is found, an error is returned.
-func ProviderFromString(s string) (Provider, error) {
-	switch strings.ToLower(s) {
-	case DockerDesktop:
-		return DockerDesktopProvider, nil
-	case Kind:
-		return KindProvider, nil
-	case Test:
-		return TestProvider, nil
-	}
-
-	return Provider{}, fmt.Errorf("unknown provider: %s", s)
-}

@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"github.com/airbytehq/abctl/internal/cmd/local"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/version"
-	"github.com/airbytehq/abctl/internal/local/localerr"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"os"
@@ -20,8 +21,8 @@ For additional help please visit https://docs.docker.com/get-docker/`
 
 	// helpKubernetes is displayed if ErrKubernetes is ever returned
 	helpKubernetes = `An error occurred while communicating with the Kubernetes cluster.
-If using Docker Desktop, ensure that Kubernetes is enabled.
-For additional help please visit https://docs.docker.com/desktop/kubernetes/`
+If this error persists, you may need to run the uninstall command before attempting to run
+the install command again.`
 
 	// helpIngress is displayed if ErrIngress is ever returned
 	helpIngress = `An error occurred while configuring ingress.
@@ -91,7 +92,7 @@ func NewCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "enable verbose output")
 
 	cmd.AddCommand(version.NewCmdVersion())
-	cmd.AddCommand(local.NewCmdLocal())
+	cmd.AddCommand(local.NewCmdLocal(k8s.DefaultProvider))
 
 	return cmd
 }
