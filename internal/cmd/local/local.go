@@ -11,8 +11,13 @@ import (
 
 var telClient telemetry.Client
 
+type Config struct {
+	Provider  k8s.Provider
+	TelClient telemetry.Client
+}
+
 // NewCmdLocal represents the local command.
-func NewCmdLocal(provider k8s.Provider) *cobra.Command {
+func NewCmdLocal(cfg *Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "local",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
@@ -24,17 +29,16 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 				if dnt {
 					telOpts = append(telOpts, telemetry.WithDnt())
 				}
-
-				telClient = telemetry.Get(telOpts...)
+				cfg.TelClient = telemetry.Get(telOpts...)
 			}
-			printProviderDetails(provider)
+			printProviderDetails(cfg.Provider)
 
 			return nil
 		},
 		Short: "Manages local Airbyte installations",
 	}
 
-	cmd.AddCommand(NewCmdInstall(provider), NewCmdUninstall(provider))
+	cmd.AddCommand(newCmdInstall(cfg), newCmdUninstall(cfg))
 
 	return cmd
 }

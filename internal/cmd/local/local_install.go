@@ -18,8 +18,9 @@ const (
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
 )
 
-func NewCmdInstall(provider k8s.Provider) *cobra.Command {
+func newCmdInstall(cfg *Config) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
+	provider := cfg.Provider
 
 	var (
 		flagChartVersion string

@@ -2,15 +2,15 @@ package local
 
 import (
 	"fmt"
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
+func newCmdUninstall(cfg *Config) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
+	provider := cfg.Provider
 
 	cmd := &cobra.Command{
 		Use:   "uninstall",
