@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 )
 
-var telClient telemetry.Client
-
 type Config struct {
 	Provider  k8s.Provider
 	TelClient telemetry.Client

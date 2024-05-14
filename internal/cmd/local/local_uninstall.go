@@ -25,9 +25,9 @@ func newCmdUninstall(cfg *Config) *cobra.Command {
 				return fmt.Errorf("could not determine docker installation status: %w", err)
 			}
 
-			telClient.Attr("docker_version", dockerVersion.Version)
-			telClient.Attr("docker_arch", dockerVersion.Arch)
-			telClient.Attr("docker_platform", dockerVersion.Platform)
+			cfg.TelClient.Attr("docker_version", dockerVersion.Version)
+			cfg.TelClient.Attr("docker_arch", dockerVersion.Arch)
+			cfg.TelClient.Attr("docker_platform", dockerVersion.Platform)
 
 			return nil
 		},
@@ -49,7 +49,7 @@ func newCmdUninstall(cfg *Config) *cobra.Command {
 
 				pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
 
-				lc, err := local.New(provider, local.WithTelemetryClient(telClient), local.WithSpinner(spinner))
+				lc, err := local.New(provider, local.WithTelemetryClient(cfg.TelClient), local.WithSpinner(spinner))
 				if err != nil {
 					pterm.Warning.Printfln("Failed to initialize 'local' command\nUninstallation attempt will continue")
 					pterm.Debug.Printfln("Initialization of 'local' failed with %s", err.Error())
