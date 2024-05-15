@@ -15,6 +15,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	coreV1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"net/http"
 	"testing"
 	"time"
@@ -108,16 +109,16 @@ func TestCommand_Install(t *testing.T) {
 	}
 
 	k8sClient := mockK8sClient{
-		getServerVersion: func() (string, error) {
+		serverVersionGet: func() (string, error) {
 			return "test", nil
 		},
-		createOrUpdateSecret: func(ctx context.Context, namespace, name string, data map[string][]byte) error {
+		secretCreateOrUpdate: func(ctx context.Context, namespace, name string, data map[string][]byte) error {
 			return nil
 		},
-		existsIngress: func(ctx context.Context, namespace string, ingress string) bool {
+		ingressExists: func(ctx context.Context, namespace string, ingress string) bool {
 			return false
 		},
-		createIngress: func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
+		ingressCreate: func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
 			return nil
 		},
 	}
@@ -190,46 +191,56 @@ func (m *mockHelmClient) UninstallReleaseByName(s string) error {
 var _ k8s.Client = (*mockK8sClient)(nil)
 
 type mockK8sClient struct {
-	createIngress        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
-	existsIngress        func(ctx context.Context, namespace string, ingress string) bool
-	updateIngress        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
-	existsNamespace      func(ctx context.Context, namespace string) bool
-	deleteNamespace      func(ctx context.Context, namespace string) error
-	createOrUpdateSecret func(ctx context.Context, namespace, name string, data map[string][]byte) error
-	getService           func(ctx context.Context, namespace, name string) (*coreV1.Service, error)
-	getServerVersion     func() (string, error)
+	ingressCreate        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
+	ingressExists        func(ctx context.Context, namespace string, ingress string) bool
+	ingressUpdate        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
+	namespaceExists      func(ctx context.Context, namespace string) bool
+	namespaceDelete      func(ctx context.Context, namespace string) error
+	secretCreateOrUpdate func(ctx context.Context, namespace, name string, data map[string][]byte) error
+	serviceGet           func(ctx context.Context, namespace, name string) (*coreV1.Service, error)
+	serverVersionGet     func() (string, error)
+	eventsWatch          func(ctx context.Context, namespace string) (watch.Interface, error)
+	logsGet              func(ctx context.Context, namespace string, name string) (string, error)
 }
 
 func (m *mockK8sClient) IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
-	return m.createIngress(ctx, namespace, ingress)
+	return m.ingressCreate(ctx, namespace, ingress)
 }
 
 func (m *mockK8sClient) IngressExists(ctx context.Context, namespace string, ingress string) bool {
-	return m.existsIngress(ctx, namespace, ingress)
+	return m.ingressExists(ctx, namespace, ingress)
 }
 
 func (m *mockK8sClient) IngressUpdate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
-	return m.updateIngress(ctx, namespace, ingress)
+	return m.ingressUpdate(ctx, namespace, ingress)
 }
 
 func (m *mockK8sClient) NamespaceExists(ctx context.Context, namespace string) bool {
-	return m.existsNamespace(ctx, namespace)
+	return m.namespaceExists(ctx, namespace)
 }
 
 func (m *mockK8sClient) NamespaceDelete(ctx context.Context, namespace string) error {
-	return m.deleteNamespace(ctx, namespace)
+	return m.namespaceDelete(ctx, namespace)
 }
 
 func (m *mockK8sClient) SecretCreateOrUpdate(ctx context.Context, namespace, name string, data map[string][]byte) error {
-	return m.createOrUpdateSecret(ctx, namespace, name, data)
+	return m.secretCreateOrUpdate(ctx, namespace, name, data)
 }
 
 func (m *mockK8sClient) ServiceGet(ctx context.Context, namespace, name string) (*coreV1.Service, error) {
-	return m.getService(ctx, namespace, name)
+	return m.serviceGet(ctx, namespace, name)
 }
 
 func (m *mockK8sClient) ServerVersionGet() (string, error) {
-	return m.getServerVersion()
+	return m.serverVersionGet()
+}
+
+func (m *mockK8sClient) EventsWatch(ctx context.Context, namespace string) (watch.Interface, error) {
+	return m.eventsWatch(ctx, namespace)
+}
+
+func (m *mockK8sClient) LogsGet(ctx context.Context, namespace string, name string) (string, error) {
+	return m.logsGet(ctx, namespace, name)
 }
 
 var _ telemetry.Client = (*mockTelemetryClient)(nil)
