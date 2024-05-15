@@ -236,10 +236,16 @@ func (m *mockK8sClient) ServerVersionGet() (string, error) {
 }
 
 func (m *mockK8sClient) EventsWatch(ctx context.Context, namespace string) (watch.Interface, error) {
+	if m.eventsWatch == nil {
+		return watch.NewFake(), nil
+	}
 	return m.eventsWatch(ctx, namespace)
 }
 
 func (m *mockK8sClient) LogsGet(ctx context.Context, namespace string, name string) (string, error) {
+	if m.logsGet == nil {
+		return "LogsGet called", nil
+	}
 	return m.logsGet(ctx, namespace, name)
 }
 
