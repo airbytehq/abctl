@@ -357,7 +357,7 @@ func (c *Command) handleEvent(ctx context.Context, e *v1events.Event) {
 		// Similar issue to DeprecatedLastTimestamp, the series attribute is always nil
 		if logs != "" {
 			pterm.Warning.Printfln(
-				"Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs:",
+				"Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs: %s",
 				e.Name, e.Reason, e.Note, e.DeprecatedCount, logs,
 			)
 		} else {
