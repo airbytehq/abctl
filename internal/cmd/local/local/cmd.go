@@ -358,7 +358,7 @@ func (c *Command) handleEvent(ctx context.Context, e *v1events.Event) {
 		if logs != "" {
 			pterm.Warning.Printfln(
 				"Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs: %s",
-				e.Name, e.Reason, e.Note, e.DeprecatedCount, logs,
+				e.Name, e.Reason, e.Note, e.DeprecatedCount, strings.TrimSpace(logs),
 			)
 		} else {
 			pterm.Warning.Printfln(
