@@ -5,6 +5,7 @@ go 1.22.2
 require (
 	github.com/cli/browser v1.3.0
 	github.com/docker/docker v26.1.0+incompatible
+	github.com/docker/go-connections v0.5.0
 	github.com/google/go-cmp v0.6.0
 	github.com/mittwald/go-helm-client v0.12.9
 	github.com/oklog/ulid/v2 v2.1.0
@@ -18,7 +19,7 @@ require (
 	k8s.io/api v0.29.2
 	k8s.io/apimachinery v0.29.2
 	k8s.io/client-go v0.29.2
-	sigs.k8s.io/kind v0.22.0
+	sigs.k8s.io/kind v0.23.0
 )
 
 require (
@@ -50,7 +51,6 @@ require (
 	github.com/docker/cli v25.0.1+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.0 // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect

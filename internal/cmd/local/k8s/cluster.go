@@ -28,7 +28,7 @@ type kindCluster struct {
 	clusterName string
 }
 
-const k8sVersion = "v1.29.1"
+const k8sVersion = "v1.30.0"
 
 func (k *kindCluster) Create(port int) error {
 	// see https://kind.sigs.k8s.io/docs/user/ingress/#create-cluster
