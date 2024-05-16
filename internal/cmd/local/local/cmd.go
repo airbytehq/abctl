@@ -17,6 +17,7 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	v1events "k8s.io/api/events/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -220,6 +221,8 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, user, pass string) error {
+	go c.watchEvents(ctx)
+
 	if err := c.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     airbyteRepoName,
@@ -292,6 +295,81 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 	}
 
 	return nil
+}
+
+func (c *Command) watchEvents(ctx context.Context) {
+	watcher, err := c.k8s.EventsWatch(ctx, airbyteNamespace)
+	if err != nil {
+		pterm.Warning.Printfln("Unable to watch airbyte events\n  %s", err)
+		return
+	}
+	defer watcher.Stop()
+
+	for {
+		select {
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				pterm.Debug.Println("Event watcher completed.")
+				return
+			}
+			if convertedEvent, ok := event.Object.(*v1events.Event); ok {
+				c.handleEvent(ctx, convertedEvent)
+			} else {
+				pterm.Debug.Printfln("Received unexpected event: %T", event.Object)
+			}
+		case <-ctx.Done():
+			pterm.Debug.Printfln("Event watcher context completed:\n  %s", ctx.Err())
+			return
+		}
+	}
+}
+
+// now is used to filter out kubernetes events that happened in the past.
+// Kubernetes wants to use the ResourceVersion on the event watch request itself, but that approach
+// is more complicated as it requires determining which ResourceVersion to initially provide.
+var now = func() *v1.Time {
+	t := v1.Now()
+	return &t
+}()
+
+// handleEvent converts a kubernetes event into a console log message
+func (c *Command) handleEvent(ctx context.Context, e *v1events.Event) {
+	// TODO: replace DeprecatedLastTimestamp,
+	// this is supposed to be replaced with series.lastObservedTime, however that field is always nil...
+	if e.DeprecatedLastTimestamp.Before(now) {
+		return
+	}
+
+	switch {
+	case strings.EqualFold(e.Type, "normal"):
+		pterm.Debug.Println(e.Note)
+	case strings.EqualFold(e.Type, "warning"):
+		var logs = ""
+		if strings.EqualFold(e.Reason, "backoff") {
+			var err error
+			logs, err = c.k8s.LogsGet(ctx, e.Regarding.Namespace, e.Regarding.Name)
+			if err != nil {
+				pterm.Debug.Printfln("Unable to retrieve logs for %s:%s\n  %s", e.Regarding.Namespace, e.Regarding.Name, err)
+			}
+		}
+
+		// TODO: replace DeprecatedCount
+		// Similar issue to DeprecatedLastTimestamp, the series attribute is always nil
+		if logs != "" {
+			pterm.Warning.Printfln(
+				"Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs: %s",
+				e.Name, e.Reason, e.Note, e.DeprecatedCount, logs,
+			)
+		} else {
+			pterm.Warning.Printfln(
+				"Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d",
+				e.Name, e.Reason, e.Note, e.DeprecatedCount,
+			)
+		}
+
+	default:
+		pterm.Debug.Printfln("Received an unsupported event type: %s", e.Type)
+	}
 }
 
 // handleBasicAuthSecret creates or updates the appropriate basic auth credentials for ingress.
@@ -465,7 +543,7 @@ func (c *Command) handleChart(
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 
 	pterm.Success.Printfln(
-		"Installed Helm Chart %s:\n\tname: %s\n\tnamespace: %s\n\tversion: %s\n\trelease: %d",
+		"Installed Helm Chart %s:\n  name: %s\n  namespace: %s\n  version: %s\n  release: %d",
 		req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Chart.Metadata.Version, helmRelease.Version)
 	return nil
 }

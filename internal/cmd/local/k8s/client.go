@@ -3,11 +3,14 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"io"
 	coreV1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	"strings"
 )
 
 // Client primarily for testing purposes
@@ -32,7 +35,13 @@ type Client interface {
 
 	// ServerVersionGet returns the kubernetes version.
 	ServerVersionGet() (string, error)
+
+	EventsWatch(ctx context.Context, namespace string) (watch.Interface, error)
+
+	LogsGet(ctx context.Context, namespace string, name string) (string, error)
 }
+
+var _ Client = (*DefaultK8sClient)(nil)
 
 // DefaultK8sClient converts the official kubernetes client to our more manageable (and testable) interface
 type DefaultK8sClient struct {
@@ -112,4 +121,22 @@ func (d *DefaultK8sClient) ServerVersionGet() (string, error) {
 
 func (d *DefaultK8sClient) ServiceGet(ctx context.Context, namespace string, name string) (*coreV1.Service, error) {
 	return d.ClientSet.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+func (d *DefaultK8sClient) EventsWatch(ctx context.Context, namespace string) (watch.Interface, error) {
+	return d.ClientSet.EventsV1().Events(namespace).Watch(ctx, metav1.ListOptions{})
+}
+
+func (d *DefaultK8sClient) LogsGet(ctx context.Context, namespace string, name string) (string, error) {
+	req := d.ClientSet.CoreV1().Pods(namespace).GetLogs(name, &coreV1.PodLogOptions{Previous: true})
+	reader, err := req.Stream(ctx)
+	if err != nil {
+		return "", fmt.Errorf("could not get logs for pod %s: %w", name, err)
+	}
+	defer reader.Close()
+	buf := new(strings.Builder)
+	if _, err := io.Copy(buf, reader); err != nil {
+		return "", fmt.Errorf("could not copy logs from pod %s: %w", name, err)
+	}
+	return buf.String(), nil
 }
