@@ -128,7 +128,7 @@ func (d *DefaultK8sClient) EventsWatch(ctx context.Context, namespace string) (w
 }
 
 func (d *DefaultK8sClient) LogsGet(ctx context.Context, namespace string, name string) (string, error) {
-	req := d.ClientSet.CoreV1().Pods(namespace).GetLogs(name, &coreV1.PodLogOptions{Previous: true})
+	req := d.ClientSet.CoreV1().Pods(namespace).GetLogs(name, &coreV1.PodLogOptions{})
 	reader, err := req.Stream(ctx)
 	if err != nil {
 		return "", fmt.Errorf("could not get logs for pod %s: %w", name, err)
