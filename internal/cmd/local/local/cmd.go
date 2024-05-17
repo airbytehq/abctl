@@ -4,6 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
@@ -24,13 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -222,12 +224,18 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 
 func pv(namespace, name string) *corev1.PersistentVolume {
 	size, _ := resource.ParseQuantity("500Mi")
+	hostPathType := corev1.HostPathDirectoryOrCreate
 
 	return &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: corev1.PersistentVolumeSpec{
-			Capacity:               corev1.ResourceList{corev1.ResourceStorage: size},
-			PersistentVolumeSource: corev1.PersistentVolumeSource{},
+			Capacity: corev1.ResourceList{corev1.ResourceStorage: size},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: path.Join("/var/local-path-provisioner", name),
+					Type: &hostPathType,
+				},
+			},
 			AccessModes: []corev1.PersistentVolumeAccessMode{
 				corev1.ReadWriteOnce,
 			},
@@ -237,7 +245,7 @@ func pv(namespace, name string) *corev1.PersistentVolume {
 	}
 }
 
-func pvc(name string) *corev1.PersistentVolumeClaim {
+func pvc(name string, volumeName string) *corev1.PersistentVolumeClaim {
 	size, _ := resource.ParseQuantity("500Mi")
 	storageClass := "standard"
 
@@ -246,6 +254,7 @@ func pvc(name string) *corev1.PersistentVolumeClaim {
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources:        corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: size}},
+			VolumeName:       volumeName,
 			StorageClassName: &storageClass,
 		},
 		Status: corev1.PersistentVolumeClaimStatus{},
@@ -266,11 +275,21 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		pterm.Info.Printfln("Namespace '%s' already exists", airbyteNamespace)
 	}
 
-	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumes().Create(ctx, pv(airbyteNamespace, "airbyte-minio-pv-claim"), metav1.CreateOptions{}); err != nil {
+	// Create minio PV and PVC
+	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumes().Create(ctx, pv(airbyteNamespace, "airbyte-minio-pv"), metav1.CreateOptions{}); err != nil {
 		pterm.Error.Printfln("Failed to create airbyte persistent volume: %s", err.Error())
 	}
 
-	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-minio-pv-claim-airbyte-minio-0"), metav1.CreateOptions{}); err != nil {
+	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-minio-pv-claim-airbyte-minio-0", "airbyte-minio-pv"), metav1.CreateOptions{}); err != nil {
+		pterm.Error.Printfln("Failed to create airbyte persistent volume claim: %s", err.Error())
+	}
+
+	// Create database PV and PVC
+	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumes().Create(ctx, pv(airbyteNamespace, "airbyte-volume-db"), metav1.CreateOptions{}); err != nil {
+		pterm.Error.Printfln("Failed to create airbyte persistent volume: %s", err.Error())
+	}
+
+	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-volume-db-claim-airbyte-db-0", "airbyte-volume-db"), metav1.CreateOptions{}); err != nil {
 		pterm.Error.Printfln("Failed to create airbyte persistent volume claim: %s", err.Error())
 	}
 
