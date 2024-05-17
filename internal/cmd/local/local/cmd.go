@@ -17,10 +17,11 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	corev1 "k8s.io/api/core/v1"
 	v1events "k8s.io/api/events/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"net/http"
@@ -219,9 +220,59 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	return c, nil
 }
 
+func pv(namespace, name string) *corev1.PersistentVolume {
+	size, _ := resource.ParseQuantity("500Mi")
+
+	return &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: corev1.PersistentVolumeSpec{
+			Capacity:               corev1.ResourceList{corev1.ResourceStorage: size},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{},
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+			},
+			PersistentVolumeReclaimPolicy: "Retain",
+			StorageClassName:              "standard",
+		},
+	}
+}
+
+func pvc(name string) *corev1.PersistentVolumeClaim {
+	size, _ := resource.ParseQuantity("500Mi")
+	storageClass := "standard"
+
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources:        corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: size}},
+			StorageClassName: &storageClass,
+		},
+		Status: corev1.PersistentVolumeClaimStatus{},
+	}
+}
+
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, user, pass string) error {
 	go c.watchEvents(ctx)
+
+	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
+		c.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", airbyteNamespace))
+		if err := c.k8s.NamespaceCreate(ctx, airbyteNamespace); err != nil {
+			pterm.Error.Printfln("Could not create namespace '%s'", airbyteNamespace)
+			return fmt.Errorf("could not create airbyte namespace: %w", err)
+		}
+	} else {
+		pterm.Info.Printfln("Namespace '%s' already exists", airbyteNamespace)
+	}
+
+	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumes().Create(ctx, pv(airbyteNamespace, "airbyte-minio-pv-claim"), metav1.CreateOptions{}); err != nil {
+		pterm.Error.Printfln("Failed to create airbyte persistent volume: %s", err.Error())
+	}
+
+	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-minio-pv-claim-airbyte-minio-0"), metav1.CreateOptions{}); err != nil {
+		pterm.Error.Printfln("Failed to create airbyte persistent volume claim: %s", err.Error())
+	}
 
 	if err := c.handleChart(ctx, chartRequest{
 		name:         "airbyte",
@@ -281,7 +332,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		}
 		pterm.Success.Println("Updated existing Ingress")
 	} else {
-		pterm.Info.Println("No existing Ingress found, will create one")
+		pterm.Info.Println("No existing Ingress found, creating one")
 		if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress()); err != nil {
 			pterm.Error.Println("Unable to create ingress")
 			return fmt.Errorf("could not create ingress: %w", err)
@@ -327,8 +378,8 @@ func (c *Command) watchEvents(ctx context.Context) {
 // now is used to filter out kubernetes events that happened in the past.
 // Kubernetes wants to use the ResourceVersion on the event watch request itself, but that approach
 // is more complicated as it requires determining which ResourceVersion to initially provide.
-var now = func() *v1.Time {
-	t := v1.Now()
+var now = func() *metav1.Time {
+	t := metav1.Now()
 	return &t
 }()
 
@@ -604,51 +655,6 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 	pterm.Success.Println("Launched web-browser successfully")
 
 	return nil
-}
-
-// ingress creates an ingress type for defining the webapp ingress rules.
-func ingress() *networkingv1.Ingress {
-	var pathType = networkingv1.PathType("Prefix")
-	var ingressClassName = "nginx"
-
-	return &networkingv1.Ingress{
-		TypeMeta: v1.TypeMeta{},
-		ObjectMeta: v1.ObjectMeta{
-			Name:      airbyteIngress,
-			Namespace: airbyteNamespace,
-			Annotations: map[string]string{
-				"nginx.ingress.kubernetes.io/auth-type":   "basic",
-				"nginx.ingress.kubernetes.io/auth-secret": "basic-auth",
-				"nginx.ingress.kubernetes.io/auth-realm":  "Authentication Required - Airbyte (abctl)",
-			},
-		},
-		Spec: networkingv1.IngressSpec{
-			IngressClassName: &ingressClassName,
-			Rules: []networkingv1.IngressRule{
-				{
-					Host: "localhost",
-					IngressRuleValue: networkingv1.IngressRuleValue{
-						HTTP: &networkingv1.HTTPIngressRuleValue{
-							Paths: []networkingv1.HTTPIngressPath{
-								{
-									Path:     "/",
-									PathType: &pathType,
-									Backend: networkingv1.IngressBackend{
-										Service: &networkingv1.IngressServiceBackend{
-											Name: fmt.Sprintf("%s-airbyte-webapp-svc", airbyteChartRelease),
-											Port: networkingv1.ServiceBackendPort{
-												Name: "http",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
 }
 
 // defaultK8s returns the default k8s client

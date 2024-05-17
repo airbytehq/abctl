@@ -22,6 +22,8 @@ type Client interface {
 	// IngressUpdate updates an existing ingress in the given namespace
 	IngressUpdate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
 
+	// NamespaceCreate creates a namespace
+	NamespaceCreate(ctx context.Context, namespace string) error
 	// NamespaceExists returns true if the namespace exists, false otherwise
 	NamespaceExists(ctx context.Context, namespace string) bool
 	// NamespaceDelete deletes the existing namespace
@@ -39,6 +41,9 @@ type Client interface {
 	EventsWatch(ctx context.Context, namespace string) (watch.Interface, error)
 
 	LogsGet(ctx context.Context, namespace string, name string) (string, error)
+
+	// TODO remove
+	TestClientSet() *kubernetes.Clientset
 }
 
 var _ Client = (*DefaultK8sClient)(nil)
@@ -46,6 +51,10 @@ var _ Client = (*DefaultK8sClient)(nil)
 // DefaultK8sClient converts the official kubernetes client to our more manageable (and testable) interface
 type DefaultK8sClient struct {
 	ClientSet *kubernetes.Clientset
+}
+
+func (d *DefaultK8sClient) TestClientSet() *kubernetes.Clientset {
+	return d.ClientSet
 }
 
 func (d *DefaultK8sClient) IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
@@ -64,6 +73,11 @@ func (d *DefaultK8sClient) IngressExists(ctx context.Context, namespace string, 
 
 func (d *DefaultK8sClient) IngressUpdate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
 	_, err := d.ClientSet.NetworkingV1().Ingresses(namespace).Update(ctx, ingress, metav1.UpdateOptions{})
+	return err
+}
+
+func (d *DefaultK8sClient) NamespaceCreate(ctx context.Context, namespace string) error {
+	_, err := d.ClientSet.CoreV1().Namespaces().Create(ctx, &coreV1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
 	return err
 }
 

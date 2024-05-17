@@ -16,6 +16,7 @@ import (
 	coreV1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
 	"net/http"
 	"testing"
 	"time"
@@ -194,6 +195,7 @@ type mockK8sClient struct {
 	ingressCreate        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
 	ingressExists        func(ctx context.Context, namespace string, ingress string) bool
 	ingressUpdate        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
+	namespaceCreate      func(ctx context.Context, namespace string) error
 	namespaceExists      func(ctx context.Context, namespace string) bool
 	namespaceDelete      func(ctx context.Context, namespace string) error
 	secretCreateOrUpdate func(ctx context.Context, namespace, name string, data map[string][]byte) error
@@ -201,6 +203,10 @@ type mockK8sClient struct {
 	serverVersionGet     func() (string, error)
 	eventsWatch          func(ctx context.Context, namespace string) (watch.Interface, error)
 	logsGet              func(ctx context.Context, namespace string, name string) (string, error)
+}
+
+func (m *mockK8sClient) TestClientSet() *kubernetes.Clientset {
+	return nil
 }
 
 func (m *mockK8sClient) IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
@@ -213,6 +219,10 @@ func (m *mockK8sClient) IngressExists(ctx context.Context, namespace string, ing
 
 func (m *mockK8sClient) IngressUpdate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
 	return m.ingressUpdate(ctx, namespace, ingress)
+}
+
+func (m *mockK8sClient) NamespaceCreate(ctx context.Context, namespace string) error {
+	return m.namespaceCreate(ctx, namespace)
 }
 
 func (m *mockK8sClient) NamespaceExists(ctx context.Context, namespace string) bool {

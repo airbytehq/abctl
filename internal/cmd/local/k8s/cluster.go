@@ -91,3 +91,46 @@ func (k *kindCluster) Exists() bool {
 
 	return false
 }
+
+//func pvc(name string) *corev1.PersistentVolumeClaim {
+//	size, _ := resource.ParseQuantity("500Mi")
+//
+//	return &corev1.PersistentVolumeClaim{
+//		ObjectMeta: metav1.ObjectMeta{Name: name},
+//		Spec: corev1.PersistentVolumeClaimSpec{
+//			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+//			Resources: corev1.VolumeResourceRequirements{
+//				Requests: corev1.ResourceList{corev1.ResourceStorage: size},
+//			},
+//			VolumeName:                "",
+//			StorageClassName:          nil,
+//			VolumeMode:                nil,
+//			DataSource:                nil,
+//			DataSourceRef:             nil,
+//			VolumeAttributesClassName: nil,
+//		},
+//		Status: corev1.PersistentVolumeClaimStatus{},
+//	}
+//}
+
+//func pv(name string) *corev1.PersistentVolume {
+//	size, _ := resource.ParseQuantity("500Mi")
+//
+//	return &corev1.PersistentVolume{
+//		ObjectMeta: metav1.ObjectMeta{Name: name},
+//		Spec: corev1.PersistentVolumeSpec{
+//			Capacity:               corev1.ResourceList{corev1.ResourceStorage: size},
+//			PersistentVolumeSource: corev1.PersistentVolumeSource{},
+//			AccessModes: []corev1.PersistentVolumeAccessMode{
+//				corev1.ReadWriteOnce,
+//			},
+//			ClaimRef:                      nil,
+//			PersistentVolumeReclaimPolicy: "",
+//			StorageClassName:              "",
+//			MountOptions:                  nil,
+//			VolumeMode:                    nil,
+//			NodeAffinity:                  nil,
+//			VolumeAttributesClassName:     nil,
+//		},
+//	}
+//}

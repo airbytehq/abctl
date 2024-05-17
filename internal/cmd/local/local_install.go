@@ -100,6 +100,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 						return err
 					}
 					pterm.Success.Printfln("Cluster '%s' created", provider.ClusterName)
+					// TODO: create volumes
 				}
 
 				lc, err := local.New(provider,
