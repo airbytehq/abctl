@@ -22,11 +22,13 @@ _trap() {
     local rv=$?
     if [ "$rv" -ne 0 ]; then
         [ -z "$TELEMETRY_MSG" ] && TELEMETRY_MSG=$(tail -n 1 "$DIR_TMP/output.log")
-        _event abctl_install failed "$TELEMETRY_MSG"
+        _telemetry_event abctl_install failed "$TELEMETRY_MSG"
+        
         echo
         echo "abctl install failed: $TELEMETRY_MSG"
     else
-        _event abctl_install succeeded "$TELEMETRY_MSG"
+        _telemetry_event abctl_install succeeded "$TELEMETRY_MSG"
+
         echo
         echo "abctl install succeeded. Run:"
         echo
@@ -54,8 +56,6 @@ TELEMETRY_MSG=
 RELEASE_TAG=${RELEASE_TAG:-""}
 
 DIR_INSTALL=${DIR_INSTALL:-/usr/local/bin}
-
-# Consts
 
 # Helpers
 _error() {
@@ -113,7 +113,7 @@ _unique_id() {
     echo "${time}${rand}" | head -c 26
 }
 
-_init_telemetry() {
+_telemetry_init() {
     [ "$TELEMETRY_ENABLED" -eq 1 ] || return 0
 
     [ -z "$TELEMETRY_SESSION_ID" ] && TELEMETRY_SESSION_ID=$(_unique_id)
@@ -131,12 +131,12 @@ _init_telemetry() {
     fi
 }
 
-_event() {
+_telemetry_event() {
+    [ "$TELEMETRY_ENABLED" -eq 1 ] || return 0
+
     local event=$1
     local state=$2
     local message=${3:-""}
-    
-    [ -z "${TELEMETRY_ENABLED}" ] && return 0
 
     # ensure we don't log the same event twice
     echo "$TELEMETRY_LOG" | grep -q "$event-$state" && return 0
@@ -234,7 +234,7 @@ _install_darwin() {
 
 _install_windows() {
     echo "Installing for Windows..."
-    echo "Unsupported"
+    echo "Unsupported, use WSL2"
 }
 
 _test_binary() {
@@ -244,9 +244,9 @@ _test_binary() {
 main() {
     [ -z "${FORCE_FUN}" ] || { "$@"; exit 0; }
 
-    _init_telemetry
+    _telemetry_init
 
-    _event abctl_install started
+    _telemetry_event abctl_install started
 
     "_install_$(_get_os)" "$@"
 
