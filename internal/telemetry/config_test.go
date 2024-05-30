@@ -4,13 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
+	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-var id = ulid.Make()
+var ulidID = ulid.Make()
+var uuidID = uuid.New()
 
 func TestLoadConfigFromFile(t *testing.T) {
 	f, err := os.CreateTemp(t.TempDir(), "analytics-")
@@ -20,7 +24,7 @@ func TestLoadConfigFromFile(t *testing.T) {
 	defer f.Close()
 
 	if _, err := f.WriteString(`# comments
-anonymous_user_id: ` + id.String()); err != nil {
+anonymous_user_id: ` + ulidID.String()); err != nil {
 		t.Fatal("could not write to temp file", err)
 	}
 
@@ -29,7 +33,7 @@ anonymous_user_id: ` + id.String()); err != nil {
 		t.Error("failed to load file", d)
 	}
 
-	if d := cmp.Diff(id.String(), cnf.UserID.String()); d != "" {
+	if d := cmp.Diff(ulidID.String(), cnf.UserID.String()); d != "" {
 		t.Error("id is incorrect", d)
 	}
 }
@@ -83,7 +87,7 @@ func TestLoadConfigFromFile_UnreadableFileReturnsErr(t *testing.T) {
 func TestWriteConfigToFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nested", "deeply", ConfigFile)
 
-	cfg := Config{UserID: ULID(id)}
+	cfg := Config{UserID: ULID(ulidID)}
 
 	if err := writeConfigToFile(path, cfg); err != nil {
 		t.Error("failed to create file", err)
@@ -95,9 +99,52 @@ func TestWriteConfigToFile(t *testing.T) {
 	}
 
 	exp := fmt.Sprintf(`%sanonymous_user_id: %s
-`, header, id.String())
+`, header, ulidID.String())
 
 	if d := cmp.Diff(exp, string(contents)); d != "" {
 		t.Error("contents do not match", d)
 	}
+}
+
+func TestUUID(t *testing.T) {
+	t.Run("string", func(t *testing.T) {
+		uuid := uuid.New()
+		if d := cmp.Diff(36, len(uuid.String())); d != "" {
+			t.Error("uuid length mismatch", d)
+		}
+	})
+
+	t.Run("yaml marshal", func(t *testing.T) {
+		uuid := NewUUID()
+		s, err := yaml.Marshal(uuid)
+		if err != nil {
+			t.Error("failed to marshal uuid", err)
+		}
+		if d := cmp.Diff(uuid.String(), strings.TrimSpace(string(s))); d != "" {
+			t.Error("uuid values do not match", d)
+		}
+	})
+
+	t.Run("yaml unmarshal", func(t *testing.T) {
+		var uuid UUID
+		if err := yaml.Unmarshal([]byte(NewUUID().String()), &uuid); err != nil {
+			t.Error("failed to unmarshal uuid", err)
+		}
+
+		if d := cmp.Diff(36, len(uuid.String())); d != "" {
+			t.Error("uuid length mismatch", d)
+		}
+	})
+
+	t.Run("isZero", func(t *testing.T) {
+		uuid := UUID(uuid.Nil)
+		if d := cmp.Diff(true, uuid.IsZero()); d != "" {
+			t.Error("uuid should zero", d)
+		}
+
+		uuid = NewUUID()
+		if d := cmp.Diff(false, uuid.IsZero()); d != "" {
+			t.Error("uuid should zero", d)
+		}
+	})
 }
