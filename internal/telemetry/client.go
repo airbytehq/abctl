@@ -96,16 +96,25 @@ func Get(opts ...GetOption) Client {
 	getOrCreateConfigFile := func(getCfg getConfig) (Config, error) {
 		configPath := filepath.Join(getCfg.userHome, ConfigFile)
 
+		// if no file exists, create a new one
 		analyticsCfg, err := loadConfigFromFile(configPath)
 		if errors.Is(err, os.ErrNotExist) {
 			// file not found, create a new one
-			analyticsCfg = Config{UserID: NewULID()}
+			analyticsCfg = Config{UserUUID: NewUUID()}
 			if err := writeConfigToFile(configPath, analyticsCfg); err != nil {
 				return analyticsCfg, fmt.Errorf("could not write file to %s: %w", configPath, err)
 			}
 			pterm.Info.Println(Welcome)
 		} else if err != nil {
 			return Config{}, fmt.Errorf("could not load config from %s: %w", configPath, err)
+		}
+
+		// if a file exists but doesn't have a uuid, create a new uuid
+		if analyticsCfg.UserUUID.IsZero() {
+			analyticsCfg.UserUUID = NewUUID()
+			if err := writeConfigToFile(configPath, analyticsCfg); err != nil {
+				return analyticsCfg, fmt.Errorf("could not write file to %s: %w", configPath, err)
+			}
 		}
 
 		return analyticsCfg, nil
