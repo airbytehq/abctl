@@ -89,15 +89,17 @@ func (u *ULID) UnmarshalYAML(node *yaml.Node) error {
 }
 
 // MarshalYAML allows for converting a ULID into a yaml field.
-//
-//goland:noinspection GoMixedReceiverTypes
 func (u ULID) MarshalYAML() (any, error) {
 	return ulid.ULID(u).String(), nil
 }
 
+func (u ULID) IsZero() bool {
+	return u.String() == "00000000000000000000000000"
+}
+
 // Config represents the analytics.yaml file.
 type Config struct {
-	UserID   ULID `yaml:"anonymous_user_id"`
+	UserID   ULID `yaml:"anonymous_user_id,omitempty"`
 	UserUUID UUID `yaml:"anonymous_user_uuid,omitempty"`
 }
 
