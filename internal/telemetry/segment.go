@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/build"
-	"github.com/oklog/ulid/v2"
+	"github.com/google/uuid"
 	"github.com/pbnjay/memory"
 	"k8s.io/apimachinery/pkg/util/json"
 	"maps"
@@ -33,7 +33,7 @@ func WithHTTPClient(d Doer) Option {
 }
 
 // WithSessionID overrides the default ulid session, primarily for testing purposes.
-func WithSessionID(sessionID ulid.ULID) Option {
+func WithSessionID(sessionID uuid.UUID) Option {
 	return func(client *SegmentClient) {
 		client.sessionID = sessionID
 	}
@@ -42,7 +42,7 @@ func WithSessionID(sessionID ulid.ULID) Option {
 // SegmentClient client, all methods communicate with segment.
 type SegmentClient struct {
 	doer      Doer
-	sessionID ulid.ULID
+	sessionID uuid.UUID
 	cfg       Config
 	attrs     map[string]string
 }
@@ -51,7 +51,7 @@ func NewSegmentClient(cfg Config, opts ...Option) *SegmentClient {
 	cli := &SegmentClient{
 		doer:      &http.Client{Timeout: 10 * time.Second},
 		cfg:       cfg,
-		sessionID: ulid.Make(),
+		sessionID: uuid.New(),
 		attrs:     map[string]string{},
 	}
 
@@ -103,7 +103,7 @@ func (s *SegmentClient) send(ctx context.Context, es EventState, et EventType, e
 	}
 
 	body := body{
-		ID:         s.cfg.UserID.String(),
+		ID:         s.cfg.UserUUID.String(),
 		Event:      string(et),
 		Properties: properties,
 		Timestamp:  time.Now().UTC().Format(time.RFC3339),
