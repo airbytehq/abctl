@@ -289,7 +289,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		pterm.Error.Printfln("Failed to create airbyte persistent volume: %s", err.Error())
 	}
 
-	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-volume-db-claim-airbyte-db-0", "airbyte-volume-db"), metav1.CreateOptions{}); err != nil {
+	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-volume-db-airbyte-db-0", "airbyte-volume-db"), metav1.CreateOptions{}); err != nil {
 		pterm.Error.Printfln("Failed to create airbyte persistent volume claim: %s", err.Error())
 	}
 
@@ -341,6 +341,19 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		return fmt.Errorf("could not create or update basic-auth secret: %w", err)
 	}
 
+	if err := c.handleIngress(ctx); err != nil {
+		return err
+	}
+
+	c.spinner.UpdateText("Verifying ingress")
+	if err := c.openBrowser(ctx, fmt.Sprintf("http://localhost:%d", c.portHTTP)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Command) handleIngress(ctx context.Context) error {
 	c.spinner.UpdateText("Checking for existing Ingress")
 
 	if c.k8s.IngressExists(ctx, airbyteNamespace, airbyteIngress) {
@@ -350,20 +363,15 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 			return fmt.Errorf("could not update existing ingress: %w", err)
 		}
 		pterm.Success.Println("Updated existing Ingress")
-	} else {
-		pterm.Info.Println("No existing Ingress found, creating one")
-		if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress()); err != nil {
-			pterm.Error.Println("Unable to create ingress")
-			return fmt.Errorf("could not create ingress: %w", err)
-		}
-		pterm.Success.Println("Ingress created")
+		return nil
 	}
 
-	c.spinner.UpdateText("Verifying ingress")
-	if err := c.openBrowser(ctx, fmt.Sprintf("http://localhost:%d", c.portHTTP)); err != nil {
-		return err
+	pterm.Info.Println("No existing Ingress found, creating one")
+	if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress()); err != nil {
+		pterm.Error.Println("Unable to create ingress")
+		return fmt.Errorf("could not create ingress: %w", err)
 	}
-
+	pterm.Success.Println("Ingress created")
 	return nil
 }
 
@@ -395,7 +403,7 @@ func (c *Command) watchEvents(ctx context.Context) {
 }
 
 // now is used to filter out kubernetes events that happened in the past.
-// Kubernetes wants to use the ResourceVersion on the event watch request itself, but that approach
+// Kubernetes wants us to use the ResourceVersion on the event watch request itself, but that approach
 // is more complicated as it requires determining which ResourceVersion to initially provide.
 var now = func() *metav1.Time {
 	t := metav1.Now()
