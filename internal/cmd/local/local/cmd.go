@@ -231,6 +231,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		chartRelease: airbyteChartRelease,
 		chartVersion: c.helmChartVersion,
 		namespace:    airbyteNamespace,
+		values:       []string{fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", "")},
 	}); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 	"net/http"
 	"os"
@@ -36,6 +37,8 @@ type Client interface {
 	Failure(context.Context, EventType, error) error
 	// Attr should be called to add additional attributes to this activity.
 	Attr(key, val string)
+	// User returns the user identifier being used by this client
+	User() uuid.UUID
 }
 
 type getConfig struct {

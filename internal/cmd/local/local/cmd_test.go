@@ -7,6 +7,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/uuid"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"helm.sh/helm/v3/pkg/action"
@@ -256,6 +257,7 @@ type mockTelemetryClient struct {
 	success func(context.Context, telemetry.EventType) error
 	failure func(context.Context, telemetry.EventType, error) error
 	attr    func(key, val string)
+	user    func() uuid.UUID
 }
 
 func (m *mockTelemetryClient) Start(ctx context.Context, eventType telemetry.EventType) error {
@@ -272,6 +274,10 @@ func (m *mockTelemetryClient) Failure(ctx context.Context, eventType telemetry.E
 
 func (m *mockTelemetryClient) Attr(key, val string) {
 	m.attr(key, val)
+}
+
+func (m *mockTelemetryClient) User() uuid.UUID {
+	return m.user()
 }
 
 var _ HTTPClient = (*mockHTTP)(nil)

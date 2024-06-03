@@ -230,7 +230,7 @@ anonymous_user_uuid: %s
 
 func TestUUID(t *testing.T) {
 	t.Run("string", func(t *testing.T) {
-		uuid := uuid.New()
+		uuid := NewUUID()
 		if d := cmp.Diff(36, len(uuid.String())); d != "" {
 			t.Error("uuid length mismatch", d)
 		}
@@ -267,6 +267,13 @@ func TestUUID(t *testing.T) {
 		uuid = NewUUID()
 		if d := cmp.Diff(false, uuid.IsZero()); d != "" {
 			t.Error("uuid should zero", d)
+		}
+	})
+
+	t.Run("ToUUID", func(t *testing.T) {
+		uuid := NewUUID()
+		if d := cmp.Diff(36, len(uuid.ToUUID())); d != "" {
+			t.Error("uuid length mismatch", d)
 		}
 	})
 }
