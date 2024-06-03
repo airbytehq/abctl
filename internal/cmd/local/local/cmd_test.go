@@ -33,6 +33,10 @@ func TestCommand_Install(t *testing.T) {
 		{name: airbyteRepoName, url: airbyteRepoURL},
 		{name: nginxRepoName, url: nginxRepoURL},
 	}
+
+	// userID is for telemetry tracking purposes
+	userID := uuid.New()
+
 	expChartCnt := 0
 	expChart := []struct {
 		chart   helmclient.ChartSpec
@@ -46,6 +50,7 @@ func TestCommand_Install(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         10 * time.Minute,
+				ValuesOptions:   values.Options{Values: []string{"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String()}},
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
@@ -126,9 +131,8 @@ func TestCommand_Install(t *testing.T) {
 
 	attrs := map[string]string{}
 	tel := mockTelemetryClient{
-		attr: func(key, val string) {
-			attrs[key] = val
-		},
+		attr: func(key, val string) { attrs[key] = val },
+		user: func() uuid.UUID { return userID },
 	}
 
 	httpClient := mockHTTP{do: func(req *http.Request) (*http.Response, error) {
