@@ -104,8 +104,9 @@ func (u ULID) IsZero() bool {
 
 // Config represents the analytics.yaml file.
 type Config struct {
-	UserID   ULID `yaml:"anonymous_user_id,omitempty"`
-	UserUUID UUID `yaml:"analytics_id,omitempty"`
+	UserID      ULID `yaml:"anonymous_user_id,omitempty"`
+	AnalyticsID UUID `yaml:"analytics_id,omitempty"`
+	//Other       map[string]interface{} `yaml:",inline"`
 }
 
 // permissions sets the file and directory permission level for the telemetry files that may be created.

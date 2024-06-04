@@ -104,7 +104,7 @@ analytics_id: ` + uuidID.String()); err != nil {
 			t.Error("failed to load file", d)
 		}
 
-		if d := cmp.Diff(uuidID.String(), cnf.UserUUID.String()); d != "" {
+		if d := cmp.Diff(uuidID.String(), cnf.AnalyticsID.String()); d != "" {
 			t.Error("id is incorrect", d)
 		}
 	})
@@ -182,7 +182,7 @@ func TestWriteConfig(t *testing.T) {
 	t.Run("uuid", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "nested", "deeply", ConfigFile)
 
-		cfg := Config{UserUUID: UUID(uuidID)}
+		cfg := Config{AnalyticsID: UUID(uuidID)}
 
 		if err := writeConfigToFile(path, cfg); err != nil {
 			t.Error("failed to create file", err)
@@ -205,8 +205,8 @@ func TestWriteConfig(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "nested", "deeply", ConfigFile)
 
 		cfg := Config{
-			UserID:   ULID(ulidID),
-			UserUUID: UUID(uuidID),
+			UserID:      ULID(ulidID),
+			AnalyticsID: UUID(uuidID),
 		}
 
 		if err := writeConfigToFile(path, cfg); err != nil {
