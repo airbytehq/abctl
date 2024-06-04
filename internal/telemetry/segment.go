@@ -81,7 +81,7 @@ func (s *SegmentClient) Attr(key, val string) {
 }
 
 func (s *SegmentClient) User() uuid.UUID {
-	return s.cfg.UserUUID.ToUUID()
+	return s.cfg.UserUUID.toUUID()
 }
 
 const (

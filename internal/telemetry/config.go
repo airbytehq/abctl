@@ -27,7 +27,7 @@ func NewUUID() UUID {
 
 // String returns a string representation of this UUID.
 func (u UUID) String() string {
-	return u.ToUUID().String()
+	return u.toUUID().String()
 }
 
 func (u *UUID) UnmarshalYAML(node *yaml.Node) error {
@@ -46,7 +46,7 @@ func (u *UUID) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func (u UUID) MarshalYAML() (any, error) {
-	return uuid.UUID(u).String(), nil
+	return u.toUUID().String(), nil
 }
 
 // IsZero implements the yaml interface, used to treat a uuid.Nil as empty for yaml purposes
@@ -54,7 +54,8 @@ func (u UUID) IsZero() bool {
 	return u.String() == uuid.Nil.String()
 }
 
-func (u UUID) ToUUID() uuid.UUID {
+// toUUID converts the telemetry.UUID type back to the underlying uuid.UUID type
+func (u UUID) toUUID() uuid.UUID {
 	return uuid.UUID(u)
 }
 

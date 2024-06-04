@@ -270,9 +270,9 @@ func TestUUID(t *testing.T) {
 		}
 	})
 
-	t.Run("ToUUID", func(t *testing.T) {
+	t.Run("toUUID", func(t *testing.T) {
 		uuid := NewUUID()
-		if d := cmp.Diff(36, len(uuid.ToUUID().String())); d != "" {
+		if d := cmp.Diff(36, len(uuid.toUUID().String())); d != "" {
 			t.Error("uuid length mismatch", d)
 		}
 	})
