@@ -39,6 +39,8 @@ func WithSessionID(sessionID uuid.UUID) Option {
 	}
 }
 
+var _ Client = (*SegmentClient)(nil)
+
 // SegmentClient client, all methods communicate with segment.
 type SegmentClient struct {
 	doer      Doer
@@ -76,6 +78,10 @@ func (s *SegmentClient) Failure(ctx context.Context, et EventType, err error) er
 
 func (s *SegmentClient) Attr(key, val string) {
 	s.attrs[key] = val
+}
+
+func (s *SegmentClient) User() uuid.UUID {
+	return s.cfg.UserUUID.toUUID()
 }
 
 const (
