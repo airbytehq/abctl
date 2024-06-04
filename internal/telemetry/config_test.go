@@ -95,7 +95,7 @@ func TestLoadConfigWithUUID(t *testing.T) {
 		defer f.Close()
 
 		if _, err := f.WriteString(`# comments
-anonymous_user_uuid: ` + uuidID.String()); err != nil {
+analytics_id: ` + uuidID.String()); err != nil {
 			t.Fatal("could not write to temp file", err)
 		}
 
@@ -193,7 +193,7 @@ func TestWriteConfig(t *testing.T) {
 			t.Error("failed to read file", err)
 		}
 
-		exp := fmt.Sprintf(`%sanonymous_user_uuid: %s
+		exp := fmt.Sprintf(`%sanalytics_id: %s
 `, header, uuidID.String())
 
 		if d := cmp.Diff(exp, string(contents)); d != "" {
@@ -219,7 +219,7 @@ func TestWriteConfig(t *testing.T) {
 		}
 
 		exp := fmt.Sprintf(`%sanonymous_user_id: %s
-anonymous_user_uuid: %s
+analytics_id: %s
 `, header, ulidID.String(), uuidID.String())
 
 		if d := cmp.Diff(exp, string(contents)); d != "" {

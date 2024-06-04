@@ -29,8 +29,8 @@ func TestGet(t *testing.T) {
 		t.Error("expected config file to contain 'Airbyte'")
 	}
 
-	if !strings.Contains(string(data), "anonymous_user_uuid") {
-		t.Error("expected config file to contain 'anonymous_user_uuid'")
+	if !strings.Contains(string(data), "analytics_id") {
+		t.Error("expected config file to contain 'analytics_id'")
 	}
 
 	if strings.Contains(string(data), "anonymous_user_id") {
@@ -64,8 +64,8 @@ func TestGet_WithExistingULID(t *testing.T) {
 		t.Error("expected config file to contain 'Airbyte'")
 	}
 
-	if !strings.Contains(string(data), "anonymous_user_uuid") {
-		t.Error("expected config file to contain 'anonymous_user_uuid'")
+	if !strings.Contains(string(data), "analytics_id") {
+		t.Error("expected config file to contain 'analytics_id'")
 	}
 
 	if !strings.Contains(string(data), "anonymous_user_id") {
