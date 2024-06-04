@@ -8,6 +8,7 @@ import (
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/uuid"
 	"net"
 	"strconv"
 	"strings"
@@ -133,6 +134,7 @@ type mockTelemetryClient struct {
 	success func(ctx context.Context, eventType telemetry.EventType) error
 	failure func(ctx context.Context, eventType telemetry.EventType, err error) error
 	attr    func(key, val string)
+	user    func() uuid.UUID
 }
 
 func (m *mockTelemetryClient) Start(ctx context.Context, eventType telemetry.EventType) error {
@@ -149,4 +151,8 @@ func (m *mockTelemetryClient) Failure(ctx context.Context, eventType telemetry.E
 
 func (m *mockTelemetryClient) Attr(key, val string) {
 	m.attr(key, val)
+}
+
+func (m *mockTelemetryClient) User() uuid.UUID {
+	return m.user()
 }

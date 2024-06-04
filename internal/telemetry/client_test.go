@@ -28,6 +28,46 @@ func TestGet(t *testing.T) {
 	if !strings.Contains(string(data), "Airbyte") {
 		t.Error("expected config file to contain 'Airbyte'")
 	}
+
+	if !strings.Contains(string(data), "anonymous_user_uuid") {
+		t.Error("expected config file to contain 'anonymous_user_uuid'")
+	}
+
+	if strings.Contains(string(data), "anonymous_user_id") {
+		t.Error("config file should not contain 'anonymous_user_id'")
+	}
+}
+
+func TestGet_WithExistingULID(t *testing.T) {
+	instance = nil
+	home := t.TempDir()
+
+	// write a config with a ulid only
+	cfg := Config{UserID: NewULID()}
+	if err := writeConfigToFile(filepath.Join(home, ConfigFile), cfg); err != nil {
+		t.Fatal("failed writing config", err)
+	}
+
+	cli := Get(WithUserHome(home))
+	if _, ok := cli.(*SegmentClient); !ok {
+		t.Error(fmt.Sprintf("expected SegmentClient; received: %T", cli))
+	}
+
+	// verify configuration file was created
+	data, err := os.ReadFile(filepath.Join(home, ConfigFile))
+	if err != nil {
+		t.Error("reading config file", err)
+	}
+
+	// and has some data
+	if !strings.Contains(string(data), "Airbyte") {
+		t.Error("expected config file to contain 'Airbyte'")
+	}
+
+	if !strings.Contains(string(data), "anonymous_user_uuid") {
+		t.Error("expected config file to contain 'anonymous_user_uuid'")
+	}
+
 	if !strings.Contains(string(data), "anonymous_user_id") {
 		t.Error("expected config file to contain 'anonymous_user_id'")
 	}

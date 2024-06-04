@@ -7,6 +7,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/uuid"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"helm.sh/helm/v3/pkg/action"
@@ -33,6 +34,10 @@ func TestCommand_Install(t *testing.T) {
 		{name: airbyteRepoName, url: airbyteRepoURL},
 		{name: nginxRepoName, url: nginxRepoURL},
 	}
+
+	// userID is for telemetry tracking purposes
+	userID := uuid.New()
+
 	expChartCnt := 0
 	expChart := []struct {
 		chart   helmclient.ChartSpec
@@ -46,6 +51,7 @@ func TestCommand_Install(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         10 * time.Minute,
+				ValuesOptions:   values.Options{Values: []string{"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String()}},
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
@@ -126,9 +132,8 @@ func TestCommand_Install(t *testing.T) {
 
 	attrs := map[string]string{}
 	tel := mockTelemetryClient{
-		attr: func(key, val string) {
-			attrs[key] = val
-		},
+		attr: func(key, val string) { attrs[key] = val },
+		user: func() uuid.UUID { return userID },
 	}
 
 	httpClient := mockHTTP{do: func(req *http.Request) (*http.Response, error) {
@@ -266,6 +271,7 @@ type mockTelemetryClient struct {
 	success func(context.Context, telemetry.EventType) error
 	failure func(context.Context, telemetry.EventType, error) error
 	attr    func(key, val string)
+	user    func() uuid.UUID
 }
 
 func (m *mockTelemetryClient) Start(ctx context.Context, eventType telemetry.EventType) error {
@@ -282,6 +288,10 @@ func (m *mockTelemetryClient) Failure(ctx context.Context, eventType telemetry.E
 
 func (m *mockTelemetryClient) Attr(key, val string) {
 	m.attr(key, val)
+}
+
+func (m *mockTelemetryClient) User() uuid.UUID {
+	return m.user()
 }
 
 var _ HTTPClient = (*mockHTTP)(nil)

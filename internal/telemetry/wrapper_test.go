@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 	"os"
 	"strings"
@@ -203,6 +204,7 @@ type MockClient struct {
 	success func(ctx context.Context, eventType EventType) error
 	failure func(ctx context.Context, eventType EventType, err error) error
 	attr    func(key, val string)
+	user    func() uuid.UUID
 }
 
 func (m MockClient) Start(ctx context.Context, eventType EventType) error {
@@ -219,4 +221,8 @@ func (m MockClient) Failure(ctx context.Context, eventType EventType, err error)
 
 func (m MockClient) Attr(key, val string) {
 	m.attr(key, val)
+}
+
+func (m MockClient) User() uuid.UUID {
+	return m.user()
 }

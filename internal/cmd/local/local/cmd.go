@@ -17,6 +17,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/cli/browser"
+	"github.com/google/uuid"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
@@ -293,6 +294,12 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		pterm.Error.Printfln("Failed to create airbyte persistent volume claim: %s", err.Error())
 	}
 
+	var telUser string
+	// only override the empty telUser if the tel.User returns a non-nil (uuid.Nil) value.
+	if c.tel.User() != uuid.Nil {
+		telUser = c.tel.User().String()
+	}
+
 	if err := c.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     airbyteRepoName,
@@ -301,6 +308,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		chartRelease: airbyteChartRelease,
 		chartVersion: c.helmChartVersion,
 		namespace:    airbyteNamespace,
+		values:       []string{fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser)},
 	}); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)
 	}
