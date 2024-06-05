@@ -103,7 +103,7 @@ func Get(opts ...GetOption) Client {
 		analyticsCfg, err := loadConfigFromFile(configPath)
 		if errors.Is(err, os.ErrNotExist) {
 			// file not found, create a new one
-			analyticsCfg = Config{UserUUID: NewUUID()}
+			analyticsCfg = Config{AnalyticsID: NewUUID()}
 			if err := writeConfigToFile(configPath, analyticsCfg); err != nil {
 				return analyticsCfg, fmt.Errorf("could not write file to %s: %w", configPath, err)
 			}
@@ -113,8 +113,8 @@ func Get(opts ...GetOption) Client {
 		}
 
 		// if a file exists but doesn't have a uuid, create a new uuid
-		if analyticsCfg.UserUUID.IsZero() {
-			analyticsCfg.UserUUID = NewUUID()
+		if analyticsCfg.AnalyticsID.IsZero() {
+			analyticsCfg.AnalyticsID = NewUUID()
 			if err := writeConfigToFile(configPath, analyticsCfg); err != nil {
 				return analyticsCfg, fmt.Errorf("could not write file to %s: %w", configPath, err)
 			}

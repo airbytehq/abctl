@@ -81,7 +81,7 @@ func (s *SegmentClient) Attr(key, val string) {
 }
 
 func (s *SegmentClient) User() uuid.UUID {
-	return s.cfg.UserUUID.toUUID()
+	return s.cfg.AnalyticsID.toUUID()
 }
 
 const (
@@ -109,7 +109,7 @@ func (s *SegmentClient) send(ctx context.Context, es EventState, et EventType, e
 	}
 
 	body := body{
-		ID:         s.cfg.UserUUID.String(),
+		ID:         s.cfg.AnalyticsID.String(),
 		Event:      string(et),
 		Properties: properties,
 		Timestamp:  time.Now().UTC().Format(time.RFC3339),
