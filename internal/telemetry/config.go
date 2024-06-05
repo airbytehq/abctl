@@ -104,9 +104,9 @@ func (u ULID) IsZero() bool {
 
 // Config represents the analytics.yaml file.
 type Config struct {
-	UserID      ULID `yaml:"anonymous_user_id,omitempty"`
-	AnalyticsID UUID `yaml:"analytics_id,omitempty"`
-	//Other       map[string]interface{} `yaml:",inline"`
+	UserID      ULID                   `yaml:"anonymous_user_id,omitempty"`
+	AnalyticsID UUID                   `yaml:"analytics_id,omitempty"`
+	Other       map[string]interface{} `yaml:",inline"`
 }
 
 // permissions sets the file and directory permission level for the telemetry files that may be created.
@@ -127,9 +127,27 @@ func loadConfigFromFile(path string) (Config, error) {
 
 	var c Config
 
-	if err := yaml.Unmarshal(analytics, &c); err != nil {
+	if err := yaml.Unmarshal(analytics, &c.Other); err != nil {
 		return Config{}, fmt.Errorf("could not unmarshal yaml: %w", err)
 	}
+	if v, ok := c.Other["anonymous_user_id"]; ok {
+		if parsed, err := ulid.Parse(v.(string)); err != nil {
+			return Config{}, fmt.Errorf("could not parse ulid (%s): %w", v, err)
+		} else {
+			c.UserID = ULID(parsed)
+		}
+	}
+
+	if v, ok := c.Other["analytics_id"]; ok {
+		if parsed, err := uuid.Parse(v.(string)); err != nil {
+			return Config{}, fmt.Errorf("could not parse uuid (%s): %w", v, err)
+		} else {
+			c.AnalyticsID = UUID(parsed)
+		}
+	}
+
+	delete(c.Other, "anonymous_user_id")
+	delete(c.Other, "analytics_id")
 
 	return c, nil
 }

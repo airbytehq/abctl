@@ -29,12 +29,12 @@ anonymous_user_id: ` + ulidID.String()); err != nil {
 			t.Fatal("could not write to temp file", err)
 		}
 
-		cnf, err := loadConfigFromFile(f.Name())
+		cfg, err := loadConfigFromFile(f.Name())
 		if d := cmp.Diff(nil, err); d != "" {
 			t.Error("failed to load file", d)
 		}
 
-		if d := cmp.Diff(ulidID.String(), cnf.UserID.String()); d != "" {
+		if d := cmp.Diff(ulidID.String(), cfg.UserID.String()); d != "" {
 			t.Error("id is incorrect", d)
 		}
 	})
@@ -99,13 +99,52 @@ analytics_id: ` + uuidID.String()); err != nil {
 			t.Fatal("could not write to temp file", err)
 		}
 
-		cnf, err := loadConfigFromFile(f.Name())
+		cfg, err := loadConfigFromFile(f.Name())
 		if d := cmp.Diff(nil, err); d != "" {
 			t.Error("failed to load file", d)
 		}
 
-		if d := cmp.Diff(uuidID.String(), cnf.AnalyticsID.String()); d != "" {
+		if d := cmp.Diff(uuidID.String(), cfg.AnalyticsID.String()); d != "" {
 			t.Error("id is incorrect", d)
+		}
+	})
+
+	t.Run("happy path with extra fields", func(t *testing.T) {
+		f, err := os.CreateTemp(t.TempDir(), "analytics-")
+		if err != nil {
+			t.Fatal("could not create temp file", err)
+		}
+		defer f.Close()
+
+		cfgData := fmt.Sprintf(`# comments
+analytics_id: %s
+extra_field: extra_value
+another_field: false
+total: 300`, uuidID.String())
+
+		if _, err := f.WriteString(cfgData); err != nil {
+			t.Fatal("could not write to temp file", err)
+		}
+
+		cfg, err := loadConfigFromFile(f.Name())
+		if d := cmp.Diff(nil, err); d != "" {
+			t.Error("failed to load file", d)
+		}
+
+		if d := cmp.Diff(uuidID.String(), cfg.AnalyticsID.String()); d != "" {
+			t.Error("id is incorrect", d)
+		}
+
+		if d := cmp.Diff("extra_value", cfg.Other["extra_field"]); d != "" {
+			t.Error("extra_field is incorrect", d)
+		}
+
+		if d := cmp.Diff(false, cfg.Other["another_field"]); d != "" {
+			t.Error("another_field is incorrect", d)
+		}
+
+		if d := cmp.Diff(300, cfg.Other["total"]); d != "" {
+			t.Error("total is incorrect", d)
 		}
 	})
 
@@ -201,6 +240,34 @@ func TestWriteConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("uuid and other", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "nested", "deeply", ConfigFile)
+
+		cfg := Config{
+			AnalyticsID: UUID(uuidID),
+			Other: map[string]interface{}{
+				"another_field": "another_value",
+			},
+		}
+
+		if err := writeConfigToFile(path, cfg); err != nil {
+			t.Error("failed to create file", err)
+		}
+
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Error("failed to read file", err)
+		}
+
+		exp := fmt.Sprintf(`%sanalytics_id: %s
+another_field: another_value
+`, header, uuidID.String())
+
+		if d := cmp.Diff(exp, string(contents)); d != "" {
+			t.Error("contents do not match", d)
+		}
+	})
+
 	t.Run("ulid and uuid", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "nested", "deeply", ConfigFile)
 
@@ -220,6 +287,38 @@ func TestWriteConfig(t *testing.T) {
 
 		exp := fmt.Sprintf(`%sanonymous_user_id: %s
 analytics_id: %s
+`, header, ulidID.String(), uuidID.String())
+
+		if d := cmp.Diff(exp, string(contents)); d != "" {
+			t.Error("contents do not match", d)
+		}
+	})
+
+	t.Run("ulid, uuid, and other", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), ConfigFile)
+
+		cfg := Config{
+			UserID:      ULID(ulidID),
+			AnalyticsID: UUID(uuidID),
+			Other: map[string]interface{}{
+				"field": "value is here",
+				"count": 100,
+			},
+		}
+
+		if err := writeConfigToFile(path, cfg); err != nil {
+			t.Error("failed to create file", err)
+		}
+
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Error("failed to read file", err)
+		}
+
+		exp := fmt.Sprintf(`%sanonymous_user_id: %s
+analytics_id: %s
+count: 100
+field: value is here
 `, header, ulidID.String(), uuidID.String())
 
 		if d := cmp.Diff(exp, string(contents)); d != "" {
