@@ -94,8 +94,10 @@ func TestLoadConfigWithUUID(t *testing.T) {
 		}
 		defer f.Close()
 
-		if _, err := f.WriteString(`# comments
-analytics_id: ` + uuidID.String()); err != nil {
+		cfgData := fmt.Sprintf(`# comments
+%s: %s`, fieldAnalyticsID, uuidID.String())
+
+		if _, err := f.WriteString(cfgData); err != nil {
 			t.Fatal("could not write to temp file", err)
 		}
 
@@ -117,10 +119,11 @@ analytics_id: ` + uuidID.String()); err != nil {
 		defer f.Close()
 
 		cfgData := fmt.Sprintf(`# comments
-analytics_id: %s
+%s: %s
 extra_field: extra_value
 another_field: false
-total: 300`, uuidID.String())
+total: 300`,
+			fieldAnalyticsID, uuidID.String())
 
 		if _, err := f.WriteString(cfgData); err != nil {
 			t.Fatal("could not write to temp file", err)
@@ -210,8 +213,8 @@ func TestWriteConfig(t *testing.T) {
 			t.Error("failed to read file", err)
 		}
 
-		exp := fmt.Sprintf(`%sanonymous_user_id: %s
-`, header, ulidID.String())
+		exp := fmt.Sprintf(`%s%s: %s
+`, header, fieldUserID, ulidID.String())
 
 		if d := cmp.Diff(exp, string(contents)); d != "" {
 			t.Error("contents do not match", d)
@@ -232,8 +235,8 @@ func TestWriteConfig(t *testing.T) {
 			t.Error("failed to read file", err)
 		}
 
-		exp := fmt.Sprintf(`%sanalytics_id: %s
-`, header, uuidID.String())
+		exp := fmt.Sprintf(`%s%s: %s
+`, header, fieldAnalyticsID, uuidID.String())
 
 		if d := cmp.Diff(exp, string(contents)); d != "" {
 			t.Error("contents do not match", d)
@@ -259,9 +262,9 @@ func TestWriteConfig(t *testing.T) {
 			t.Error("failed to read file", err)
 		}
 
-		exp := fmt.Sprintf(`%sanalytics_id: %s
+		exp := fmt.Sprintf(`%s%s: %s
 another_field: another_value
-`, header, uuidID.String())
+`, header, fieldAnalyticsID, uuidID.String())
 
 		if d := cmp.Diff(exp, string(contents)); d != "" {
 			t.Error("contents do not match", d)
@@ -285,9 +288,9 @@ another_field: another_value
 			t.Error("failed to read file", err)
 		}
 
-		exp := fmt.Sprintf(`%sanonymous_user_id: %s
-analytics_id: %s
-`, header, ulidID.String(), uuidID.String())
+		exp := fmt.Sprintf(`%s%s: %s
+%s: %s
+`, header, fieldUserID, ulidID.String(), fieldAnalyticsID, uuidID.String())
 
 		if d := cmp.Diff(exp, string(contents)); d != "" {
 			t.Error("contents do not match", d)
@@ -316,10 +319,10 @@ analytics_id: %s
 		}
 
 		exp := fmt.Sprintf(`%sanonymous_user_id: %s
-analytics_id: %s
+%s: %s
 count: 100
 field: value is here
-`, header, ulidID.String(), uuidID.String())
+`, header, ulidID.String(), fieldAnalyticsID, uuidID.String())
 
 		if d := cmp.Diff(exp, string(contents)); d != "" {
 			t.Error("contents do not match", d)

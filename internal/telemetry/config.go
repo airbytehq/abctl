@@ -15,6 +15,12 @@ const (
 Anonymous usage reporting is currently enabled. For more information, please see https://docs.airbyte.com/telemetry`
 )
 
+// fields
+const (
+	fieldAnalyticsID = "analytics_id"
+	fieldUserID      = "anonymous_user_id"
+)
+
 var ConfigFile = filepath.Join(".airbyte", "analytics.yml")
 
 // UUID is a wrapper around uuid.UUID so that we can implement the yaml interfaces.
@@ -130,7 +136,7 @@ func loadConfigFromFile(path string) (Config, error) {
 	if err := yaml.Unmarshal(analytics, &c.Other); err != nil {
 		return Config{}, fmt.Errorf("could not unmarshal yaml: %w", err)
 	}
-	if v, ok := c.Other["anonymous_user_id"]; ok {
+	if v, ok := c.Other[fieldUserID]; ok {
 		if parsed, err := ulid.Parse(v.(string)); err != nil {
 			return Config{}, fmt.Errorf("could not parse ulid (%s): %w", v, err)
 		} else {
@@ -138,7 +144,7 @@ func loadConfigFromFile(path string) (Config, error) {
 		}
 	}
 
-	if v, ok := c.Other["analytics_id"]; ok {
+	if v, ok := c.Other[fieldAnalyticsID]; ok {
 		if parsed, err := uuid.Parse(v.(string)); err != nil {
 			return Config{}, fmt.Errorf("could not parse uuid (%s): %w", v, err)
 		} else {
@@ -146,8 +152,8 @@ func loadConfigFromFile(path string) (Config, error) {
 		}
 	}
 
-	delete(c.Other, "anonymous_user_id")
-	delete(c.Other, "analytics_id")
+	delete(c.Other, fieldUserID)
+	delete(c.Other, fieldAnalyticsID)
 
 	return c, nil
 }
