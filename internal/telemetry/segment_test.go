@@ -53,7 +53,7 @@ func TestSegmentClient_Start(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserUUID: UUID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 
@@ -155,7 +155,7 @@ func TestSegmentClient_StartWithAttr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserUUID: UUID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 	cli.Attr("key1", "val1")
 	cli.Attr("key2", "val2")
 
@@ -264,7 +264,7 @@ func TestSegmentClient_StartErr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserUUID: UUID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 
@@ -289,7 +289,7 @@ func TestSegmentClient_Success(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserUUID: UUID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 
@@ -391,7 +391,7 @@ func TestSegmentClient_SuccessWithAttr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserUUID: UUID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 	cli.Attr("key1", "val1")
 	cli.Attr("key2", "val2")
 
@@ -500,7 +500,7 @@ func TestSegmentClient_SuccessErr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserUUID: UUID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 
@@ -525,7 +525,7 @@ func TestSegmentClient_Failure(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserUUID: UUID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 	failure := errors.New("failure reason")
@@ -628,7 +628,7 @@ func TestSegmentClient_FailureWithAttr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserUUID: UUID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 	cli.Attr("key1", "val1")
 	cli.Attr("key2", "val2")
 
@@ -738,7 +738,7 @@ func TestSegmentClient_FailureErr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserUUID: UUID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 	failure := errors.New("failure reason")
