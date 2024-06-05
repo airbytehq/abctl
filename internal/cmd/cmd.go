@@ -92,7 +92,7 @@ func NewCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "enable verbose output")
 
 	cmd.AddCommand(version.NewCmdVersion())
-	cmd.AddCommand(local.NewCmdLocal(k8s.DefaultProvider))
+	cmd.AddCommand(local.NewCmdLocal(&local.Config{Provider: k8s.DefaultProvider}))
 
 	return cmd
 }

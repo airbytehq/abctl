@@ -18,8 +18,9 @@ const (
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
 )
 
-func NewCmdInstall(provider k8s.Provider) *cobra.Command {
+func newCmdInstall(cfg *Config) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
+	provider := cfg.Provider
 
 	var (
 		flagChartVersion string
@@ -41,9 +42,9 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 				return fmt.Errorf("could not determine docker installation status: %w", err)
 			}
 
-			telClient.Attr("docker_version", dockerVersion.Version)
-			telClient.Attr("docker_arch", dockerVersion.Arch)
-			telClient.Attr("docker_platform", dockerVersion.Platform)
+			cfg.TelClient.Attr("docker_version", dockerVersion.Version)
+			cfg.TelClient.Attr("docker_arch", dockerVersion.Arch)
+			cfg.TelClient.Attr("docker_platform", dockerVersion.Platform)
 
 			spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", flagPort))
 			if err := portAvailable(cmd.Context(), flagPort); err != nil {
@@ -104,7 +105,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 				lc, err := local.New(provider,
 					local.WithPortHTTP(flagPort),
-					local.WithTelemetryClient(telClient),
+					local.WithTelemetryClient(cfg.TelClient),
 					local.WithSpinner(spinner),
 					local.WithHelmChartVersion(flagChartVersion),
 				)
