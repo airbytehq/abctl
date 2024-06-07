@@ -48,28 +48,23 @@ func NewCmdStatus(provider k8s.Provider) *cobra.Command {
 				}
 
 				var port int
+				pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
+				spinner.UpdateText(fmt.Sprintf("Validating existing cluster '%s'", provider.ClusterName))
 
-				if cluster.Exists() {
-					// existing cluster, validate it
-					pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
-					spinner.UpdateText(fmt.Sprintf("Validating existing cluster '%s'", provider.ClusterName))
-
-					// only for kind do we need to check the existing port
-					if provider.Name == k8s.Kind {
-						if dockerClient == nil {
-							dockerClient, err = docker.New(cmd.Context())
-							if err != nil {
-								pterm.Error.Printfln("Could not connect to Docker daemon")
-								return fmt.Errorf("could not connect to docker: %w", err)
-							}
-						}
-
-						port, err = dockerClient.Port(cmd.Context(), fmt.Sprintf("%s-control-plane", provider.ClusterName))
+				// only for kind do we need to check the existing port
+				if provider.Name == k8s.Kind {
+					if dockerClient == nil {
+						dockerClient, err = docker.New(cmd.Context())
 						if err != nil {
-							pterm.Warning.Printfln("TODO!!!")
+							pterm.Error.Printfln("Could not connect to Docker daemon")
+							return fmt.Errorf("could not connect to docker: %w", err)
 						}
+					}
 
-						pterm.Info.Printfln("port: %d", port)
+					port, err = dockerClient.Port(cmd.Context(), fmt.Sprintf("%s-control-plane", provider.ClusterName))
+					if err != nil {
+						pterm.Warning.Printfln("Could not determine docker port for cluster '%s'", provider.ClusterName)
+						return nil
 					}
 				}
 
