@@ -24,6 +24,7 @@ type EventType string
 
 const (
 	Install   EventType = "install"
+	Status    EventType = "status"
 	Uninstall EventType = "uninstall"
 )
 

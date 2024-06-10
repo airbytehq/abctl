@@ -494,6 +494,30 @@ func (c *Command) Uninstall(ctx context.Context) error {
 	return nil
 }
 
+// Status handles the status of local Airbyte.
+func (c *Command) Status(_ context.Context) error {
+	charts := []string{airbyteChartRelease, nginxChartRelease}
+	for _, name := range charts {
+		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", name))
+
+		rel, err := c.helm.GetRelease(name)
+		if err != nil {
+			pterm.Warning.Println("Could not get airbyte release")
+			pterm.Debug.Printfln("could not get airbyte release: %s", err)
+			continue
+		}
+
+		pterm.Info.Println(fmt.Sprintf(
+			"Found helm chart '%s'\n  Status: %s\n  Chart Version: %s\n  App Version: %s",
+			name, rel.Info.Status.String(), rel.Chart.Metadata.Version, rel.Chart.Metadata.AppVersion,
+		))
+	}
+
+	pterm.Info.Println(fmt.Sprintf("Airbyte should be accessible via http://localhost:%d", c.portHTTP))
+
+	return nil
+}
+
 // chartRequest exists to make all the parameters to handleChart somewhat manageable
 type chartRequest struct {
 	name         string
@@ -551,7 +575,7 @@ func (c *Command) handleChart(
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 
 	pterm.Success.Printfln(
-		"Installed Helm Chart %s:\n  name: %s\n  namespace: %s\n  version: %s\n  release: %d",
+		"Installed Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  Release: %d",
 		req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Chart.Metadata.Version, helmRelease.Version)
 	return nil
 }
