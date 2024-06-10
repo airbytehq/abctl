@@ -53,7 +53,7 @@ These credentials can be changed either of the following
    ```shell
    ABCTL_LOCAL_INSTALL_USERNAME=foo
    ABCTL_LOCAL_INSTALL_PASSWORD=bar
-   abc local install
+   abctl local install
    ```
   
 ### Additional Options
