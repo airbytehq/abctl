@@ -12,6 +12,8 @@ import (
 func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
+	var flagPersist bool
+
 	cmd := &cobra.Command{
 		Use:   "uninstall",
 		Short: "Uninstall Airbyte locally",
@@ -54,7 +56,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 					pterm.Warning.Printfln("Failed to initialize 'local' command\nUninstallation attempt will continue")
 					pterm.Debug.Printfln("Initialization of 'local' failed with %s", err.Error())
 				} else {
-					if err := lc.Uninstall(cmd.Context()); err != nil {
+					if err := lc.Uninstall(cmd.Context(), flagPersist); err != nil {
 						pterm.Warning.Printfln("could not complete uninstall: %s", err.Error())
 						pterm.Warning.Println("will still attempt to uninstall the cluster")
 					}
@@ -73,6 +75,8 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 			})
 		},
 	}
+
+	cmd.Flags().BoolVar(&flagPersist, "persist", false, "remove persisted data")
 
 	return cmd
 }

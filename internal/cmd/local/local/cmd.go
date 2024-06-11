@@ -278,20 +278,20 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 
 	// Create minio PV and PVC
 	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumes().Create(ctx, pv(airbyteNamespace, "airbyte-minio-pv"), metav1.CreateOptions{}); err != nil {
-		pterm.Error.Printfln("Failed to create airbyte persistent volume: %s", err.Error())
+		pterm.Error.Printfln("Failed to create persistent volume: %s", err.Error())
 	}
 
 	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-minio-pv-claim-airbyte-minio-0", "airbyte-minio-pv"), metav1.CreateOptions{}); err != nil {
-		pterm.Error.Printfln("Failed to create airbyte persistent volume claim: %s", err.Error())
+		pterm.Error.Printfln("Failed to create persistent volume claim: %s", err.Error())
 	}
 
 	// Create database PV and PVC
 	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumes().Create(ctx, pv(airbyteNamespace, "airbyte-volume-db"), metav1.CreateOptions{}); err != nil {
-		pterm.Error.Printfln("Failed to create airbyte persistent volume: %s", err.Error())
+		pterm.Error.Printfln("Failed to create persistent volume: %s", err.Error())
 	}
 
 	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-volume-db-airbyte-db-0", "airbyte-volume-db"), metav1.CreateOptions{}); err != nil {
-		pterm.Error.Printfln("Failed to create airbyte persistent volume claim: %s", err.Error())
+		pterm.Error.Printfln("Failed to create persistent volume claim: %s", err.Error())
 	}
 
 	var telUser string
@@ -478,7 +478,12 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 }
 
 // Uninstall handles the uninstallation of Airbyte.
-func (c *Command) Uninstall(ctx context.Context) error {
+func (c *Command) Uninstall(ctx context.Context, persist bool) error {
+	// if not removing persisted data, then this is a no-op
+	if !persist {
+		return nil
+	}
+
 	{
 		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", airbyteChartName))
 
