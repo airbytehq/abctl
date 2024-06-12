@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: airbyte-abctl-migrate-postgres
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+  volumeName: airbyte-volume-db
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: airbyte-abctl-migrate-minio
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+  volumeName: airbyte-minio-pv
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: temp
+spec:
+  containers:
+    - name: temp
+      image: busybox
+      command: ["/bin/sh", "-c", "sleep 3600"]
+      volumeMounts:
+      - name: postgres-src
+        mountPath: /mnt/postgres-src
+      - name: minio-src
+        mountPath: /mnt/minio-src
+      - name: postgres-dst
+        mountPath: /mnt/postgres-dst
+      - name: minio-dst
+        mountPath: /mnt/minio-dst
+  volumes:
+  - name: postgres-src
+    hostPath:
+      path: /mnt/postgres
+  - name: minio-src
+    hostPath:
+      path: /mnt/minio
+  - name: postgres-dst
+    persistentVolumeClaim:
+      claimName: airbyte-abctl-migrate-postgres
+  - name: minio-dst
+    persistentVolumeClaim:
+      claimName: airbyte-abctl-migrate-minio

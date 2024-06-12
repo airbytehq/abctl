@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/pterm/pterm"
 	"os"
 	"runtime"
 	"strconv"
@@ -25,7 +27,8 @@ type Version struct {
 // Client interface for testing purposes. Includes only the methods used by the underlying docker package.
 type Client interface {
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
-	ServerVersion(context.Context) (types.Version, error)
+	ServerVersion(ctx context.Context) (types.Version, error)
+	VolumeInspect(ctx context.Context, volumeID string) (volume.Volume, error)
 }
 
 var _ Client = (*client.Client)(nil)
@@ -152,4 +155,13 @@ func (d *Docker) Port(ctx context.Context, container string) (int, error) {
 	}
 
 	return 0, errors.New("could not determine port for container")
+}
+
+func (d *Docker) VolumeExists(ctx context.Context, volumeID string) string {
+	if v, err := d.Client.VolumeInspect(ctx, volumeID); err != nil {
+		pterm.Debug.Println(fmt.Sprintf("Volume %s cannot be accessed: %s", volumeID, err))
+		return ""
+	} else {
+		return v.Mountpoint
+	}
 }

@@ -23,6 +23,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 	var (
 		flagChartVersion string
+		flagMigrate      bool
 		flagUsername     string
 		flagPassword     string
 		flagPort         int
@@ -107,23 +108,33 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					local.WithPortHTTP(flagPort),
 					local.WithTelemetryClient(telClient),
 					local.WithSpinner(spinner),
-					local.WithHelmChartVersion(flagChartVersion),
 				)
 				if err != nil {
 					pterm.Error.Printfln("Failed to initialize 'local' command")
 					return fmt.Errorf("could not initialize local command: %w", err)
 				}
 
-				user := flagUsername
-				if env := os.Getenv(envBasicAuthUser); env != "" {
-					user = env
-				}
-				pass := flagPassword
-				if env := os.Getenv(envBasicAuthPass); env != "" {
-					pass = env
+				opts := local.InstallOptions{
+					User:             flagUsername,
+					Pass:             flagPassword,
+					HelmChartVersion: flagChartVersion,
+					Migrate:          flagMigrate,
+					Dock:             dockerClient,
 				}
 
-				if err := lc.Install(cmd.Context(), user, pass); err != nil {
+				if opts.HelmChartVersion == "latest" {
+					opts.HelmChartVersion = ""
+				}
+
+				if env := os.Getenv(envBasicAuthUser); env != "" {
+					opts.User = env
+				}
+
+				if env := os.Getenv(envBasicAuthPass); env != "" {
+					opts.Pass = env
+				}
+
+				if err := lc.Install(cmd.Context(), opts); err != nil {
 					spinner.Fail("Unable to install Airbyte locally")
 					return err
 				}
@@ -139,6 +150,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the specific Airbyte helm chart version to install")
+	cmd.Flags().BoolVar(&flagMigrate, "migrate", false, "migrate data from docker compose installation")
 
 	return cmd
 }

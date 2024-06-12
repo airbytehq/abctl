@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"net/http"
 	"os"
 	"path"
@@ -71,17 +72,16 @@ type BrowserLauncher func(url string) error
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
-	provider         k8s.Provider
-	cluster          k8s.Cluster
-	http             HTTPClient
-	helm             HelmClient
-	k8s              k8s.Client
-	portHTTP         int
-	spinner          *pterm.SpinnerPrinter
-	tel              telemetry.Client
-	launcher         BrowserLauncher
-	userHome         string
-	helmChartVersion string
+	provider k8s.Provider
+	cluster  k8s.Cluster
+	http     HTTPClient
+	helm     HelmClient
+	k8s      k8s.Client
+	portHTTP int
+	spinner  *pterm.SpinnerPrinter
+	tel      telemetry.Client
+	launcher BrowserLauncher
+	userHome string
 }
 
 // Option for configuring the Command, primarily exists for testing
@@ -132,12 +132,6 @@ func WithUserHome(home string) Option {
 func WithSpinner(spinner *pterm.SpinnerPrinter) Option {
 	return func(c *Command) {
 		c.spinner = spinner
-	}
-}
-
-func WithHelmChartVersion(version string) Option {
-	return func(c *Command) {
-		c.helmChartVersion = version
 	}
 }
 
@@ -204,10 +198,6 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 		c.launcher = browser.OpenURL
 	}
 
-	if c.helmChartVersion == "latest" {
-		c.helmChartVersion = ""
-	}
-
 	// fetch k8s version information
 	{
 		k8sVersion, err := c.k8s.ServerVersionGet()
@@ -262,8 +252,33 @@ func pvc(name string, volumeName string) *corev1.PersistentVolumeClaim {
 	}
 }
 
+func (c *Command) migrate(ctx context.Context, dock *docker.Docker) error {
+	const (
+		volData = "airbyte_data"
+		volDB   = "airbyte_db"
+	)
+
+	if mnt := dock.VolumeExists(ctx, volData); mnt != "" {
+		c.spinner.UpdateText("Migrating data")
+	}
+
+	if mnt := dock.VolumeExists(ctx, volDB); mnt != "" {
+		c.spinner.UpdateText("Migrating db")
+	}
+
+	return nil
+}
+
+type InstallOptions struct {
+	User             string
+	Pass             string
+	HelmChartVersion string
+	Migrate          bool
+	Dock             *docker.Docker
+}
+
 // Install handles the installation of Airbyte
-func (c *Command) Install(ctx context.Context, user, pass string) error {
+func (c *Command) Install(ctx context.Context, opts InstallOptions) error {
 	go c.watchEvents(ctx)
 
 	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
@@ -276,20 +291,30 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		pterm.Info.Printfln("Namespace '%s' already exists", airbyteNamespace)
 	}
 
-	// Create minio PV and PVC
+	// create the persistent volumes
 	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumes().Create(ctx, pv(airbyteNamespace, "airbyte-minio-pv"), metav1.CreateOptions{}); err != nil {
 		pterm.Error.Printfln("Failed to create persistent volume: %s", err.Error())
 	}
-
-	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-minio-pv-claim-airbyte-minio-0", "airbyte-minio-pv"), metav1.CreateOptions{}); err != nil {
-		pterm.Error.Printfln("Failed to create persistent volume claim: %s", err.Error())
-	}
-
-	// Create database PV and PVC
 	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumes().Create(ctx, pv(airbyteNamespace, "airbyte-volume-db"), metav1.CreateOptions{}); err != nil {
 		pterm.Error.Printfln("Failed to create persistent volume: %s", err.Error())
 	}
 
+	if opts.Migrate {
+		c.spinner.UpdateText("Migrating airbyte data")
+		if err := c.migrate(ctx, opts.Dock); err != nil {
+			pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
+			return fmt.Errorf("could not migrate data from previous airbyte installation: %w", err)
+		}
+
+		if true {
+			return errors.New("blocked")
+		}
+	}
+
+	// create the persistent volume claims
+	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-minio-pv-claim-airbyte-minio-0", "airbyte-minio-pv"), metav1.CreateOptions{}); err != nil {
+		pterm.Error.Printfln("Failed to create persistent volume claim: %s", err.Error())
+	}
 	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-volume-db-airbyte-db-0", "airbyte-volume-db"), metav1.CreateOptions{}); err != nil {
 		pterm.Error.Printfln("Failed to create persistent volume claim: %s", err.Error())
 	}
@@ -306,9 +331,14 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		repoURL:      airbyteRepoURL,
 		chartName:    airbyteChartName,
 		chartRelease: airbyteChartRelease,
-		chartVersion: c.helmChartVersion,
+		chartVersion: opts.HelmChartVersion,
 		namespace:    airbyteNamespace,
-		values:       []string{fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser)},
+		values: []string{
+			fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser),
+			"postgresql.postgresqlUsername=docker",
+			"postgresql.postgresqlPassword=docker",
+			"postgresql.postgresqlDatabase=airbyte",
+		},
 	}); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)
 	}
@@ -345,7 +375,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 
 	c.spinner.UpdateText("Configuring Basic-Auth")
 	// basic auth
-	if err := c.handleBasicAuthSecret(ctx, user, pass); err != nil {
+	if err := c.handleBasicAuthSecret(ctx, opts.User, opts.Pass); err != nil {
 		return fmt.Errorf("could not create or update basic-auth secret: %w", err)
 	}
 
