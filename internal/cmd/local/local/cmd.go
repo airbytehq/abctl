@@ -335,9 +335,9 @@ func (c *Command) Install(ctx context.Context, opts InstallOptions) error {
 		namespace:    airbyteNamespace,
 		values: []string{
 			fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser),
-			"postgresql.postgresqlUsername=docker",
-			"postgresql.postgresqlPassword=docker",
-			"postgresql.postgresqlDatabase=airbyte",
+			//"postgresql.postgresqlUsername=docker",
+			//"postgresql.postgresqlPassword=docker",
+			//"postgresql.postgresqlDatabase=airbyte",
 		},
 	}); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)

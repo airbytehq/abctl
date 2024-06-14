@@ -32,7 +32,8 @@ spec:
   containers:
     - name: temp
       image: busybox
-      command: ["/bin/sh", "-c", "sleep 3600"]
+      command: ["/bin/sh", "-c"]
+      args: ["rm -rf /mnt/postgres-dst/pgdata && mkdir /mnt/postgres-dst/pgdata && chown 70:70 /mnt/postgres-dst/pgdata && cp -a /mnt/postgres-src/* /mnt/postgres-dst/pgdata"]
       volumeMounts:
       - name: postgres-src
         mountPath: /mnt/postgres-src

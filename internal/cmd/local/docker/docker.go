@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pterm/pterm"
 	"os"
 	"runtime"
@@ -26,7 +29,15 @@ type Version struct {
 
 // Client interface for testing purposes. Includes only the methods used by the underlying docker package.
 type Client interface {
+	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
+	ContainerRemove(ctx context.Context, container string, options container.RemoveOptions) error
+	ContainerStop(ctx context.Context, container string, options container.StopOptions) error
+
+	ContainerExecCreate(ctx context.Context, container string, config types.ExecConfig) (types.IDResponse, error)
+	ContainerExecInspect(ctx context.Context, execID string) (types.ContainerExecInspect, error)
+	ContainerExecStart(ctx context.Context, execID string, config types.ExecStartCheck) error
+
 	ServerVersion(ctx context.Context) (types.Version, error)
 	VolumeInspect(ctx context.Context, volumeID string) (volume.Volume, error)
 }
@@ -164,4 +175,96 @@ func (d *Docker) VolumeExists(ctx context.Context, volumeID string) string {
 	} else {
 		return v.Mountpoint
 	}
+}
+
+const (
+	migrateImage         = "postgresql:13-alpine"
+	migrateContainerName = "airbyte-abctl-migrate"
+	migrateUser          = "docker"
+	migratePass          = "docker"
+	migrateDB            = "airbyte"
+	migratePGDATA        = "/var/lib/postgresql/data"
+)
+
+func (d *Docker) Migrate(ctx context.Context, volume string) error {
+	if v := d.VolumeExists(ctx, volume); v == "" {
+		return errors.New(fmt.Sprintf("volume %s does not exist", volume))
+	}
+
+	// docker run --name airbyte-abctl-migrate \
+	// -e POSTGRES_USER=docker -e POSTGRES_PASSWORD=docker -e POSTGRES_DB=airbyte -e PGDATA=/var/lib/postgresql/data \
+	// -v airbyte_db:/var/lib/postgresql/data
+	// postgres:13-alpine
+	con, err := d.Client.ContainerCreate(
+		ctx,
+		&container.Config{
+			Env: []string{
+				"POSTGRES_USER=" + migrateUser,
+				"POSTGRES_PASSWORD=" + migratePass,
+				"POSTGRES_DB=" + migrateDB,
+				"PGDATA=" + migratePGDATA,
+			},
+			Image:   migrateImage,
+			Volumes: map[string]struct{}{"airbyte_db:/var/lib/postgresql/data": {}},
+		},
+		nil,
+		nil,
+		nil,
+		migrateContainerName,
+	)
+	if err != nil {
+		return fmt.Errorf("could not create docker container: %w", err)
+	}
+	// cleanup the container when we're done
+	defer func() {
+		if err := d.Client.ContainerStop(ctx, con.ID, container.StopOptions{}); err != nil {
+			pterm.Debug.Println(fmt.Sprintf("Could not stop docker container %s: %s", con.ID, err))
+		}
+		if err := d.Client.ContainerRemove(ctx, con.ID, container.RemoveOptions{Force: true}); err != nil {
+			pterm.Debug.Println(fmt.Sprintf("Could not remove docker container %s: %s", con.ID, err))
+		}
+	}()
+
+	// docker exec airbyte-abctl-migrate psql -U docker -c "CREATE ROLE airbyte SUPERUSER CREATEROLE CREATEDB REPLICATION BYPASSRLS LOGIN PASSWORD 'airbyte'"
+	// docker exec airbyte-abctl-migrate psql -U airbyte postgres -c 'ALTER DATABASE airbyte RENAME TO "db-airbyte"'
+	var (
+		cmdPsqlUser   = `psql -U docker -c "CREATE ROLE airbyte SUPERUSER CREATEROLE CREATEDB REPLICATION BYPASSRLS LOGIN PASSWORD 'airbyte'"`
+		cmdPsqlRename = `psql -U airbyte postgres -c 'ALTER DATABASE airbyte RENAME TO "db-airbyte"'`
+	)
+	// add a new database user to match the default helm user
+	if err := d.Exec(ctx, con.ID, []string{cmdPsqlUser}); err != nil {
+		return fmt.Errorf("could not update postgres user: %w", err)
+	}
+	// rename the database to match the default helm database name
+	if err := d.Exec(ctx, con.ID, []string{cmdPsqlRename}); err != nil {
+		return fmt.Errorf("could not rename postgres database: %w", err)
+	}
+}
+
+// Exec executes an exec cmd against the container.
+// Largely inspired by the official docker client - https://github.com/docker/cli/blob/d69d501f699efb0cc1f16274e368e09ef8927840/cli/command/container/exec.go#L93
+func (d *Docker) Exec(ctx context.Context, container string, cmd []string) error {
+	if _, err := d.Client.ContainerInspect(ctx, container); err != nil {
+		return fmt.Errorf("could not inspect container '%s': %w", container, err)
+	}
+
+	resCreate, err := d.Client.ContainerExecCreate(ctx, container, types.ExecConfig{Cmd: cmd})
+	if err != nil {
+		return fmt.Errorf("could not create exec for container '%s': %w", container, err)
+	}
+
+	if err := d.Client.ContainerExecStart(ctx, resCreate.ID, types.ExecStartCheck{}); err != nil {
+		return fmt.Errorf("could not start exec for container '%s': %w", container, err)
+	}
+
+	resInspect, err := d.Client.ContainerExecInspect(ctx, resCreate.ID)
+	if err != nil {
+		return fmt.Errorf("could not inspect container '%s': %w", container, err)
+	}
+
+	if resInspect.ExitCode != 0 {
+		return fmt.Errorf("container '%s' exec exited with non-zero exit code: %d", container, resInspect.ExitCode)
+	}
+
+	return nil
 }
