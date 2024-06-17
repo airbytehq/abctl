@@ -22,6 +22,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
 	var (
+		flagChartValues  string
 		flagChartVersion string
 		flagUsername     string
 		flagPassword     string
@@ -138,6 +139,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the specific Airbyte helm chart version to install")
+	cmd.Flags().StringVar(&flagChartVersion, "values", "", "specify the specific Airbyte helm chart version to install")
 
 	return cmd
 }
