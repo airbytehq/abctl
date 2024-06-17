@@ -239,6 +239,8 @@ func (d *Docker) Migrate(ctx context.Context, volume string) error {
 	if err := d.Exec(ctx, con.ID, []string{cmdPsqlRename}); err != nil {
 		return fmt.Errorf("could not rename postgres database: %w", err)
 	}
+
+	return nil
 }
 
 // Exec executes an exec cmd against the container.
