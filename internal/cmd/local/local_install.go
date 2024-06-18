@@ -22,10 +22,11 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
 	var (
-		flagChartVersion string
-		flagUsername     string
-		flagPassword     string
-		flagPort         int
+		flagChartValuesFile string
+		flagChartVersion    string
+		flagUsername        string
+		flagPassword        string
+		flagPort            int
 	)
 
 	cmd := &cobra.Command{
@@ -114,16 +115,14 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					return fmt.Errorf("could not initialize local command: %w", err)
 				}
 
-				user := flagUsername
 				if env := os.Getenv(envBasicAuthUser); env != "" {
-					user = env
+					flagUsername = env
 				}
-				pass := flagPassword
 				if env := os.Getenv(envBasicAuthPass); env != "" {
-					pass = env
+					flagPassword = env
 				}
 
-				if err := lc.Install(cmd.Context(), user, pass); err != nil {
+				if err := lc.Install(cmd.Context(), flagUsername, flagPassword, flagChartValuesFile); err != nil {
 					spinner.Fail("Unable to install Airbyte locally")
 					return err
 				}
@@ -138,7 +137,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
 
-	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the specific Airbyte helm chart version to install")
+	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "the Airbyte helm chart version to install")
+	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
 
 	return cmd
 }
