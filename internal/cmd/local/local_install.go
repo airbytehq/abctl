@@ -22,11 +22,12 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
 	var (
-		flagChartVersion string
-		flagMigrate      bool
-		flagUsername     string
-		flagPassword     string
-		flagPort         int
+		flagChartValuesFile string
+		flagChartVersion    string
+		flagMigrate         bool
+		flagUsername        string
+		flagPassword        string
+		flagPort            int
 	)
 
 	cmd := &cobra.Command{
@@ -118,6 +119,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					User:             flagUsername,
 					Pass:             flagPassword,
 					HelmChartVersion: flagChartVersion,
+					ValuesFile:       flagChartValuesFile,
 					Migrate:          flagMigrate,
 					Dock:             dockerClient,
 				}
@@ -150,6 +152,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the specific Airbyte helm chart version to install")
+	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
 	cmd.Flags().BoolVar(&flagMigrate, "migrate", false, "migrate data from docker compose installation")
 
 	return cmd
