@@ -221,7 +221,16 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 }
 
 // Install handles the installation of Airbyte
-func (c *Command) Install(ctx context.Context, user, pass string) error {
+func (c *Command) Install(ctx context.Context, user, pass, valuesFile string) error {
+	var values string
+	if valuesFile != "" {
+		raw, err := os.ReadFile(valuesFile)
+		if err != nil {
+			return fmt.Errorf("could not read values file '%s': %w", valuesFile, err)
+		}
+		values = string(raw)
+	}
+
 	go c.watchEvents(ctx)
 
 	var telUser string
@@ -239,6 +248,7 @@ func (c *Command) Install(ctx context.Context, user, pass string) error {
 		chartVersion: c.helmChartVersion,
 		namespace:    airbyteNamespace,
 		values:       []string{fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser)},
+		valuesYAML:   values,
 	}); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)
 	}
@@ -528,6 +538,7 @@ type chartRequest struct {
 	chartVersion string
 	namespace    string
 	values       []string
+	valuesYAML   string
 }
 
 // handleChart will handle the installation of a chart
@@ -563,6 +574,7 @@ func (c *Command) handleChart(
 		Wait:            true,
 		Timeout:         10 * time.Minute,
 		ValuesOptions:   values.Options{Values: req.values},
+		ValuesYaml:      req.valuesYAML,
 		Version:         req.chartVersion,
 	},
 		&helmclient.GenericHelmOptions{},
