@@ -311,10 +311,14 @@ func (c *Command) Install(ctx context.Context, opts InstallOptions) error {
 
 	if opts.Migrate {
 		c.spinner.UpdateText("Migrating airbyte data")
-		if err := c.migrate(ctx, opts.Dock); err != nil {
+		if err := opts.Dock.Migrate(ctx, "airbyte_db"); err != nil {
 			pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
 			return fmt.Errorf("could not migrate data from previous airbyte installation: %w", err)
 		}
+		//if err := c.migrate(ctx, opts.Dock); err != nil {
+		//	pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
+		//	return fmt.Errorf("could not migrate data from previous airbyte installation: %w", err)
+		//}
 
 		if true {
 			return errors.New("blocked")

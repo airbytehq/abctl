@@ -7,12 +7,17 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/archive"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pterm/pterm"
+	"io"
 	"os"
+	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 )
@@ -33,6 +38,7 @@ type Client interface {
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
 	ContainerRemove(ctx context.Context, container string, options container.RemoveOptions) error
 	ContainerStop(ctx context.Context, container string, options container.StopOptions) error
+	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, types.ContainerPathStat, error)
 
 	ContainerExecCreate(ctx context.Context, container string, config types.ExecConfig) (types.IDResponse, error)
 	ContainerExecInspect(ctx context.Context, execID string) (types.ContainerExecInspect, error)
@@ -81,12 +87,11 @@ var _ pinger = (*client.Client)(nil)
 
 // newWithOptions allows for the docker client to be injected for testing purposes.
 func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker, error) {
-	userHome, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("could not determine user home directory: %w", err)
-	}
+	var (
+		dockerCli Client
+		err       error
+	)
 
-	var dockerCli Client
 	dockerOpts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
 
 	switch goos {
@@ -94,6 +99,7 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
 		dockerCli, err = createAndPing(ctx, newPing, "unix:///var/run/docker.sock", dockerOpts)
 		if err != nil {
+			userHome, _ := os.UserHomeDir()
 			var err2 error
 			dockerCli, err2 = createAndPing(ctx, newPing, fmt.Sprintf("unix://%s/.docker/run/docker.sock", userHome), dockerOpts)
 			if err2 != nil {
@@ -178,12 +184,11 @@ func (d *Docker) VolumeExists(ctx context.Context, volumeID string) string {
 }
 
 const (
-	migrateImage         = "postgresql:13-alpine"
-	migrateContainerName = "airbyte-abctl-migrate"
-	migrateUser          = "docker"
-	migratePass          = "docker"
-	migrateDB            = "airbyte"
-	migratePGDATA        = "/var/lib/postgresql/data"
+	migrateImage  = "postgres:13-alpine"
+	migrateUser   = "docker"
+	migratePass   = "docker"
+	migrateDB     = "airbyte"
+	migratePGDATA = "/var/lib/postgresql/data"
 )
 
 func (d *Docker) Migrate(ctx context.Context, volume string) error {
@@ -191,38 +196,87 @@ func (d *Docker) Migrate(ctx context.Context, volume string) error {
 		return errors.New(fmt.Sprintf("volume %s does not exist", volume))
 	}
 
-	// docker run --name airbyte-abctl-migrate \
+	// docker run -d -v airbyte_db:/var/lib/postgresql/data alpine:3.20 tail -f /dev/null
+	one, err := d.Client.ContainerCreate(
+		ctx,
+		&container.Config{
+			Image:      "alpine:3.20",
+			Entrypoint: []string{"tail", "-f", "/dev/null"},
+		},
+		&container.HostConfig{
+			Mounts: []mount.Mount{
+				{
+					Type:   mount.TypeVolume,
+					Source: "airbyte_db",
+					Target: "/var/lib/postgresql/data",
+				},
+			},
+		},
+		nil,
+		nil,
+		"")
+	if err != nil {
+		return fmt.Errorf("could not create initial docker migrate container: %w", err)
+	}
+	pterm.Debug.Println(fmt.Sprintf("Created initial migration container '%s'", one.ID))
+
+	// docker cp [one.ID]]:/var/lib/postgresql/data/. ~/.airbyte/abctl/data/airbyte-volume-db/pgdata
+	userHome, _ := os.UserHomeDir()
+	dst := filepath.Join(userHome, ".airbyte", "abctl", "data", "airbyte-volume-db", "pgdata")
+	if err := copyFromContainer(ctx, d.Client, one.ID, "/var/lib/postgresql/data/.", dst); err != nil {
+		return fmt.Errorf("could not copy airbyte db data from container %s: %w", one.ID, err)
+	}
+	pterm.Debug.Println(fmt.Sprintf("copied airbyte db data from container '%s' to '%s'", one.ID, dst))
+
+	if err := d.Client.ContainerStop(ctx, one.ID, container.StopOptions{}); err != nil {
+		pterm.Debug.Println(fmt.Sprintf("Could not stop docker container %s: %s", one.ID, err))
+	}
+
+	if err := d.Client.ContainerRemove(ctx, one.ID, container.RemoveOptions{}); err != nil {
+		pterm.Debug.Println(fmt.Sprintf("Could not remove docker container %s: %s", one.ID, err))
+	}
+	pterm.Debug.Println(fmt.Sprintf("Removed initial migration container '%s'", one.ID))
+
+	// docker run
 	// -e POSTGRES_USER=docker -e POSTGRES_PASSWORD=docker -e POSTGRES_DB=airbyte -e PGDATA=/var/lib/postgresql/data \
-	// -v airbyte_db:/var/lib/postgresql/data
+	// -v ~/.airbyte/abctl/data/airbyte-volume-db/pgdata:/var/lib/postgresql/data
 	// postgres:13-alpine
 	con, err := d.Client.ContainerCreate(
 		ctx,
 		&container.Config{
+			Image: migrateImage,
 			Env: []string{
 				"POSTGRES_USER=" + migrateUser,
 				"POSTGRES_PASSWORD=" + migratePass,
 				"POSTGRES_DB=" + migrateDB,
 				"PGDATA=" + migratePGDATA,
 			},
-			Image:   migrateImage,
-			Volumes: map[string]struct{}{"airbyte_db:/var/lib/postgresql/data": {}},
+		},
+		&container.HostConfig{
+			Mounts: []mount.Mount{
+				{
+					Type:   mount.TypeBind,
+					Source: dst,
+					Target: migratePGDATA,
+				},
+			},
 		},
 		nil,
 		nil,
-		nil,
-		migrateContainerName,
-	)
+		"")
 	if err != nil {
 		return fmt.Errorf("could not create docker container: %w", err)
 	}
-	// cleanup the container when we're done
+	pterm.Debug.Println(fmt.Sprintf("Created secondary migration container '%s'", con.ID))
+	pterm.Debug.Println(con.Warnings)
+	// cleanup and remove container when we're done
 	defer func() {
-		if err := d.Client.ContainerStop(ctx, con.ID, container.StopOptions{}); err != nil {
-			pterm.Debug.Println(fmt.Sprintf("Could not stop docker container %s: %s", con.ID, err))
-		}
-		if err := d.Client.ContainerRemove(ctx, con.ID, container.RemoveOptions{Force: true}); err != nil {
-			pterm.Debug.Println(fmt.Sprintf("Could not remove docker container %s: %s", con.ID, err))
-		}
+		//if err := d.Client.ContainerStop(ctx, con.ID, container.StopOptions{}); err != nil {
+		//	pterm.Debug.Println(fmt.Sprintf("Could not stop docker container %s: %s", con.ID, err))
+		//}
+		//if err := d.Client.ContainerRemove(ctx, con.ID, container.RemoveOptions{Force: true}); err != nil {
+		//	pterm.Debug.Println(fmt.Sprintf("Could not remove docker container %s: %s", con.ID, err))
+		//}
 	}()
 
 	// docker exec airbyte-abctl-migrate psql -U docker -c "CREATE ROLE airbyte SUPERUSER CREATEROLE CREATEDB REPLICATION BYPASSRLS LOGIN PASSWORD 'airbyte'"
@@ -232,11 +286,11 @@ func (d *Docker) Migrate(ctx context.Context, volume string) error {
 		cmdPsqlRename = `psql -U airbyte postgres -c 'ALTER DATABASE airbyte RENAME TO "db-airbyte"'`
 	)
 	// add a new database user to match the default helm user
-	if err := d.Exec(ctx, con.ID, []string{cmdPsqlUser}); err != nil {
+	if err := exec(ctx, d.Client, con.ID, []string{cmdPsqlUser}); err != nil {
 		return fmt.Errorf("could not update postgres user: %w", err)
 	}
 	// rename the database to match the default helm database name
-	if err := d.Exec(ctx, con.ID, []string{cmdPsqlRename}); err != nil {
+	if err := exec(ctx, d.Client, con.ID, []string{cmdPsqlRename}); err != nil {
 		return fmt.Errorf("could not rename postgres database: %w", err)
 	}
 
@@ -245,27 +299,54 @@ func (d *Docker) Migrate(ctx context.Context, volume string) error {
 
 // Exec executes an exec cmd against the container.
 // Largely inspired by the official docker client - https://github.com/docker/cli/blob/d69d501f699efb0cc1f16274e368e09ef8927840/cli/command/container/exec.go#L93
-func (d *Docker) Exec(ctx context.Context, container string, cmd []string) error {
-	if _, err := d.Client.ContainerInspect(ctx, container); err != nil {
+func exec(ctx context.Context, cli Client, container string, cmd []string) error {
+	if _, err := cli.ContainerInspect(ctx, container); err != nil {
 		return fmt.Errorf("could not inspect container '%s': %w", container, err)
 	}
 
-	resCreate, err := d.Client.ContainerExecCreate(ctx, container, types.ExecConfig{Cmd: cmd})
+	resCreate, err := cli.ContainerExecCreate(ctx, container, types.ExecConfig{Cmd: cmd})
 	if err != nil {
 		return fmt.Errorf("could not create exec for container '%s': %w", container, err)
 	}
 
-	if err := d.Client.ContainerExecStart(ctx, resCreate.ID, types.ExecStartCheck{}); err != nil {
+	if err := cli.ContainerExecStart(ctx, resCreate.ID, types.ExecStartCheck{}); err != nil {
 		return fmt.Errorf("could not start exec for container '%s': %w", container, err)
 	}
 
-	resInspect, err := d.Client.ContainerExecInspect(ctx, resCreate.ID)
+	resInspect, err := cli.ContainerExecInspect(ctx, resCreate.ID)
 	if err != nil {
 		return fmt.Errorf("could not inspect container '%s': %w", container, err)
 	}
 
 	if resInspect.ExitCode != 0 {
 		return fmt.Errorf("container '%s' exec exited with non-zero exit code: %d", container, resInspect.ExitCode)
+	}
+
+	return nil
+}
+
+// copyFromContainer emulates the `docker cp` command
+// dst will be treated as a directory.
+func copyFromContainer(ctx context.Context, cli Client, container, src, dst string) error {
+	// ensure dst directory exists
+	if err := os.MkdirAll(path.Dir(dst), 0755); err != nil {
+		return fmt.Errorf("could not create directory '%s': %w", dst, err)
+	}
+
+	reader, stat, err := cli.CopyFromContainer(ctx, container, src)
+	if err != nil {
+		return fmt.Errorf("could not copy from container '%s': %w", container, err)
+	}
+	defer reader.Close()
+
+	copyInfo := archive.CopyInfo{
+		Path:   src,
+		Exists: true,
+		IsDir:  stat.Mode.IsDir(),
+	}
+
+	if err := archive.CopyTo(reader, copyInfo, dst); err != nil {
+		return fmt.Errorf("could not copy from container '%s': %w", container, err)
 	}
 
 	return nil
