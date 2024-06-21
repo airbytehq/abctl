@@ -187,9 +187,6 @@ func (d *Docker) VolumeExists(ctx context.Context, volumeID string) string {
 
 const (
 	migrateImage  = "postgres:13-alpine"
-	migrateUser   = "docker"
-	migratePass   = "docker"
-	migrateDB     = "airbyte"
 	migratePGDATA = "/var/lib/postgresql/data"
 )
 

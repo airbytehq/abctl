@@ -29,7 +29,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	corev1 "k8s.io/api/core/v1"
-	v1events "k8s.io/api/events/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -278,6 +278,46 @@ type InstallOptions struct {
 	Dock             *docker.Docker
 }
 
+const (
+	// persistent volume constants, these are named to match the values given in the helm chart
+	pvMinio = "airbyte-minio-pv"
+	pvPsql  = "airbyte-volume-db"
+
+	// persistent volume claim constants, these are named to match the values given in the helm chart
+	pvcMinio = "airbyte-minio-pv-claim-airbyte-minio-0"
+	pvcPsql  = "airbyte-volume-db-airbyte-db-0"
+)
+
+func (c *Command) persistentVolume(ctx context.Context, namespace, name string) error {
+	if !c.k8s.PersistentVolumeExists(ctx, namespace, name) {
+		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume '%s'", name))
+		if err := c.k8s.PersistentVolumeCreate(ctx, namespace, name); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume '%s'", name))
+			return fmt.Errorf("could not create persistent volume '%s': %w", name, err)
+		}
+		pterm.Info.Println(fmt.Sprintf("Persistent volume '%s' created", name))
+	} else {
+		pterm.Info.Printfln("Persistent volume '%s' already exists", name)
+	}
+
+	return nil
+}
+
+func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, volumeName string) error {
+	if !c.k8s.PersistentVolumeClaimExists(ctx, namespace, name, volumeName) {
+		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume claim '%s'", name))
+		if err := c.k8s.PersistentVolumeClaimCreate(ctx, namespace, name, volumeName); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume claim '%s'", name))
+			return fmt.Errorf("could not create persistent volume claim '%s': %w", name, err)
+		}
+		pterm.Info.Println(fmt.Sprintf("Persistent volume claim '%s' created", name))
+	} else {
+		pterm.Info.Printfln("Persistent volume claim '%s' already exists", name)
+	}
+
+	return nil
+}
+
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, opts InstallOptions) error {
 	var values string
@@ -294,19 +334,20 @@ func (c *Command) Install(ctx context.Context, opts InstallOptions) error {
 	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", airbyteNamespace))
 		if err := c.k8s.NamespaceCreate(ctx, airbyteNamespace); err != nil {
-			pterm.Error.Printfln("Could not create namespace '%s'", airbyteNamespace)
+			pterm.Error.Println(fmt.Sprintf("Could not create namespace '%s'", airbyteNamespace))
 			return fmt.Errorf("could not create airbyte namespace: %w", err)
 		}
+		pterm.Info.Println(fmt.Sprintf("Namespace '%s' created", airbyteNamespace))
 	} else {
 		pterm.Info.Printfln("Namespace '%s' already exists", airbyteNamespace)
 	}
 
-	// create the persistent volumes
-	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumes().Create(ctx, pv(airbyteNamespace, "airbyte-minio-pv"), metav1.CreateOptions{}); err != nil {
-		pterm.Error.Printfln("Failed to create persistent volume: %s", err.Error())
+	if err := c.persistentVolume(ctx, airbyteNamespace, pvMinio); err != nil {
+		return err
 	}
-	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumes().Create(ctx, pv(airbyteNamespace, "airbyte-volume-db"), metav1.CreateOptions{}); err != nil {
-		pterm.Error.Printfln("Failed to create persistent volume: %s", err.Error())
+
+	if err := c.persistentVolume(ctx, airbyteNamespace, pvPsql); err != nil {
+		return err
 	}
 
 	if opts.Migrate {
@@ -321,12 +362,11 @@ func (c *Command) Install(ctx context.Context, opts InstallOptions) error {
 		//}
 	}
 
-	// create the persistent volume claims
-	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-minio-pv-claim-airbyte-minio-0", "airbyte-minio-pv"), metav1.CreateOptions{}); err != nil {
-		pterm.Error.Printfln("Failed to create persistent volume claim: %s", err.Error())
+	if err := c.persistentVolumeClaim(ctx, airbyteNamespace, pvcMinio, pvMinio); err != nil {
+		return err
 	}
-	if _, err := c.k8s.TestClientSet().CoreV1().PersistentVolumeClaims(airbyteNamespace).Create(ctx, pvc("airbyte-volume-db-airbyte-db-0", "airbyte-volume-db"), metav1.CreateOptions{}); err != nil {
-		pterm.Error.Printfln("Failed to create persistent volume claim: %s", err.Error())
+	if err := c.persistentVolumeClaim(ctx, airbyteNamespace, pvcPsql, pvPsql); err != nil {
+		return err
 	}
 
 	var telUser string
@@ -439,7 +479,7 @@ func (c *Command) watchEvents(ctx context.Context) {
 				pterm.Debug.Println("Event watcher completed.")
 				return
 			}
-			if convertedEvent, ok := event.Object.(*v1events.Event); ok {
+			if convertedEvent, ok := event.Object.(*eventsv1.Event); ok {
 				c.handleEvent(ctx, convertedEvent)
 			} else {
 				pterm.Debug.Printfln("Received unexpected event: %T", event.Object)
@@ -460,7 +500,7 @@ var now = func() *metav1.Time {
 }()
 
 // handleEvent converts a kubernetes event into a console log message
-func (c *Command) handleEvent(ctx context.Context, e *v1events.Event) {
+func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	// TODO: replace DeprecatedLastTimestamp,
 	// this is supposed to be replaced with series.lastObservedTime, however that field is always nil...
 	if e.DeprecatedLastTimestamp.Before(now) {
