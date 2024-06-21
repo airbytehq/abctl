@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"time"
 )
 
 // Version contains al the version information that is being tracked.
@@ -37,6 +38,7 @@ type Client interface {
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
 	ContainerRemove(ctx context.Context, container string, options container.RemoveOptions) error
+	ContainerStart(ctx context.Context, container string, options container.StartOptions) error
 	ContainerStop(ctx context.Context, container string, options container.StopOptions) error
 	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, types.ContainerPathStat, error)
 
@@ -226,16 +228,9 @@ func (d *Docker) Migrate(ctx context.Context, volume string) error {
 	if err := copyFromContainer(ctx, d.Client, one.ID, "/var/lib/postgresql/data/.", dst); err != nil {
 		return fmt.Errorf("could not copy airbyte db data from container %s: %w", one.ID, err)
 	}
-	pterm.Debug.Println(fmt.Sprintf("copied airbyte db data from container '%s' to '%s'", one.ID, dst))
+	pterm.Debug.Println(fmt.Sprintf("Copied airbyte db data from container '%s' to '%s'", one.ID, dst))
 
-	if err := d.Client.ContainerStop(ctx, one.ID, container.StopOptions{}); err != nil {
-		pterm.Debug.Println(fmt.Sprintf("Could not stop docker container %s: %s", one.ID, err))
-	}
-
-	if err := d.Client.ContainerRemove(ctx, one.ID, container.RemoveOptions{}); err != nil {
-		pterm.Debug.Println(fmt.Sprintf("Could not remove docker container %s: %s", one.ID, err))
-	}
-	pterm.Debug.Println(fmt.Sprintf("Removed initial migration container '%s'", one.ID))
+	stopContainer(ctx, d.Client, one.ID)
 
 	// docker run
 	// -e POSTGRES_USER=docker -e POSTGRES_PASSWORD=docker -e POSTGRES_DB=airbyte -e PGDATA=/var/lib/postgresql/data \
@@ -246,9 +241,9 @@ func (d *Docker) Migrate(ctx context.Context, volume string) error {
 		&container.Config{
 			Image: migrateImage,
 			Env: []string{
-				"POSTGRES_USER=" + migrateUser,
-				"POSTGRES_PASSWORD=" + migratePass,
-				"POSTGRES_DB=" + migrateDB,
+				"POSTGRES_USER=docker",     // + migrateUser,
+				"POSTGRES_PASSWORD=docker", // + migratePass,
+				"POSTGRES_DB=postgres",     // + migrateDB,
 				"PGDATA=" + migratePGDATA,
 			},
 		},
@@ -268,31 +263,41 @@ func (d *Docker) Migrate(ctx context.Context, volume string) error {
 		return fmt.Errorf("could not create docker container: %w", err)
 	}
 	pterm.Debug.Println(fmt.Sprintf("Created secondary migration container '%s'", con.ID))
-	pterm.Debug.Println(con.Warnings)
+	pterm.Debug.Println(fmt.Sprintf("Container was created with the following warnings: %s", con.Warnings))
+	if err := d.Client.ContainerStart(ctx, con.ID, container.StartOptions{}); err != nil {
+		return fmt.Errorf("could not start container %s: %w", con.ID, err)
+	}
 	// cleanup and remove container when we're done
 	defer func() {
-		//if err := d.Client.ContainerStop(ctx, con.ID, container.StopOptions{}); err != nil {
-		//	pterm.Debug.Println(fmt.Sprintf("Could not stop docker container %s: %s", con.ID, err))
-		//}
-		//if err := d.Client.ContainerRemove(ctx, con.ID, container.RemoveOptions{Force: true}); err != nil {
-		//	pterm.Debug.Println(fmt.Sprintf("Could not remove docker container %s: %s", con.ID, err))
-		//}
+		stopContainer(ctx, d.Client, con.ID)
 	}()
+
+	// TODO figure out a better way to determine when the container has successfully started
+	time.Sleep(10 * time.Second)
 
 	// docker exec airbyte-abctl-migrate psql -U docker -c "CREATE ROLE airbyte SUPERUSER CREATEROLE CREATEDB REPLICATION BYPASSRLS LOGIN PASSWORD 'airbyte'"
 	// docker exec airbyte-abctl-migrate psql -U airbyte postgres -c 'ALTER DATABASE airbyte RENAME TO "db-airbyte"'
 	var (
-		cmdPsqlUser   = `psql -U docker -c "CREATE ROLE airbyte SUPERUSER CREATEROLE CREATEDB REPLICATION BYPASSRLS LOGIN PASSWORD 'airbyte'"`
-		cmdPsqlRename = `psql -U airbyte postgres -c 'ALTER DATABASE airbyte RENAME TO "db-airbyte"'`
+		cmdPsqlRename = []string{"psql", "-U", "docker", "-d", "postgres", "-c", `ALTER DATABASE "airbyte" RENAME TO "db-airbyte"`}
+		cmdPsqlUser   = []string{"psql", "-U", "docker", "-d", "postgres", "-c", `CREATE ROLE airbyte SUPERUSER CREATEROLE CREATEDB REPLICATION BYPASSRLS LOGIN PASSWORD 'airbyte'`}
 	)
 	// add a new database user to match the default helm user
-	if err := exec(ctx, d.Client, con.ID, []string{cmdPsqlUser}); err != nil {
+	now := time.Now()
+	pterm.Debug.Println("Adding airbyte postgres user")
+	if err := exec(ctx, d.Client, con.ID, cmdPsqlUser); err != nil {
+		pterm.Debug.Println("Failed to add postgres user")
 		return fmt.Errorf("could not update postgres user: %w", err)
 	}
+	pterm.Debug.Println(fmt.Sprintf("Adding airbyte postgres user completed in %s", time.Since(now)))
+
 	// rename the database to match the default helm database name
-	if err := exec(ctx, d.Client, con.ID, []string{cmdPsqlRename}); err != nil {
+	pterm.Debug.Println("Renaming database")
+	now = time.Now()
+	if err := exec(ctx, d.Client, con.ID, cmdPsqlRename); err != nil {
+		pterm.Debug.Println("Failed to rename database")
 		return fmt.Errorf("could not rename postgres database: %w", err)
 	}
+	pterm.Debug.Println(fmt.Sprintf("Renaming database completed in %s", time.Since(now)))
 
 	return nil
 }
@@ -313,13 +318,27 @@ func exec(ctx context.Context, cli Client, container string, cmd []string) error
 		return fmt.Errorf("could not start exec for container '%s': %w", container, err)
 	}
 
-	resInspect, err := cli.ContainerExecInspect(ctx, resCreate.ID)
-	if err != nil {
-		return fmt.Errorf("could not inspect container '%s': %w", container, err)
-	}
+	ticker := time.NewTicker(500 * time.Millisecond) // how often to check
+	timer := time.After(5 * time.Minute)             // how long to wait
+	running := true
 
-	if resInspect.ExitCode != 0 {
-		return fmt.Errorf("container '%s' exec exited with non-zero exit code: %d", container, resInspect.ExitCode)
+	// loop until the exec command returns a "Running == false" status, or until we've hit our timer
+	for running {
+		select {
+		case <-ticker.C:
+			res, err := cli.ContainerExecInspect(ctx, resCreate.ID)
+			if err != nil {
+				return fmt.Errorf("could not inspect container '%s': %w", container, err)
+			}
+			running = res.Running
+			if res.ExitCode != 0 {
+				return fmt.Errorf("container '%s' exec exited with non-zero exit code: %d", container, res.ExitCode)
+			}
+		case <-timer:
+			return errors.New("timed out waiting for docker exec to complete")
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	return nil
@@ -350,4 +369,15 @@ func copyFromContainer(ctx context.Context, cli Client, container, src, dst stri
 	}
 
 	return nil
+}
+
+func stopContainer(ctx context.Context, cli Client, containerID string) {
+	pterm.Debug.Println(fmt.Sprintf("Stopping container '%s'", containerID))
+	if err := cli.ContainerStop(ctx, containerID, container.StopOptions{}); err != nil {
+		pterm.Debug.Println(fmt.Sprintf("Could not stop docker container %s: %s", containerID, err))
+	}
+	pterm.Debug.Println(fmt.Sprintf("Removing container '%s'", containerID))
+	if err := cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true}); err != nil {
+		pterm.Debug.Println(fmt.Sprintf("Could not remove docker container %s: %s", containerID, err))
+	}
 }

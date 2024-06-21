@@ -319,10 +319,6 @@ func (c *Command) Install(ctx context.Context, opts InstallOptions) error {
 		//	pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
 		//	return fmt.Errorf("could not migrate data from previous airbyte installation: %w", err)
 		//}
-
-		if true {
-			return errors.New("blocked")
-		}
 	}
 
 	// create the persistent volume claims
