@@ -35,12 +35,18 @@ type Client interface {
 	// NamespaceDelete deletes the existing namespace
 	NamespaceDelete(ctx context.Context, namespace string) error
 
+	// PersistentVolumeCreate creates a persistent volume
 	PersistentVolumeCreate(ctx context.Context, namespace, name string) error
+	// PersistentVolumeExists returns true if the persistent volume exists, false otherwise
 	PersistentVolumeExists(ctx context.Context, namespace, name string) bool
+	// PersistentVolumeDelete deletes the existing persistent volume
 	PersistentVolumeDelete(ctx context.Context, namespace, name string) error
 
+	// PersistentVolumeClaimCreate creates a persistent volume claim
 	PersistentVolumeClaimCreate(ctx context.Context, namespace, name, volumeName string) error
+	// PersistentVolumeClaimExists returns true if the persistent volume claim exists, false otherwise
 	PersistentVolumeClaimExists(ctx context.Context, namespace, name, volumeName string) bool
+	// PersistentVolumeClaimDelete deletes the existing persistent volume claim
 	PersistentVolumeClaimDelete(ctx context.Context, namespace, name, volumeName string) error
 
 	// SecretCreateOrUpdate will update or create the secret name with the payload of data in the specified namespace

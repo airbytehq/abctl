@@ -269,7 +269,7 @@ func (c *Command) migrate(ctx context.Context, dock *docker.Docker) error {
 	return nil
 }
 
-type InstallOptions struct {
+type InstallOps struct {
 	User             string
 	Pass             string
 	HelmChartVersion string
@@ -319,7 +319,7 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 }
 
 // Install handles the installation of Airbyte
-func (c *Command) Install(ctx context.Context, opts InstallOptions) error {
+func (c *Command) Install(ctx context.Context, opts InstallOps) error {
 	var values string
 	if opts.ValuesFile != "" {
 		raw, err := os.ReadFile(opts.ValuesFile)
