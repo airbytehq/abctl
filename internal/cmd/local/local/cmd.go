@@ -523,15 +523,21 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 		// TODO: replace DeprecatedCount
 		// Similar issue to DeprecatedLastTimestamp, the series attribute is always nil
 		if logs != "" {
-			pterm.Warning.Printfln(
-				"Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs: %s",
-				e.Name, e.Reason, e.Note, e.DeprecatedCount, strings.TrimSpace(logs),
-			)
+			msg := fmt.Sprintf("Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs: %s",
+				e.Name, e.Reason, e.Note, e.DeprecatedCount, strings.TrimSpace(logs))
+			pterm.Debug.Println(msg)
+			// only show the warning if the count is higher than 5
+			if e.DeprecatedCount > 5 {
+				pterm.Warning.Printfln(msg)
+			}
 		} else {
-			pterm.Warning.Printfln(
-				"Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d",
-				e.Name, e.Reason, e.Note, e.DeprecatedCount,
-			)
+			msg := fmt.Sprintf("Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d",
+				e.Name, e.Reason, e.Note, e.DeprecatedCount)
+			pterm.Debug.Printfln(msg)
+			// only show the warning if the count is higher than 5
+			if e.DeprecatedCount > 5 {
+				pterm.Warning.Printfln(msg)
+			}
 		}
 
 	default:
