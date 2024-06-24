@@ -7,7 +7,6 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -28,10 +27,8 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage/driver"
-	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -213,69 +210,13 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	return c, nil
 }
 
-func pv(namespace, name string) *corev1.PersistentVolume {
-	size, _ := resource.ParseQuantity("500Mi")
-	hostPathType := corev1.HostPathDirectoryOrCreate
-
-	return &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-		Spec: corev1.PersistentVolumeSpec{
-			Capacity: corev1.ResourceList{corev1.ResourceStorage: size},
-			PersistentVolumeSource: corev1.PersistentVolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: path.Join("/var/local-path-provisioner", name),
-					Type: &hostPathType,
-				},
-			},
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				corev1.ReadWriteOnce,
-			},
-			PersistentVolumeReclaimPolicy: "Retain",
-			StorageClassName:              "standard",
-		},
-	}
-}
-
-func pvc(name string, volumeName string) *corev1.PersistentVolumeClaim {
-	size, _ := resource.ParseQuantity("500Mi")
-	storageClass := "standard"
-
-	return &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources:        corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: size}},
-			VolumeName:       volumeName,
-			StorageClassName: &storageClass,
-		},
-		Status: corev1.PersistentVolumeClaimStatus{},
-	}
-}
-
-func (c *Command) migrate(ctx context.Context, dock *docker.Docker) error {
-	const (
-		volData = "airbyte_data"
-		volDB   = "airbyte_db"
-	)
-
-	if mnt := dock.VolumeExists(ctx, volData); mnt != "" {
-		c.spinner.UpdateText("Migrating data")
-	}
-
-	if mnt := dock.VolumeExists(ctx, volDB); mnt != "" {
-		c.spinner.UpdateText("Migrating db")
-	}
-
-	return nil
-}
-
 type InstallOps struct {
 	User             string
 	Pass             string
 	HelmChartVersion string
 	ValuesFile       string
 	Migrate          bool
-	Dock             *docker.Docker
+	Docker           *docker.Docker
 }
 
 const (
@@ -352,14 +293,10 @@ func (c *Command) Install(ctx context.Context, opts InstallOps) error {
 
 	if opts.Migrate {
 		c.spinner.UpdateText("Migrating airbyte data")
-		if err := opts.Dock.Migrate(ctx, "airbyte_db"); err != nil {
+		if err := opts.Docker.MigrateComposeDB(ctx, "airbyte_db"); err != nil {
 			pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
 			return fmt.Errorf("could not migrate data from previous airbyte installation: %w", err)
 		}
-		//if err := c.migrate(ctx, opts.Dock); err != nil {
-		//	pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
-		//	return fmt.Errorf("could not migrate data from previous airbyte installation: %w", err)
-		//}
 	}
 
 	if err := c.persistentVolumeClaim(ctx, airbyteNamespace, pvcMinio, pvMinio); err != nil {
@@ -385,9 +322,6 @@ func (c *Command) Install(ctx context.Context, opts InstallOps) error {
 		namespace:    airbyteNamespace,
 		values: []string{
 			fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser),
-			//"postgresql.postgresqlUsername=docker",
-			//"postgresql.postgresqlPassword=docker",
-			//"postgresql.postgresqlDatabase=airbyte",
 		},
 		valuesYAML: values,
 	}); err != nil {

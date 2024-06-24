@@ -121,7 +121,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					HelmChartVersion: flagChartVersion,
 					ValuesFile:       flagChartValuesFile,
 					Migrate:          flagMigrate,
-					Dock:             dockerClient,
+					Docker:           dockerClient,
 				}
 
 				if opts.HelmChartVersion == "latest" {
