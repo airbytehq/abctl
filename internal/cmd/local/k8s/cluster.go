@@ -52,10 +52,6 @@ nodes:
     extraMounts:
       - hostPath: %s
         containerPath: /var/local-path-provisioner
-      - hostPath: /var/lib/docker/volumes/airbyte_db/_data
-        containerPath: /mnt/postgres
-      - hostPath: /var/lib/docker/volumes/airbyte_data/_data
-        containerPath: /mnt/minio
     extraPortMappings:
       - containerPort: 80
         hostPort: %d
