@@ -12,7 +12,7 @@ import (
 func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
-	var flagPersist bool
+	var flagPersisted bool
 
 	cmd := &cobra.Command{
 		Use:   "uninstall",
@@ -56,7 +56,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 					pterm.Warning.Printfln("Failed to initialize 'local' command\nUninstallation attempt will continue")
 					pterm.Debug.Printfln("Initialization of 'local' failed with %s", err.Error())
 				} else {
-					if err := lc.Uninstall(cmd.Context(), flagPersist); err != nil {
+					if err := lc.Uninstall(cmd.Context(), local.UninstallOpts{Persisted: flagPersisted}); err != nil {
 						pterm.Warning.Printfln("could not complete uninstall: %s", err.Error())
 						pterm.Warning.Println("will still attempt to uninstall the cluster")
 					}
@@ -64,10 +64,10 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 
 				spinner.UpdateText(fmt.Sprintf("Verifying uninstallation status of cluster '%s'", provider.ClusterName))
 				if err := cluster.Delete(); err != nil {
-					pterm.Error.Printfln("Uninstallation of cluster '%s' failed", provider.ClusterName)
+					pterm.Error.Printfln(fmt.Sprintf("Uninstallation of cluster '%s' failed", provider.ClusterName))
 					return fmt.Errorf("could not uninstall cluster %s", provider.ClusterName)
 				}
-				pterm.Success.Printfln("Uninstallation of cluster '%s' completed successfully", provider.ClusterName)
+				pterm.Success.Printfln(fmt.Sprintf("Uninstallation of cluster '%s' completed successfully", provider.ClusterName))
 
 				spinner.Success("Airbyte uninstallation complete")
 
@@ -76,7 +76,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&flagPersist, "persist", false, "remove persisted data")
+	cmd.Flags().BoolVar(&flagPersisted, "persisted", false, "remove persisted data")
 
 	return cmd
 }

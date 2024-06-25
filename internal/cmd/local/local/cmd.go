@@ -2,7 +2,6 @@ package local
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
@@ -26,9 +24,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
-	"helm.sh/helm/v3/pkg/storage/driver"
 	eventsv1 "k8s.io/api/events/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -210,7 +206,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	return c, nil
 }
 
-type InstallOps struct {
+type InstallOpts struct {
 	User             string
 	Pass             string
 	HelmChartVersion string
@@ -260,7 +256,7 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 }
 
 // Install handles the installation of Airbyte
-func (c *Command) Install(ctx context.Context, opts InstallOps) error {
+func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	var values string
 	if opts.ValuesFile != "" {
 		raw, err := os.ReadFile(opts.ValuesFile)
@@ -498,102 +494,22 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 	return nil
 }
 
+type UninstallOpts struct {
+	Persisted bool
+}
+
 // Uninstall handles the uninstallation of Airbyte.
-func (c *Command) Uninstall(ctx context.Context, persist bool) error {
-	// if not removing persisted data, then this is a no-op
-	if !persist {
-		return nil
+func (c *Command) Uninstall(_ context.Context, opts UninstallOpts) error {
+	// check if persisted data should be removed, if not this is a noop
+	if opts.Persisted {
+		c.spinner.UpdateText("Removing persisted data")
+		data := filepath.Join(c.userHome, ".airbyte", "abctl", "data")
+		if err := os.RemoveAll(data); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to remove persisted data '%s'", data))
+			return fmt.Errorf("could not remove persisted data '%s': %w", data, err)
+		}
+		pterm.Success.Println("Removed persisted data")
 	}
-
-	{
-		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", airbyteChartName))
-
-		airbyteChartExists := true
-		if _, err := c.helm.GetRelease(airbyteChartRelease); err != nil {
-			if !errors.Is(err, driver.ErrReleaseNotFound) {
-				pterm.Error.Printfln("Could not verify installation status of %s Helm Chart", airbyteChartName)
-				return fmt.Errorf("could not fetch airbyte release: %w", err)
-			}
-
-			pterm.Success.Printfln("Helm Chart %s is not installed", airbyteChartName)
-			airbyteChartExists = false
-		} else {
-			pterm.Success.Printfln("Verified Helm Chart %s is installed", airbyteChartName)
-		}
-
-		if airbyteChartExists {
-			c.spinner.UpdateText(fmt.Sprintf("Uninstalling %s Helm Chart", airbyteChartName))
-			if err := c.helm.UninstallReleaseByName(airbyteChartRelease); err != nil {
-				pterm.Error.Printfln("Could not uninstall %s Helm Chart", airbyteChartName)
-				return fmt.Errorf("could not uninstall airbyte chart: %w", err)
-			}
-			pterm.Success.Printfln("Uninstalled %s Helm Chart", airbyteChartName)
-		}
-	}
-
-	{
-		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", nginxChartName))
-
-		nginxChartExists := true
-		if _, err := c.helm.GetRelease(nginxChartRelease); err != nil {
-			if !errors.Is(err, driver.ErrReleaseNotFound) {
-				pterm.Error.Printfln("Could not verify installation status of %s Helm Chart", nginxChartName)
-				return fmt.Errorf("could not fetch nginx release: %w", err)
-			}
-
-			pterm.Success.Printfln("Helm Chart %s is not installed", nginxChartName)
-			nginxChartExists = false
-		}
-
-		if nginxChartExists {
-			c.spinner.UpdateText(fmt.Sprintf("Uninstalling %s Helm Chart", nginxChartName))
-			if err := c.helm.UninstallReleaseByName(nginxChartRelease); err != nil {
-				pterm.Error.Printfln("Could not uninstall %s Helm Chart", nginxChartName)
-				return fmt.Errorf("could not uninstall nginx chart: %w", err)
-			}
-		}
-		pterm.Success.Printfln("Uninstalled %s Helm Chart", nginxChartName)
-	}
-
-	c.spinner.UpdateText(fmt.Sprintf("Deleting Kubernetes namespace '%s'", airbyteNamespace))
-
-	if err := c.k8s.NamespaceDelete(ctx, airbyteNamespace); err != nil {
-		if !k8serrors.IsNotFound(err) {
-			pterm.Error.Printfln("Could not delete Kubernetes namespace '%s'", airbyteNamespace)
-			return fmt.Errorf("could not delete namespace: %w", err)
-		}
-	}
-
-	// there is no blocking delete namespace call, so poll until it's been deleted, or we've exhausted our time
-	namespaceDeleted := false
-	var wg sync.WaitGroup
-	ticker := time.NewTicker(1 * time.Second) // how ofter to check
-	timer := time.After(5 * time.Minute)      // how long to wait
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case <-ticker.C:
-				if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
-					namespaceDeleted = true
-					return
-				}
-			case <-timer:
-				ticker.Stop()
-				return
-			}
-		}
-	}()
-
-	wg.Wait()
-
-	if !namespaceDeleted {
-		pterm.Error.Printfln("Could not delete Kubernetes namespace '%s'", airbyteNamespace)
-		return errors.New("could not delete namespace")
-	}
-
-	pterm.Success.Printfln("Namespace '%s' deleted", airbyteNamespace)
 
 	return nil
 }

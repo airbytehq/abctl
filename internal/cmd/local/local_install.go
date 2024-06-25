@@ -115,7 +115,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					return fmt.Errorf("could not initialize local command: %w", err)
 				}
 
-				opts := local.InstallOps{
+				opts := local.InstallOpts{
 					User:             flagUsername,
 					Pass:             flagPassword,
 					HelmChartVersion: flagChartVersion,
