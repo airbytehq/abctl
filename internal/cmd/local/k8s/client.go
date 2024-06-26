@@ -15,9 +15,9 @@ import (
 	"strings"
 )
 
-// PersistentVolumeSize is the size of the disks created by the persistent-volumes and requested by
+// DefaultPersistentVolumeSize is the size of the disks created by the persistent-volumes and requested by
 // the persistent-volume-claims.
-var PersistentVolumeSize = resource.MustParse("500Mi")
+var DefaultPersistentVolumeSize = resource.MustParse("500Mi")
 
 // Client primarily for testing purposes
 type Client interface {
@@ -113,7 +113,7 @@ func (d *DefaultK8sClient) PersistentVolumeCreate(ctx context.Context, namespace
 	pv := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: corev1.PersistentVolumeSpec{
-			Capacity: corev1.ResourceList{corev1.ResourceStorage: PersistentVolumeSize},
+			Capacity: corev1.ResourceList{corev1.ResourceStorage: DefaultPersistentVolumeSize},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
 					Path: path.Join("/var/local-path-provisioner", name),
@@ -151,7 +151,7 @@ func (d *DefaultK8sClient) PersistentVolumeClaimCreate(ctx context.Context, name
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources:        corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: PersistentVolumeSize}},
+			Resources:        corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: DefaultPersistentVolumeSize}},
 			VolumeName:       volumeName,
 			StorageClassName: &storageClass,
 		},
