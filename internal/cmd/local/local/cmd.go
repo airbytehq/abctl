@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -503,10 +504,9 @@ func (c *Command) Uninstall(_ context.Context, opts UninstallOpts) error {
 	// check if persisted data should be removed, if not this is a noop
 	if opts.Persisted {
 		c.spinner.UpdateText("Removing persisted data")
-		data := filepath.Join(c.userHome, ".airbyte", "abctl", "data")
-		if err := os.RemoveAll(data); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to remove persisted data '%s'", data))
-			return fmt.Errorf("could not remove persisted data '%s': %w", data, err)
+		if err := os.RemoveAll(paths.Data); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to remove persisted data '%s'", paths.Data))
+			return fmt.Errorf("could not remove persisted data '%s': %w", paths.Data, err)
 		}
 		pterm.Success.Println("Removed persisted data")
 	}

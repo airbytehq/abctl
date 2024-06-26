@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -209,8 +210,7 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 	pterm.Debug.Println(fmt.Sprintf("Created initial migration container '%s'", conCopy.ID))
 
 	// docker cp [conCopy.ID]]:/$migratePGDATA/. ~/.airbyte/abctl/data/airbyte-volume-db/pgdata
-	userHome, _ := os.UserHomeDir()
-	dst := filepath.Join(userHome, ".airbyte", "abctl", "data", "airbyte-volume-db", "pgdata")
+	dst := filepath.Join(paths.Data, "airbyte-volume-db", "pgdata")
 	// note the src must end with a `.`, due to how docker cp works with directories
 	if err := d.copyFromContainer(ctx, conCopy.ID, migratePGDATA+"/.", dst); err != nil {
 		return fmt.Errorf("could not copy airbyte db data from container %s: %w", conCopy.ID, err)
