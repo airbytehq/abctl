@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -101,9 +102,8 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
 		dockerCli, err = createAndPing(ctx, newPing, "unix:///var/run/docker.sock", dockerOpts)
 		if err != nil {
-			userHome, _ := os.UserHomeDir()
 			var err2 error
-			dockerCli, err2 = createAndPing(ctx, newPing, fmt.Sprintf("unix://%s/.docker/run/docker.sock", userHome), dockerOpts)
+			dockerCli, err2 = createAndPing(ctx, newPing, fmt.Sprintf("unix://%s/.docker/run/docker.sock", paths.UserHome), dockerOpts)
 			if err2 != nil {
 				return nil, fmt.Errorf("%w: could not create docker client: (%w, %w)", localerr.ErrDocker, err, err2)
 			}
@@ -209,8 +209,7 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 	pterm.Debug.Println(fmt.Sprintf("Created initial migration container '%s'", conCopy.ID))
 
 	// docker cp [conCopy.ID]]:/$migratePGDATA/. ~/.airbyte/abctl/data/airbyte-volume-db/pgdata
-	userHome, _ := os.UserHomeDir()
-	dst := filepath.Join(userHome, ".airbyte", "abctl", "data", "airbyte-volume-db", "pgdata")
+	dst := filepath.Join(paths.Data, "airbyte-volume-db", "pgdata")
 	// note the src must end with a `.`, due to how docker cp works with directories
 	if err := d.copyFromContainer(ctx, conCopy.ID, migratePGDATA+"/.", dst); err != nil {
 		return fmt.Errorf("could not copy airbyte db data from container %s: %w", conCopy.ID, err)

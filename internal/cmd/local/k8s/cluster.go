@@ -2,8 +2,7 @@ package k8s
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"sigs.k8s.io/kind/pkg/cluster"
 	"time"
 )
@@ -32,11 +31,6 @@ type kindCluster struct {
 
 const k8sVersion = "v1.29.1"
 
-var mountPath = func() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".airbyte", "abctl", "data")
-}
-
 func (k *kindCluster) Create(port int) error {
 	// see https://kind.sigs.k8s.io/docs/user/ingress/#create-cluster
 	rawCfg := fmt.Sprintf(`kind: Cluster
@@ -56,7 +50,7 @@ nodes:
       - containerPort: 80
         hostPort: %d
         protocol: TCP`,
-		mountPath(),
+		paths.Data,
 		port)
 
 	opts := []cluster.CreateOption{
