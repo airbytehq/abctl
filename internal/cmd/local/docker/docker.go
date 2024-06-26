@@ -204,7 +204,7 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 		nil,
 		"")
 	if err != nil {
-		return fmt.Errorf("could not create initial docker migrate container: %w", err)
+		return fmt.Errorf("could not create initial docker migration container: %w", err)
 	}
 	pterm.Debug.Println(fmt.Sprintf("Created initial migration container '%s'", conCopy.ID))
 
@@ -217,7 +217,7 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 	}
 	pterm.Debug.Println(fmt.Sprintf("Copied airbyte db data from container '%s' to '%s'", conCopy.ID, dst))
 
-	d.stopContainer(ctx, conCopy.ID)
+	d.stopAndRemoveContainer(ctx, conCopy.ID)
 
 	// Create a container for adding the correct db user and renaming the database.
 	// We have inconsistencies between our docker and helm default database credentials and even our database name.
@@ -255,7 +255,7 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 		return fmt.Errorf("could not start container %s: %w", conTransform.ID, err)
 	}
 	// cleanup and remove container when we're done
-	defer func() { d.stopContainer(ctx, conTransform.ID) }()
+	defer func() { d.stopAndRemoveContainer(ctx, conTransform.ID) }()
 
 	// TODO figure out a better way to determine when the container has successfully started
 	time.Sleep(10 * time.Second)
@@ -287,7 +287,7 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 	return nil
 }
 
-// volumeExists returns true if the volumeID exists on the host machine, false otherwise.
+// volumeExists returns the MountPoint of the volumeID (if the volume exists), an empty string otherwise.
 func (d *Docker) volumeExists(ctx context.Context, volumeID string) string {
 	if v, err := d.Client.VolumeInspect(ctx, volumeID); err != nil {
 		pterm.Debug.Println(fmt.Sprintf("Volume %s cannot be accessed: %s", volumeID, err))
@@ -366,8 +366,8 @@ func (d *Docker) copyFromContainer(ctx context.Context, container, src, dst stri
 	return nil
 }
 
-// stopContainer will stop and ultimately remove the containerID
-func (d *Docker) stopContainer(ctx context.Context, containerID string) {
+// stopAndRemoveContainer will stop and ultimately remove the containerID
+func (d *Docker) stopAndRemoveContainer(ctx context.Context, containerID string) {
 	pterm.Debug.Println(fmt.Sprintf("Stopping container '%s'", containerID))
 	if err := d.Client.ContainerStop(ctx, containerID, container.StopOptions{}); err != nil {
 		pterm.Debug.Println(fmt.Sprintf("Could not stop docker container %s: %s", containerID, err))
