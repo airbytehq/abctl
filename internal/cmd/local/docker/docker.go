@@ -102,9 +102,8 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
 		dockerCli, err = createAndPing(ctx, newPing, "unix:///var/run/docker.sock", dockerOpts)
 		if err != nil {
-			userHome, _ := os.UserHomeDir()
 			var err2 error
-			dockerCli, err2 = createAndPing(ctx, newPing, fmt.Sprintf("unix://%s/.docker/run/docker.sock", userHome), dockerOpts)
+			dockerCli, err2 = createAndPing(ctx, newPing, fmt.Sprintf("unix://%s/.docker/run/docker.sock", paths.UserHome), dockerOpts)
 			if err2 != nil {
 				return nil, fmt.Errorf("%w: could not create docker client: (%w, %w)", localerr.ErrDocker, err, err2)
 			}
