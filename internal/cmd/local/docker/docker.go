@@ -179,7 +179,7 @@ func (d *Docker) Port(ctx context.Context, container string) (int, error) {
 const migratePGDATA = "/var/lib/postgresql/data"
 
 // MigrateComposeDB handles migrating the existing docker compose database into the abctl managed k8s cluster.
-// TODO: move this method of the the docker class?
+// TODO: move this method out of the the docker class?
 func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 	if v := d.volumeExists(ctx, volume); v == "" {
 		return errors.New(fmt.Sprintf("volume %s does not exist", volume))
