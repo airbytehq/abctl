@@ -296,6 +296,59 @@ func (d *Docker) volumeExists(ctx context.Context, volumeID string) string {
 	}
 }
 
+func (d *Docker) wait(ctx context.Context, container string, cmd []string, duration time.Duration) error {
+	ticker := time.NewTicker(500 & time.Millisecond)
+	defer ticker.Stop()
+	timer := time.After(duration)
+
+	checking := true
+	for checking {
+		select {
+		case <-ticker.C:
+			if _, err := d.Client.ContainerInspect(ctx, container); err != nil {
+				pterm.Debug.Println(fmt.Sprintf("Container '%s' is not yet available", container))
+				continue
+			}
+			checking = false
+		case <-timer:
+			return errors.New("timed out checking container")
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	execID, err := d.createAndStartContainerExec(ctx, container, cmd)
+	if err != nil {
+		return fmt.Errorf("could not start container exec: %w", err)
+	}
+
+	waiting := true
+	for waiting {
+		select {
+		case <-ticker.C:
+			res, err := d.Client.ContainerExecInspect(ctx, execID)
+			if err != nil {
+				pterm.Debug.Println(fmt.Sprintf("Unable to inspect container exec: %s: %s", execID, err))
+				continue
+			}
+			switch {
+			case !res.Running && res.ExitCode == 0:
+				waiting = false
+
+			}
+			if !res.Running && res.ExitCode == 0 {
+				waiting = false
+			}
+		case <-timer:
+			return errors.New("timed out waiting for container")
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	return nil
+}
+
 // Exec executes an exec cmd against the container.
 // Largely inspired by the official docker client - https://github.com/docker/cli/blob/d69d501f699efb0cc1f16274e368e09ef8927840/cli/command/container/exec.go#L93
 func (d *Docker) exec(ctx context.Context, container string, cmd []string) error {
@@ -303,24 +356,20 @@ func (d *Docker) exec(ctx context.Context, container string, cmd []string) error
 		return fmt.Errorf("could not inspect container '%s': %w", container, err)
 	}
 
-	resCreate, err := d.Client.ContainerExecCreate(ctx, container, types.ExecConfig{Cmd: cmd})
+	execID, err := d.createAndStartContainerExec(ctx, container, cmd)
 	if err != nil {
-		return fmt.Errorf("could not create exec for container '%s': %w", container, err)
+		return fmt.Errorf("could not start container exec: %w", err)
 	}
-
-	if err := d.Client.ContainerExecStart(ctx, resCreate.ID, types.ExecStartCheck{}); err != nil {
-		return fmt.Errorf("could not start exec for container '%s': %w", container, err)
-	}
-
 	ticker := time.NewTicker(500 * time.Millisecond) // how often to check
-	timer := time.After(5 * time.Minute)             // how long to wait
+	defer ticker.Stop()
+	timer := time.After(5 * time.Minute) // how long to wait
 	running := true
 
 	// loop until the exec command returns a "Running == false" status, or until we've hit our timer
 	for running {
 		select {
 		case <-ticker.C:
-			res, err := d.Client.ContainerExecInspect(ctx, resCreate.ID)
+			res, err := d.Client.ContainerExecInspect(ctx, execID)
 			if err != nil {
 				return fmt.Errorf("could not inspect container '%s': %w", container, err)
 			}
@@ -336,6 +385,19 @@ func (d *Docker) exec(ctx context.Context, container string, cmd []string) error
 	}
 
 	return nil
+}
+
+func (d *Docker) createAndStartContainerExec(ctx context.Context, container string, cmd []string) (string, error) {
+	resCreate, err := d.Client.ContainerExecCreate(ctx, container, types.ExecConfig{Cmd: cmd})
+	if err != nil {
+		return "", fmt.Errorf("could not create exec for container '%s': %w", container, err)
+	}
+
+	if err := d.Client.ContainerExecStart(ctx, resCreate.ID, types.ExecStartCheck{}); err != nil {
+		return "", fmt.Errorf("could not start exec for container '%s': %w", container, err)
+	}
+
+	return resCreate.ID, nil
 }
 
 // copyFromContainer emulates the `docker cp` command.
