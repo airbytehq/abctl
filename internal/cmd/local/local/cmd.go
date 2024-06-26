@@ -2,8 +2,16 @@ package local
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
@@ -17,20 +25,10 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
-	"helm.sh/helm/v3/pkg/storage/driver"
-	v1events "k8s.io/api/events/v1"
-	networkingv1 "k8s.io/api/networking/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	eventsv1 "k8s.io/api/events/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -68,17 +66,16 @@ type BrowserLauncher func(url string) error
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
-	provider         k8s.Provider
-	cluster          k8s.Cluster
-	http             HTTPClient
-	helm             HelmClient
-	k8s              k8s.Client
-	portHTTP         int
-	spinner          *pterm.SpinnerPrinter
-	tel              telemetry.Client
-	launcher         BrowserLauncher
-	userHome         string
-	helmChartVersion string
+	provider k8s.Provider
+	cluster  k8s.Cluster
+	http     HTTPClient
+	helm     HelmClient
+	k8s      k8s.Client
+	portHTTP int
+	spinner  *pterm.SpinnerPrinter
+	tel      telemetry.Client
+	launcher BrowserLauncher
+	userHome string
 }
 
 // Option for configuring the Command, primarily exists for testing
@@ -129,12 +126,6 @@ func WithUserHome(home string) Option {
 func WithSpinner(spinner *pterm.SpinnerPrinter) Option {
 	return func(c *Command) {
 		c.spinner = spinner
-	}
-}
-
-func WithHelmChartVersion(version string) Option {
-	return func(c *Command) {
-		c.helmChartVersion = version
 	}
 }
 
@@ -201,10 +192,6 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 		c.launcher = browser.OpenURL
 	}
 
-	if c.helmChartVersion == "latest" {
-		c.helmChartVersion = ""
-	}
-
 	// fetch k8s version information
 	{
 		k8sVersion, err := c.k8s.ServerVersionGet()
@@ -220,18 +207,101 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	return c, nil
 }
 
+type InstallOpts struct {
+	User             string
+	Pass             string
+	HelmChartVersion string
+	ValuesFile       string
+	Migrate          bool
+	Docker           *docker.Docker
+}
+
+const (
+	// persistent volume constants, these are named to match the values given in the helm chart
+	pvMinio = "airbyte-minio-pv"
+	pvPsql  = "airbyte-volume-db"
+
+	// persistent volume claim constants, these are named to match the values given in the helm chart
+	pvcMinio = "airbyte-minio-pv-claim-airbyte-minio-0"
+	pvcPsql  = "airbyte-volume-db-airbyte-db-0"
+)
+
+func (c *Command) persistentVolume(ctx context.Context, namespace, name string) error {
+	if !c.k8s.PersistentVolumeExists(ctx, namespace, name) {
+		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume '%s'", name))
+		if err := c.k8s.PersistentVolumeCreate(ctx, namespace, name); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume '%s'", name))
+			return fmt.Errorf("could not create persistent volume '%s': %w", name, err)
+		}
+		pterm.Info.Println(fmt.Sprintf("Persistent volume '%s' created", name))
+	} else {
+		pterm.Info.Printfln("Persistent volume '%s' already exists", name)
+	}
+
+	return nil
+}
+
+func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, volumeName string) error {
+	if !c.k8s.PersistentVolumeClaimExists(ctx, namespace, name, volumeName) {
+		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume claim '%s'", name))
+		if err := c.k8s.PersistentVolumeClaimCreate(ctx, namespace, name, volumeName); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume claim '%s'", name))
+			return fmt.Errorf("could not create persistent volume claim '%s': %w", name, err)
+		}
+		pterm.Info.Println(fmt.Sprintf("Persistent volume claim '%s' created", name))
+	} else {
+		pterm.Info.Printfln("Persistent volume claim '%s' already exists", name)
+	}
+
+	return nil
+}
+
 // Install handles the installation of Airbyte
-func (c *Command) Install(ctx context.Context, user, pass, valuesFile string) error {
+func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	var values string
-	if valuesFile != "" {
-		raw, err := os.ReadFile(valuesFile)
+	if opts.ValuesFile != "" {
+		raw, err := os.ReadFile(opts.ValuesFile)
 		if err != nil {
-			return fmt.Errorf("could not read values file '%s': %w", valuesFile, err)
+			return fmt.Errorf("could not read values file '%s': %w", opts.ValuesFile, err)
 		}
 		values = string(raw)
 	}
 
 	go c.watchEvents(ctx)
+
+	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
+		c.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", airbyteNamespace))
+		if err := c.k8s.NamespaceCreate(ctx, airbyteNamespace); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Could not create namespace '%s'", airbyteNamespace))
+			return fmt.Errorf("could not create airbyte namespace: %w", err)
+		}
+		pterm.Info.Println(fmt.Sprintf("Namespace '%s' created", airbyteNamespace))
+	} else {
+		pterm.Info.Printfln("Namespace '%s' already exists", airbyteNamespace)
+	}
+
+	if err := c.persistentVolume(ctx, airbyteNamespace, pvMinio); err != nil {
+		return err
+	}
+
+	if err := c.persistentVolume(ctx, airbyteNamespace, pvPsql); err != nil {
+		return err
+	}
+
+	if opts.Migrate {
+		c.spinner.UpdateText("Migrating airbyte data")
+		if err := opts.Docker.MigrateComposeDB(ctx, "airbyte_db"); err != nil {
+			pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
+			return fmt.Errorf("could not migrate data from previous airbyte installation: %w", err)
+		}
+	}
+
+	if err := c.persistentVolumeClaim(ctx, airbyteNamespace, pvcMinio, pvMinio); err != nil {
+		return err
+	}
+	if err := c.persistentVolumeClaim(ctx, airbyteNamespace, pvcPsql, pvPsql); err != nil {
+		return err
+	}
 
 	var telUser string
 	// only override the empty telUser if the tel.User returns a non-nil (uuid.Nil) value.
@@ -245,10 +315,12 @@ func (c *Command) Install(ctx context.Context, user, pass, valuesFile string) er
 		repoURL:      airbyteRepoURL,
 		chartName:    airbyteChartName,
 		chartRelease: airbyteChartRelease,
-		chartVersion: c.helmChartVersion,
+		chartVersion: opts.HelmChartVersion,
 		namespace:    airbyteNamespace,
-		values:       []string{fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser)},
-		valuesYAML:   values,
+		values: []string{
+			fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser),
+		},
+		valuesYAML: values,
 	}); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)
 	}
@@ -285,10 +357,23 @@ func (c *Command) Install(ctx context.Context, user, pass, valuesFile string) er
 
 	c.spinner.UpdateText("Configuring Basic-Auth")
 	// basic auth
-	if err := c.handleBasicAuthSecret(ctx, user, pass); err != nil {
+	if err := c.handleBasicAuthSecret(ctx, opts.User, opts.Pass); err != nil {
 		return fmt.Errorf("could not create or update basic-auth secret: %w", err)
 	}
 
+	if err := c.handleIngress(ctx); err != nil {
+		return err
+	}
+
+	c.spinner.UpdateText("Verifying ingress")
+	if err := c.openBrowser(ctx, fmt.Sprintf("http://localhost:%d", c.portHTTP)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Command) handleIngress(ctx context.Context) error {
 	c.spinner.UpdateText("Checking for existing Ingress")
 
 	if c.k8s.IngressExists(ctx, airbyteNamespace, airbyteIngress) {
@@ -298,20 +383,15 @@ func (c *Command) Install(ctx context.Context, user, pass, valuesFile string) er
 			return fmt.Errorf("could not update existing ingress: %w", err)
 		}
 		pterm.Success.Println("Updated existing Ingress")
-	} else {
-		pterm.Info.Println("No existing Ingress found, will create one")
-		if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress()); err != nil {
-			pterm.Error.Println("Unable to create ingress")
-			return fmt.Errorf("could not create ingress: %w", err)
-		}
-		pterm.Success.Println("Ingress created")
+		return nil
 	}
 
-	c.spinner.UpdateText("Verifying ingress")
-	if err := c.openBrowser(ctx, fmt.Sprintf("http://localhost:%d", c.portHTTP)); err != nil {
-		return err
+	pterm.Info.Println("No existing Ingress found, creating one")
+	if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress()); err != nil {
+		pterm.Error.Println("Unable to create ingress")
+		return fmt.Errorf("could not create ingress: %w", err)
 	}
-
+	pterm.Success.Println("Ingress created")
 	return nil
 }
 
@@ -330,7 +410,7 @@ func (c *Command) watchEvents(ctx context.Context) {
 				pterm.Debug.Println("Event watcher completed.")
 				return
 			}
-			if convertedEvent, ok := event.Object.(*v1events.Event); ok {
+			if convertedEvent, ok := event.Object.(*eventsv1.Event); ok {
 				c.handleEvent(ctx, convertedEvent)
 			} else {
 				pterm.Debug.Printfln("Received unexpected event: %T", event.Object)
@@ -343,15 +423,15 @@ func (c *Command) watchEvents(ctx context.Context) {
 }
 
 // now is used to filter out kubernetes events that happened in the past.
-// Kubernetes wants to use the ResourceVersion on the event watch request itself, but that approach
+// Kubernetes wants us to use the ResourceVersion on the event watch request itself, but that approach
 // is more complicated as it requires determining which ResourceVersion to initially provide.
-var now = func() *v1.Time {
-	t := v1.Now()
+var now = func() *metav1.Time {
+	t := metav1.Now()
 	return &t
 }()
 
 // handleEvent converts a kubernetes event into a console log message
-func (c *Command) handleEvent(ctx context.Context, e *v1events.Event) {
+func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	// TODO: replace DeprecatedLastTimestamp,
 	// this is supposed to be replaced with series.lastObservedTime, however that field is always nil...
 	if e.DeprecatedLastTimestamp.Before(now) {
@@ -374,15 +454,21 @@ func (c *Command) handleEvent(ctx context.Context, e *v1events.Event) {
 		// TODO: replace DeprecatedCount
 		// Similar issue to DeprecatedLastTimestamp, the series attribute is always nil
 		if logs != "" {
-			pterm.Warning.Printfln(
-				"Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs: %s",
-				e.Name, e.Reason, e.Note, e.DeprecatedCount, strings.TrimSpace(logs),
-			)
+			msg := fmt.Sprintf("Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs: %s",
+				e.Name, e.Reason, e.Note, e.DeprecatedCount, strings.TrimSpace(logs))
+			pterm.Debug.Println(msg)
+			// only show the warning if the count is higher than 5
+			if e.DeprecatedCount > 5 {
+				pterm.Warning.Printfln(msg)
+			}
 		} else {
-			pterm.Warning.Printfln(
-				"Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d",
-				e.Name, e.Reason, e.Note, e.DeprecatedCount,
-			)
+			msg := fmt.Sprintf("Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d",
+				e.Name, e.Reason, e.Note, e.DeprecatedCount)
+			pterm.Debug.Printfln(msg)
+			// only show the warning if the count is higher than 5
+			if e.DeprecatedCount > 5 {
+				pterm.Warning.Printfln(msg)
+			}
 		}
 
 	default:
@@ -409,97 +495,21 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 	return nil
 }
 
+type UninstallOpts struct {
+	Persisted bool
+}
+
 // Uninstall handles the uninstallation of Airbyte.
-func (c *Command) Uninstall(ctx context.Context) error {
-	{
-		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", airbyteChartName))
-
-		airbyteChartExists := true
-		if _, err := c.helm.GetRelease(airbyteChartRelease); err != nil {
-			if !errors.Is(err, driver.ErrReleaseNotFound) {
-				pterm.Error.Printfln("Could not verify installation status of %s Helm Chart", airbyteChartName)
-				return fmt.Errorf("could not fetch airbyte release: %w", err)
-			}
-
-			pterm.Success.Printfln("Helm Chart %s is not installed", airbyteChartName)
-			airbyteChartExists = false
-		} else {
-			pterm.Success.Printfln("Verified Helm Chart %s is installed", airbyteChartName)
+func (c *Command) Uninstall(_ context.Context, opts UninstallOpts) error {
+	// check if persisted data should be removed, if not this is a noop
+	if opts.Persisted {
+		c.spinner.UpdateText("Removing persisted data")
+		if err := os.RemoveAll(paths.Data); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to remove persisted data '%s'", paths.Data))
+			return fmt.Errorf("could not remove persisted data '%s': %w", paths.Data, err)
 		}
-
-		if airbyteChartExists {
-			c.spinner.UpdateText(fmt.Sprintf("Uninstalling %s Helm Chart", airbyteChartName))
-			if err := c.helm.UninstallReleaseByName(airbyteChartRelease); err != nil {
-				pterm.Error.Printfln("Could not uninstall %s Helm Chart", airbyteChartName)
-				return fmt.Errorf("could not uninstall airbyte chart: %w", err)
-			}
-			pterm.Success.Printfln("Uninstalled %s Helm Chart", airbyteChartName)
-		}
+		pterm.Success.Println("Removed persisted data")
 	}
-
-	{
-		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", nginxChartName))
-
-		nginxChartExists := true
-		if _, err := c.helm.GetRelease(nginxChartRelease); err != nil {
-			if !errors.Is(err, driver.ErrReleaseNotFound) {
-				pterm.Error.Printfln("Could not verify installation status of %s Helm Chart", nginxChartName)
-				return fmt.Errorf("could not fetch nginx release: %w", err)
-			}
-
-			pterm.Success.Printfln("Helm Chart %s is not installed", nginxChartName)
-			nginxChartExists = false
-		}
-
-		if nginxChartExists {
-			c.spinner.UpdateText(fmt.Sprintf("Uninstalling %s Helm Chart", nginxChartName))
-			if err := c.helm.UninstallReleaseByName(nginxChartRelease); err != nil {
-				pterm.Error.Printfln("Could not uninstall %s Helm Chart", nginxChartName)
-				return fmt.Errorf("could not uninstall nginx chart: %w", err)
-			}
-		}
-		pterm.Success.Printfln("Uninstalled %s Helm Chart", nginxChartName)
-	}
-
-	c.spinner.UpdateText(fmt.Sprintf("Deleting Kubernetes namespace '%s'", airbyteNamespace))
-
-	if err := c.k8s.NamespaceDelete(ctx, airbyteNamespace); err != nil {
-		if !k8serrors.IsNotFound(err) {
-			pterm.Error.Printfln("Could not delete Kubernetes namespace '%s'", airbyteNamespace)
-			return fmt.Errorf("could not delete namespace: %w", err)
-		}
-	}
-
-	// there is no blocking delete namespace call, so poll until it's been deleted, or we've exhausted our time
-	namespaceDeleted := false
-	var wg sync.WaitGroup
-	ticker := time.NewTicker(1 * time.Second) // how ofter to check
-	timer := time.After(5 * time.Minute)      // how long to wait
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case <-ticker.C:
-				if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
-					namespaceDeleted = true
-					return
-				}
-			case <-timer:
-				ticker.Stop()
-				return
-			}
-		}
-	}()
-
-	wg.Wait()
-
-	if !namespaceDeleted {
-		pterm.Error.Printfln("Could not delete Kubernetes namespace '%s'", airbyteNamespace)
-		return errors.New("could not delete namespace")
-	}
-
-	pterm.Success.Printfln("Namespace '%s' deleted", airbyteNamespace)
 
 	return nil
 }
@@ -648,51 +658,6 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 	pterm.Success.Println("Launched web-browser successfully")
 
 	return nil
-}
-
-// ingress creates an ingress type for defining the webapp ingress rules.
-func ingress() *networkingv1.Ingress {
-	var pathType = networkingv1.PathType("Prefix")
-	var ingressClassName = "nginx"
-
-	return &networkingv1.Ingress{
-		TypeMeta: v1.TypeMeta{},
-		ObjectMeta: v1.ObjectMeta{
-			Name:      airbyteIngress,
-			Namespace: airbyteNamespace,
-			Annotations: map[string]string{
-				"nginx.ingress.kubernetes.io/auth-type":   "basic",
-				"nginx.ingress.kubernetes.io/auth-secret": "basic-auth",
-				"nginx.ingress.kubernetes.io/auth-realm":  "Authentication Required - Airbyte (abctl)",
-			},
-		},
-		Spec: networkingv1.IngressSpec{
-			IngressClassName: &ingressClassName,
-			Rules: []networkingv1.IngressRule{
-				{
-					Host: "localhost",
-					IngressRuleValue: networkingv1.IngressRuleValue{
-						HTTP: &networkingv1.HTTPIngressRuleValue{
-							Paths: []networkingv1.HTTPIngressPath{
-								{
-									Path:     "/",
-									PathType: &pathType,
-									Backend: networkingv1.IngressBackend{
-										Service: &networkingv1.IngressServiceBackend{
-											Name: fmt.Sprintf("%s-airbyte-webapp-svc", airbyteChartRelease),
-											Port: networkingv1.ServiceBackendPort{
-												Name: "http",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
 }
 
 // defaultK8s returns the default k8s client

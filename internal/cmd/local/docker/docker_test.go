@@ -5,9 +5,14 @@ import (
 	"errors"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/google/go-cmp/cmp"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"io"
 	"testing"
 )
 
@@ -313,13 +318,61 @@ func TestPort_Err(t *testing.T) {
 }
 
 // -- mocks
+var _ pinger = (*mockPinger)(nil)
+
 type mockPinger struct {
-	containerInspect func(ctx context.Context, containerID string) (types.ContainerJSON, error)
-	serverVersion    func(ctx context.Context) (types.Version, error)
-	ping             func(ctx context.Context) (types.Ping, error)
+	containerCreate   func(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
+	containerInspect  func(ctx context.Context, containerID string) (types.ContainerJSON, error)
+	containerRemove   func(ctx context.Context, container string, options container.RemoveOptions) error
+	containerStart    func(ctx context.Context, container string, options container.StartOptions) error
+	containerStop     func(ctx context.Context, container string, options container.StopOptions) error
+	copyFromContainer func(ctx context.Context, container, srcPath string) (io.ReadCloser, types.ContainerPathStat, error)
+
+	containerExecCreate  func(ctx context.Context, container string, config types.ExecConfig) (types.IDResponse, error)
+	containerExecInspect func(ctx context.Context, execID string) (types.ContainerExecInspect, error)
+	containerExecStart   func(ctx context.Context, execID string, config types.ExecStartCheck) error
+
+	serverVersion func(ctx context.Context) (types.Version, error)
+	volumeInspect func(ctx context.Context, volumeID string) (volume.Volume, error)
+
+	ping func(ctx context.Context) (types.Ping, error)
 }
 
-var _ pinger = (*mockPinger)(nil)
+func (m mockPinger) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error) {
+	return m.containerCreate(ctx, config, hostConfig, networkingConfig, platform, containerName)
+}
+
+func (m mockPinger) ContainerRemove(ctx context.Context, container string, options container.RemoveOptions) error {
+	return m.containerRemove(ctx, container, options)
+}
+
+func (m mockPinger) ContainerStart(ctx context.Context, container string, options container.StartOptions) error {
+	return m.containerStart(ctx, container, options)
+}
+
+func (m mockPinger) ContainerStop(ctx context.Context, container string, options container.StopOptions) error {
+	return m.containerStop(ctx, container, options)
+}
+
+func (m mockPinger) CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, types.ContainerPathStat, error) {
+	return m.copyFromContainer(ctx, container, srcPath)
+}
+
+func (m mockPinger) ContainerExecCreate(ctx context.Context, container string, config types.ExecConfig) (types.IDResponse, error) {
+	return m.containerExecCreate(ctx, container, config)
+}
+
+func (m mockPinger) ContainerExecInspect(ctx context.Context, execID string) (types.ContainerExecInspect, error) {
+	return m.containerExecInspect(ctx, execID)
+}
+
+func (m mockPinger) ContainerExecStart(ctx context.Context, execID string, config types.ExecStartCheck) error {
+	return m.containerExecStart(ctx, execID, config)
+}
+
+func (m mockPinger) VolumeInspect(ctx context.Context, volumeID string) (volume.Volume, error) {
+	return m.volumeInspect(ctx, volumeID)
+}
 
 func (m mockPinger) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
 	if m.containerInspect == nil {

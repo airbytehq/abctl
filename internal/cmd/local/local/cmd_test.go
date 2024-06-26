@@ -51,7 +51,9 @@ func TestCommand_Install(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         10 * time.Minute,
-				ValuesOptions:   values.Options{Values: []string{"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String()}},
+				ValuesOptions: values.Options{Values: []string{
+					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
+				}},
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
@@ -156,7 +158,7 @@ func TestCommand_Install(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := c.Install(context.Background(), "user", "pass", ""); err != nil {
+	if err := c.Install(context.Background(), InstallOpts{User: "user", Pass: "pass"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -293,7 +295,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := c.Install(context.Background(), "user", "pass", "testdata/values.yml"); err != nil {
+	if err := c.Install(context.Background(), InstallOpts{User: "user", Pass: "pass", ValuesFile: "testdata/values.yml"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -317,7 +319,7 @@ func TestCommand_Install_InvalidValuesFile(t *testing.T) {
 
 	valuesFile := "testdata/dne.yml"
 
-	err = c.Install(context.Background(), "user", "pass", valuesFile)
+	err = c.Install(context.Background(), InstallOpts{User: "user", Pass: "pass", ValuesFile: valuesFile})
 	if err == nil {
 		t.Fatal("expecting an error, received none")
 	}
@@ -363,40 +365,111 @@ func (m *mockHelmClient) UninstallReleaseByName(s string) error {
 var _ k8s.Client = (*mockK8sClient)(nil)
 
 type mockK8sClient struct {
-	ingressCreate        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
-	ingressExists        func(ctx context.Context, namespace string, ingress string) bool
-	ingressUpdate        func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
-	namespaceExists      func(ctx context.Context, namespace string) bool
-	namespaceDelete      func(ctx context.Context, namespace string) error
-	secretCreateOrUpdate func(ctx context.Context, namespace, name string, data map[string][]byte) error
-	serviceGet           func(ctx context.Context, namespace, name string) (*coreV1.Service, error)
-	serverVersionGet     func() (string, error)
-	eventsWatch          func(ctx context.Context, namespace string) (watch.Interface, error)
-	logsGet              func(ctx context.Context, namespace string, name string) (string, error)
+	ingressCreate               func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
+	ingressExists               func(ctx context.Context, namespace string, ingress string) bool
+	ingressUpdate               func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
+	namespaceCreate             func(ctx context.Context, namespace string) error
+	namespaceExists             func(ctx context.Context, namespace string) bool
+	namespaceDelete             func(ctx context.Context, namespace string) error
+	persistentVolumeCreate      func(ctx context.Context, namespace, name string) error
+	persistentVolumeExists      func(ctx context.Context, namespace, name string) bool
+	persistentVolumeDelete      func(ctx context.Context, namespace, name string) error
+	persistentVolumeClaimCreate func(ctx context.Context, namespace, name, volumeName string) error
+	persistentVolumeClaimExists func(ctx context.Context, namespace, name, volumeName string) bool
+	persistentVolumeClaimDelete func(ctx context.Context, namespace, name, volumeName string) error
+	secretCreateOrUpdate        func(ctx context.Context, namespace, name string, data map[string][]byte) error
+	serviceGet                  func(ctx context.Context, namespace, name string) (*coreV1.Service, error)
+	serverVersionGet            func() (string, error)
+	eventsWatch                 func(ctx context.Context, namespace string) (watch.Interface, error)
+	logsGet                     func(ctx context.Context, namespace string, name string) (string, error)
 }
 
 func (m *mockK8sClient) IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
-	return m.ingressCreate(ctx, namespace, ingress)
+	if m.ingressCreate != nil {
+		return m.ingressCreate(ctx, namespace, ingress)
+	}
+	return nil
 }
 
 func (m *mockK8sClient) IngressExists(ctx context.Context, namespace string, ingress string) bool {
-	return m.ingressExists(ctx, namespace, ingress)
+	if m.ingressExists != nil {
+		return m.ingressExists(ctx, namespace, ingress)
+	}
+	return true
 }
 
 func (m *mockK8sClient) IngressUpdate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
-	return m.ingressUpdate(ctx, namespace, ingress)
+	if m.ingressUpdate != nil {
+		return m.ingressUpdate(ctx, namespace, ingress)
+	}
+	return nil
+}
+
+func (m *mockK8sClient) NamespaceCreate(ctx context.Context, namespace string) error {
+	if m.namespaceCreate != nil {
+		return m.namespaceCreate(ctx, namespace)
+	}
+	return nil
 }
 
 func (m *mockK8sClient) NamespaceExists(ctx context.Context, namespace string) bool {
-	return m.namespaceExists(ctx, namespace)
+	if m.namespaceExists != nil {
+		return m.namespaceExists(ctx, namespace)
+	}
+	return true
 }
 
 func (m *mockK8sClient) NamespaceDelete(ctx context.Context, namespace string) error {
-	return m.namespaceDelete(ctx, namespace)
+	if m.namespaceDelete != nil {
+		return m.namespaceDelete(ctx, namespace)
+	}
+	return nil
+}
+
+func (m *mockK8sClient) PersistentVolumeCreate(ctx context.Context, namespace, name string) error {
+	if m.persistentVolumeCreate != nil {
+		return m.persistentVolumeCreate(ctx, namespace, name)
+	}
+	return nil
+}
+func (m *mockK8sClient) PersistentVolumeExists(ctx context.Context, namespace, name string) bool {
+	if m.persistentVolumeExists != nil {
+		return m.persistentVolumeExists(ctx, namespace, name)
+	}
+	return true
+}
+func (m *mockK8sClient) PersistentVolumeDelete(ctx context.Context, namespace, name string) error {
+	if m.persistentVolumeDelete != nil {
+		return m.persistentVolumeDelete(ctx, namespace, name)
+	}
+	return nil
+}
+
+func (m *mockK8sClient) PersistentVolumeClaimCreate(ctx context.Context, namespace, name, volumeName string) error {
+	if m.persistentVolumeClaimCreate != nil {
+		return m.persistentVolumeClaimCreate(ctx, namespace, name, volumeName)
+	}
+	return nil
+}
+func (m *mockK8sClient) PersistentVolumeClaimExists(ctx context.Context, namespace, name, volumeName string) bool {
+	if m.persistentVolumeClaimExists != nil {
+		return m.persistentVolumeClaimExists(ctx, namespace, name, volumeName)
+	}
+	return true
+}
+func (m *mockK8sClient) PersistentVolumeClaimDelete(ctx context.Context, namespace, name, volumeName string) error {
+	if m.persistentVolumeClaimDelete != nil {
+		return m.persistentVolumeClaimDelete(ctx, namespace, name, volumeName)
+	}
+	return nil
 }
 
 func (m *mockK8sClient) SecretCreateOrUpdate(ctx context.Context, namespace, name string, data map[string][]byte) error {
-	return m.secretCreateOrUpdate(ctx, namespace, name, data)
+	if m.secretCreateOrUpdate != nil {
+		return m.secretCreateOrUpdate(ctx, namespace, name, data)
+	}
+
+	return nil
 }
 
 func (m *mockK8sClient) ServiceGet(ctx context.Context, namespace, name string) (*coreV1.Service, error) {

@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"fmt"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"sigs.k8s.io/kind/pkg/cluster"
 	"time"
 )
@@ -42,10 +43,14 @@ nodes:
       nodeRegistration:
         kubeletExtraArgs:
           node-labels: "ingress-ready=true"
+    extraMounts:
+      - hostPath: %s
+        containerPath: /var/local-path-provisioner
     extraPortMappings:
       - containerPort: 80
         hostPort: %d
         protocol: TCP`,
+		paths.Data,
 		port)
 
 	opts := []cluster.CreateOption{

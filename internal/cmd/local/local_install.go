@@ -24,6 +24,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	var (
 		flagChartValuesFile string
 		flagChartVersion    string
+		flagMigrate         bool
 		flagUsername        string
 		flagPassword        string
 		flagPort            int
@@ -107,21 +108,34 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					local.WithPortHTTP(flagPort),
 					local.WithTelemetryClient(telClient),
 					local.WithSpinner(spinner),
-					local.WithHelmChartVersion(flagChartVersion),
 				)
 				if err != nil {
 					pterm.Error.Printfln("Failed to initialize 'local' command")
 					return fmt.Errorf("could not initialize local command: %w", err)
 				}
 
-				if env := os.Getenv(envBasicAuthUser); env != "" {
-					flagUsername = env
-				}
-				if env := os.Getenv(envBasicAuthPass); env != "" {
-					flagPassword = env
+				opts := local.InstallOpts{
+					User:             flagUsername,
+					Pass:             flagPassword,
+					HelmChartVersion: flagChartVersion,
+					ValuesFile:       flagChartValuesFile,
+					Migrate:          flagMigrate,
+					Docker:           dockerClient,
 				}
 
-				if err := lc.Install(cmd.Context(), flagUsername, flagPassword, flagChartValuesFile); err != nil {
+				if opts.HelmChartVersion == "latest" {
+					opts.HelmChartVersion = ""
+				}
+
+				if env := os.Getenv(envBasicAuthUser); env != "" {
+					opts.User = env
+				}
+
+				if env := os.Getenv(envBasicAuthPass); env != "" {
+					opts.Pass = env
+				}
+
+				if err := lc.Install(cmd.Context(), opts); err != nil {
 					spinner.Fail("Unable to install Airbyte locally")
 					return err
 				}
@@ -136,8 +150,9 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
 
-	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "the Airbyte helm chart version to install")
+	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
+	cmd.Flags().BoolVar(&flagMigrate, "migrate", false, "migrate data from docker compose installation")
 
 	return cmd
 }
