@@ -505,16 +505,21 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 }
 
 func (c *Command) handleDockerSecret(ctx context.Context, file, server, user, pass, email string) error {
-	data := ""
+	data := map[string][]byte{corev1.DockerConfigJsonKey: {}}
 	if file != "" {
 		raw, err := os.ReadFile(file)
 		if err != nil {
 			pterm.Error.Println(fmt.Sprintf("Unable to read docker-file '%s'", file))
 			return fmt.Errorf("unable to read docker-file '%s': %w", file, err)
 		}
-		data = string(raw)
+		data[corev1.DockerConfigJsonKey] = raw
 	} else {
-
+		secret, err := docker.Secret(server, user, pass, email)
+		if err != nil {
+			pterm.Error.Println("Unable to create docker secret")
+			return fmt.Errorf("unable to create docker secret: %w", err)
+		}
+		data[corev1.DockerConfigJsonKey] = secret
 	}
 
 	if err := c.k8s.SecretCreateOrUpdate(ctx, corev1.SecretTypeDockerConfigJson, airbyteNamespace, "docker-auth", data); err != nil {
