@@ -191,7 +191,6 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVar(&flagDockerPass, "docker-password", "", "docker password, can also be specified via "+envDockerPass)
 	cmd.Flags().StringVar(&flagDockerEmail, "docker-email", "", "docker email, can also be specified via "+envDockerEmail)
 
-	cmd.MarkFlagsMutuallyExclusive("docker-file", "docker-username")
 	cmd.MarkFlagsRequiredTogether("docker-username", "docker-password", "docker-email")
 
 	return cmd

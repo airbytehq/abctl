@@ -334,7 +334,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 			return fmt.Errorf("could not create '%s' secret: %w", dockerAuthSecretName, err)
 		}
 		pterm.Debug.Println(fmt.Sprintf("Created '%s' secret", dockerAuthSecretName))
-		airbyteValues = append(airbyteValues, fmt.Sprintf("global.imagePullSecrets=%s", dockerAuthSecretName))
+		airbyteValues = append(airbyteValues, fmt.Sprintf("global.imagePullSecrets[0].name=%s", dockerAuthSecretName))
 	}
 
 	if err := c.handleChart(ctx, chartRequest{
