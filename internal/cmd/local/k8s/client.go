@@ -50,7 +50,7 @@ type Client interface {
 	PersistentVolumeClaimDelete(ctx context.Context, namespace, name, volumeName string) error
 
 	// SecretCreateOrUpdate will update or create the secret name with the payload of data in the specified namespace
-	SecretCreateOrUpdate(ctx context.Context, namespace, name string, data map[string][]byte) error
+	SecretCreateOrUpdate(ctx context.Context, secretType corev1.SecretType, namespace, name string, data map[string][]byte) error
 
 	// ServiceGet returns a the service for the given namespace and name
 	ServiceGet(ctx context.Context, namespace, name string) (*corev1.Service, error)
@@ -175,7 +175,7 @@ func (d *DefaultK8sClient) PersistentVolumeClaimDelete(ctx context.Context, name
 	return d.ClientSet.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 }
 
-func (d *DefaultK8sClient) SecretCreateOrUpdate(ctx context.Context, namespace, name string, data map[string][]byte) error {
+func (d *DefaultK8sClient) SecretCreateOrUpdate(ctx context.Context, secretType corev1.SecretType, namespace, name string, data map[string][]byte) error {
 	secret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
@@ -183,6 +183,7 @@ func (d *DefaultK8sClient) SecretCreateOrUpdate(ctx context.Context, namespace, 
 			Name:      name,
 		},
 		Data: data,
+		Type: secretType,
 	}
 	_, err := d.ClientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err == nil {

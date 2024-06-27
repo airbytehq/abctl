@@ -121,7 +121,7 @@ func TestCommand_Install(t *testing.T) {
 		serverVersionGet: func() (string, error) {
 			return "test", nil
 		},
-		secretCreateOrUpdate: func(ctx context.Context, namespace, name string, data map[string][]byte) error {
+		secretCreateOrUpdate: func(ctx context.Context, secretType coreV1.SecretType, namespace, name string, data map[string][]byte) error {
 			return nil
 		},
 		ingressExists: func(ctx context.Context, namespace string, ingress string) bool {
@@ -158,7 +158,7 @@ func TestCommand_Install(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := c.Install(context.Background(), InstallOpts{User: "user", Pass: "pass"}); err != nil {
+	if err := c.Install(context.Background(), InstallOpts{BasicAuthUser: "user", BasicAuthPass: "pass"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -258,7 +258,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		serverVersionGet: func() (string, error) {
 			return "test", nil
 		},
-		secretCreateOrUpdate: func(ctx context.Context, namespace, name string, data map[string][]byte) error {
+		secretCreateOrUpdate: func(ctx context.Context, secretType coreV1.SecretType, namespace, name string, data map[string][]byte) error {
 			return nil
 		},
 		ingressExists: func(ctx context.Context, namespace string, ingress string) bool {
@@ -295,7 +295,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := c.Install(context.Background(), InstallOpts{User: "user", Pass: "pass", ValuesFile: "testdata/values.yml"}); err != nil {
+	if err := c.Install(context.Background(), InstallOpts{BasicAuthUser: "user", BasicAuthPass: "pass", ValuesFile: "testdata/values.yml"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -319,7 +319,7 @@ func TestCommand_Install_InvalidValuesFile(t *testing.T) {
 
 	valuesFile := "testdata/dne.yml"
 
-	err = c.Install(context.Background(), InstallOpts{User: "user", Pass: "pass", ValuesFile: valuesFile})
+	err = c.Install(context.Background(), InstallOpts{BasicAuthUser: "user", BasicAuthPass: "pass", ValuesFile: valuesFile})
 	if err == nil {
 		t.Fatal("expecting an error, received none")
 	}
@@ -377,7 +377,7 @@ type mockK8sClient struct {
 	persistentVolumeClaimCreate func(ctx context.Context, namespace, name, volumeName string) error
 	persistentVolumeClaimExists func(ctx context.Context, namespace, name, volumeName string) bool
 	persistentVolumeClaimDelete func(ctx context.Context, namespace, name, volumeName string) error
-	secretCreateOrUpdate        func(ctx context.Context, namespace, name string, data map[string][]byte) error
+	secretCreateOrUpdate        func(ctx context.Context, secretType coreV1.SecretType, namespace, name string, data map[string][]byte) error
 	serviceGet                  func(ctx context.Context, namespace, name string) (*coreV1.Service, error)
 	serverVersionGet            func() (string, error)
 	eventsWatch                 func(ctx context.Context, namespace string) (watch.Interface, error)
@@ -464,9 +464,9 @@ func (m *mockK8sClient) PersistentVolumeClaimDelete(ctx context.Context, namespa
 	return nil
 }
 
-func (m *mockK8sClient) SecretCreateOrUpdate(ctx context.Context, namespace, name string, data map[string][]byte) error {
+func (m *mockK8sClient) SecretCreateOrUpdate(ctx context.Context, secretType coreV1.SecretType, namespace, name string, data map[string][]byte) error {
 	if m.secretCreateOrUpdate != nil {
-		return m.secretCreateOrUpdate(ctx, namespace, name, data)
+		return m.secretCreateOrUpdate(ctx, secretType, namespace, name, data)
 	}
 
 	return nil
