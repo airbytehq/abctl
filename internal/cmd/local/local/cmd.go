@@ -746,7 +746,7 @@ func defaultHelm(kubecfg, kubectx string) (HelmClient, error) {
 	return helm, nil
 }
 
-// k8sClientConfig returns a k8s client config using the ~/.kubc/config file and the k8sContext context.
+// k8sClientConfig returns a k8s client config using the ~/.kube/config file and the k8sContext context.
 func k8sClientConfig(kubecfg, kubectx string) (clientcmd.ClientConfig, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
