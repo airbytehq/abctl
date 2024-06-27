@@ -49,6 +49,9 @@ const (
 // Port is the default port that Airbyte will deploy to.
 const Port = 8000
 
+// dockerAuthSecretName is the name of the secret which holds the docker authentication information.
+const dockerAuthSecretName = "docker-auth"
+
 // HelmClient primarily for testing purposes
 type HelmClient interface {
 	AddOrUpdateChartRepo(entry repo.Entry) error
@@ -218,11 +221,14 @@ type InstallOpts struct {
 
 	Docker *docker.Docker
 
-	DockerFile   string
 	DockerServer string
 	DockerUser   string
 	DockerPass   string
 	DockerEmail  string
+}
+
+func (i *InstallOpts) dockerAuth() bool {
+	return i.DockerUser != "" && i.DockerPass != ""
 }
 
 const (
@@ -317,6 +323,20 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		telUser = c.tel.User().String()
 	}
 
+	airbyteValues := []string{
+		fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser),
+	}
+
+	if opts.dockerAuth() {
+		pterm.Debug.Println(fmt.Sprintf("Creating '%s' secret", dockerAuthSecretName))
+		if err := c.handleDockerSecret(ctx, opts.DockerServer, opts.DockerUser, opts.DockerPass, opts.DockerEmail); err != nil {
+			pterm.Debug.Println(fmt.Sprintf("Could not create '%s' secret", dockerAuthSecretName))
+			return fmt.Errorf("could not create '%s' secret: %w", dockerAuthSecretName, err)
+		}
+		pterm.Debug.Println(fmt.Sprintf("Created '%s' secret", dockerAuthSecretName))
+		airbyteValues = append(airbyteValues, fmt.Sprintf("global.imagePullSecrets=%s", dockerAuthSecretName))
+	}
+
 	if err := c.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     airbyteRepoName,
@@ -325,10 +345,8 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		chartRelease: airbyteChartRelease,
 		chartVersion: opts.HelmChartVersion,
 		namespace:    airbyteNamespace,
-		values: []string{
-			fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser),
-		},
-		valuesYAML: values,
+		values:       airbyteValues,
+		valuesYAML:   values,
 	}); err != nil {
 		return fmt.Errorf("could not install airbyte chart: %w", err)
 	}
@@ -504,25 +522,16 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 	return nil
 }
 
-func (c *Command) handleDockerSecret(ctx context.Context, file, server, user, pass, email string) error {
-	data := map[string][]byte{corev1.DockerConfigJsonKey: {}}
-	if file != "" {
-		raw, err := os.ReadFile(file)
-		if err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to read docker-file '%s'", file))
-			return fmt.Errorf("unable to read docker-file '%s': %w", file, err)
-		}
-		data[corev1.DockerConfigJsonKey] = raw
-	} else {
-		secret, err := docker.Secret(server, user, pass, email)
-		if err != nil {
-			pterm.Error.Println("Unable to create docker secret")
-			return fmt.Errorf("unable to create docker secret: %w", err)
-		}
-		data[corev1.DockerConfigJsonKey] = secret
+func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
+	data := map[string][]byte{}
+	secret, err := docker.Secret(server, user, pass, email)
+	if err != nil {
+		pterm.Error.Println("Unable to create docker secret")
+		return fmt.Errorf("unable to create docker secret: %w", err)
 	}
+	data[corev1.DockerConfigJsonKey] = secret
 
-	if err := c.k8s.SecretCreateOrUpdate(ctx, corev1.SecretTypeDockerConfigJson, airbyteNamespace, "docker-auth", data); err != nil {
+	if err := c.k8s.SecretCreateOrUpdate(ctx, corev1.SecretTypeDockerConfigJson, airbyteNamespace, dockerAuthSecretName, data); err != nil {
 		pterm.Error.Println("Could not create Docker-auth secret")
 		return fmt.Errorf("unable to create docker-auth secret: %w", err)
 	}

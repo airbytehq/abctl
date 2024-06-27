@@ -39,7 +39,6 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		flagMigrate         bool
 		flagPort            int
 
-		flagDockerFile   string
 		flagDockerServer string
 		flagDockerUser   string
 		flagDockerPass   string
@@ -138,7 +137,6 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					Migrate:          flagMigrate,
 					Docker:           dockerClient,
 
-					DockerFile:   flagDockerFile,
 					DockerServer: flagDockerServer,
 					DockerUser:   flagDockerUser,
 					DockerPass:   flagDockerPass,
@@ -148,12 +146,14 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 				if opts.HelmChartVersion == "latest" {
 					opts.HelmChartVersion = ""
 				}
+
 				if env := os.Getenv(envBasicAuthUser); env != "" {
 					opts.BasicAuthUser = env
 				}
 				if env := os.Getenv(envBasicAuthPass); env != "" {
 					opts.BasicAuthPass = env
 				}
+
 				if env := os.Getenv(envDockerServer); env != "" {
 					opts.DockerServer = env
 				}
@@ -186,7 +186,6 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
 	cmd.Flags().BoolVar(&flagMigrate, "migrate", false, "migrate data from docker compose installation")
 
-	cmd.Flags().StringVar(&flagDockerFile, "docker-file", "", "docker login credentials file")
 	cmd.Flags().StringVar(&flagDockerServer, "docker-server", "https://index.docker.io/v1/", "docker registry, can also be specified via "+envDockerServer)
 	cmd.Flags().StringVar(&flagDockerUser, "docker-username", "", "docker username, can also be specified via "+envDockerEmail)
 	cmd.Flags().StringVar(&flagDockerPass, "docker-password", "", "docker password, can also be specified via "+envDockerPass)
