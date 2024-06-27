@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	corev1 "k8s.io/api/core/v1"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -208,12 +209,20 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 }
 
 type InstallOpts struct {
-	User             string
-	Pass             string
+	BasicAuthUser string
+	BasicAuthPass string
+
 	HelmChartVersion string
 	ValuesFile       string
 	Migrate          bool
-	Docker           *docker.Docker
+
+	Docker *docker.Docker
+
+	DockerFile   string
+	DockerServer string
+	DockerUser   string
+	DockerPass   string
+	DockerEmail  string
 }
 
 const (
@@ -283,7 +292,6 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	if err := c.persistentVolume(ctx, airbyteNamespace, pvMinio); err != nil {
 		return err
 	}
-
 	if err := c.persistentVolume(ctx, airbyteNamespace, pvPsql); err != nil {
 		return err
 	}
@@ -357,7 +365,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 
 	c.spinner.UpdateText("Configuring Basic-Auth")
 	// basic auth
-	if err := c.handleBasicAuthSecret(ctx, opts.User, opts.Pass); err != nil {
+	if err := c.handleBasicAuthSecret(ctx, opts.BasicAuthUser, opts.BasicAuthPass); err != nil {
 		return fmt.Errorf("could not create or update basic-auth secret: %w", err)
 	}
 
@@ -488,10 +496,32 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 	}
 
 	data := map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))}
-	if err := c.k8s.SecretCreateOrUpdate(ctx, airbyteNamespace, "basic-auth", data); err != nil {
+	if err := c.k8s.SecretCreateOrUpdate(ctx, corev1.SecretTypeOpaque, airbyteNamespace, "basic-auth", data); err != nil {
 		pterm.Error.Println("Could not create Basic-Auth secret")
+		return fmt.Errorf("could not create Basic-Auth secret: %w", err)
 	}
 	pterm.Success.Println("Basic-Auth secret created")
+	return nil
+}
+
+func (c *Command) handleDockerSecret(ctx context.Context, file, server, user, pass, email string) error {
+	data := ""
+	if file != "" {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to read docker-file '%s'", file))
+			return fmt.Errorf("unable to read docker-file '%s': %w", file, err)
+		}
+		data = string(raw)
+	} else {
+
+	}
+
+	if err := c.k8s.SecretCreateOrUpdate(ctx, corev1.SecretTypeDockerConfigJson, airbyteNamespace, "docker-auth", data); err != nil {
+		pterm.Error.Println("Could not create Docker-auth secret")
+		return fmt.Errorf("unable to create docker-auth secret: %w", err)
+	}
+	pterm.Success.Println("Docker-auth secret created")
 	return nil
 }
 

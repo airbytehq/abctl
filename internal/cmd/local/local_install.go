@@ -16,18 +16,34 @@ const (
 	envBasicAuthUser = "ABCTL_LOCAL_INSTALL_USERNAME"
 	// envBasicAuthPass is the env-var that can be specified to override the default basic-auth password.
 	envBasicAuthPass = "ABCTL_LOCAL_INSTALL_PASSWORD"
+
+	// envDockerServer is the env-var that can be specified to override the default docker registry.
+	envDockerServer = "ABCTL_LOCAL_INSTALL_DOCKER_SERVER"
+	// envDockerUser is the env-var that can be specified to override the default docker username.
+	envDockerUser = "ABCTL_LOCAL_INSTALL_DOCKER_USERNAME"
+	// envDockerPass is the env-var that can be specified to override the default docker password.
+	envDockerPass = "ABCTL_LOCAL_INSTALL_DOCKER_PASSWORD"
+	// envDockerEmail is the env-var that can be specified to override the default docker email.
+	envDockerEmail = "ABCTL_LOCAL_INSTALL_DOCKER_EMAIL"
 )
 
 func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
 	var (
+		flagBasicAuthUser string
+		flagBasicAuthPass string
+
 		flagChartValuesFile string
 		flagChartVersion    string
 		flagMigrate         bool
-		flagUsername        string
-		flagPassword        string
 		flagPort            int
+
+		flagDockerFile   string
+		flagDockerServer string
+		flagDockerUser   string
+		flagDockerPass   string
+		flagDockerEmail  string
 	)
 
 	cmd := &cobra.Command{
@@ -115,24 +131,40 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 				}
 
 				opts := local.InstallOpts{
-					User:             flagUsername,
-					Pass:             flagPassword,
+					BasicAuthUser:    flagBasicAuthUser,
+					BasicAuthPass:    flagBasicAuthPass,
 					HelmChartVersion: flagChartVersion,
 					ValuesFile:       flagChartValuesFile,
 					Migrate:          flagMigrate,
 					Docker:           dockerClient,
+
+					DockerFile:   flagDockerFile,
+					DockerServer: flagDockerServer,
+					DockerUser:   flagDockerUser,
+					DockerPass:   flagDockerPass,
+					DockerEmail:  flagDockerEmail,
 				}
 
 				if opts.HelmChartVersion == "latest" {
 					opts.HelmChartVersion = ""
 				}
-
 				if env := os.Getenv(envBasicAuthUser); env != "" {
-					opts.User = env
+					opts.BasicAuthUser = env
 				}
-
 				if env := os.Getenv(envBasicAuthPass); env != "" {
-					opts.Pass = env
+					opts.BasicAuthPass = env
+				}
+				if env := os.Getenv(envDockerServer); env != "" {
+					opts.DockerServer = env
+				}
+				if env := os.Getenv(envDockerUser); env != "" {
+					opts.DockerUser = env
+				}
+				if env := os.Getenv(envDockerPass); env != "" {
+					opts.DockerPass = env
+				}
+				if env := os.Getenv(envDockerEmail); env != "" {
+					opts.DockerEmail = env
 				}
 
 				if err := lc.Install(cmd.Context(), opts); err != nil {
@@ -146,13 +178,22 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&flagUsername, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
-	cmd.Flags().StringVarP(&flagPassword, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
+	cmd.Flags().StringVarP(&flagBasicAuthUser, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
+	cmd.Flags().StringVarP(&flagBasicAuthPass, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
 	cmd.Flags().BoolVar(&flagMigrate, "migrate", false, "migrate data from docker compose installation")
+
+	cmd.Flags().StringVar(&flagDockerFile, "docker-file", "", "docker login credentials file")
+	cmd.Flags().StringVar(&flagDockerServer, "docker-server", "https://index.docker.io/v1/", "docker registry, can also be specified via "+envDockerServer)
+	cmd.Flags().StringVar(&flagDockerUser, "docker-username", "", "docker username, can also be specified via "+envDockerEmail)
+	cmd.Flags().StringVar(&flagDockerPass, "docker-password", "", "docker password, can also be specified via "+envDockerPass)
+	cmd.Flags().StringVar(&flagDockerEmail, "docker-email", "", "docker email, can also be specified via "+envDockerEmail)
+
+	cmd.MarkFlagsMutuallyExclusive("docker-file", "docker-username")
+	cmd.MarkFlagsRequiredTogether("docker-username", "docker-password", "docker-email")
 
 	return cmd
 }
