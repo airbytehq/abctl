@@ -535,7 +535,7 @@ func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, em
 		pterm.Error.Println("Could not create Docker-auth secret")
 		return fmt.Errorf("unable to create docker-auth secret: %w", err)
 	}
-	pterm.Success.Println("Docker-auth secret created")
+	pterm.Success.Println("Docker-Auth secret created")
 	return nil
 }
 
