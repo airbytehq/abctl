@@ -244,6 +244,18 @@ const (
 func (c *Command) persistentVolume(ctx context.Context, namespace, name string) error {
 	if !c.k8s.PersistentVolumeExists(ctx, namespace, name) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume '%s'", name))
+
+		// Pre-create the volume directory with 0755 permissions.  K8s, when using HostPathDirectoryOrCreate will
+		// create the directory (if it doesn't exist) with 0755 permissions which causes issues when docker
+		// is running as root and our pods are not.
+		path := filepath.Join(paths.Data, name)
+		const perms = 0755
+		pterm.Debug.Println(fmt.Sprintf("Creating directory '%s' with %d permissions", path, perms))
+		if err := os.MkdirAll(path, perms); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Could not create directory '%s'", name))
+			return fmt.Errorf("could not create persistent volume '%s': %w", name, err)
+		}
+
 		if err := c.k8s.PersistentVolumeCreate(ctx, namespace, name); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume '%s'", name))
 			return fmt.Errorf("could not create persistent volume '%s': %w", name, err)
