@@ -326,7 +326,11 @@ func (d *Docker) ensureImage(ctx context.Context, img string) error {
 		pterm.Error.Println(fmt.Sprintf("Could not pull the docker image '%s'", img))
 		return fmt.Errorf("could not pull image '%s': %w", img, err)
 	}
-	_ = reader.Close()
+	pterm.Debug.Println(fmt.Sprintf("Successfully pulled the docker image '%s'", img))
+	defer reader.Close()
+	if _, err := io.Copy(io.Discard, reader); err != nil {
+		return fmt.Errorf("error fetching output: %w", err)
+	}
 
 	return nil
 }
