@@ -241,17 +241,29 @@ const (
 	pvcPsql  = "airbyte-volume-db-airbyte-db-0"
 )
 
+// persistentVolume creates a persistent volume in the namespace with the name provided.
+// if uid (user id) and gid (group id) are non-zero, the persistent directory on the host machine that holds the
+// persistent volume will be changed to be owned by
 func (c *Command) persistentVolume(ctx context.Context, namespace, name string) error {
 	if !c.k8s.PersistentVolumeExists(ctx, namespace, name) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume '%s'", name))
 
-		// Pre-create the volume directory with 0755 permissions.  K8s, when using HostPathDirectoryOrCreate will
-		// create the directory (if it doesn't exist) with 0755 permissions which causes issues when docker
-		// is running as root and our pods are not.
+		// Pre-create the volume directory.
+		//
+		// K8s, when using HostPathDirectoryOrCreate will create the directory (if it doesn't exist)
+		// with 0755 permissions _but_ it will be owned by the user under which the docker daemon is running,
+		// not the user that is running this code.
+		//
+		// This causes issues if the docker daemon is running as root but this code is not (the expectation is
+		// that this code should not need to run as root), as the non-root user will not have write permissions to
+		// k8s created directory (again 0755 permissions).
+		//
+		// By pre-creating the volume directory we can ensure that the owner of that directory will be the
+		// user that is running this code and not the user that is running the docker daemon.
 		path := filepath.Join(paths.Data, name)
-		const perms = 0755
-		pterm.Debug.Println(fmt.Sprintf("Creating directory '%s' with %d permissions", path, perms))
-		if err := os.MkdirAll(path, perms); err != nil {
+
+		pterm.Debug.Println(fmt.Sprintf("Creating directory '%s'", path))
+		if err := os.MkdirAll(path, 0755); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Could not create directory '%s'", name))
 			return fmt.Errorf("could not create persistent volume '%s': %w", name, err)
 		}
@@ -260,6 +272,24 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume '%s'", name))
 			return fmt.Errorf("could not create persistent volume '%s': %w", name, err)
 		}
+
+		// Update the permissions of the volume directory to be globally writable (0777).
+		//
+		// This is necessary to ensure that the postgres image can actually write to the volume directory
+		// that it is assigned, as the postgres image creates its own user (postgres:postgres) with
+		// uid/gid of 70:70.  If this uid/gid doesn't exist on the host machine, then the postgres image
+		// will not be able to write to the volume directory unless that directory is publicly writable.
+		//
+		// Why not set the permissions to 0777 when this directory was created earlier in this method?
+		// Because it is likely that the host has a umask defined that would override this 0777 to 0775 or 0755.
+		// Due to the postgres uid/gid issue mentioned above, 0775 or 0755 would not allow the postgres image
+		// access to the persisted volume directory.
+		pterm.Debug.Println(fmt.Sprintf("Updating permissions for '%s'", path))
+		if err := os.Chmod(path, 0777); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Could not set permissions for '%s'", path))
+			return fmt.Errorf("could not set permissions for '%s': %w", path, err)
+		}
+
 		pterm.Info.Println(fmt.Sprintf("Persistent volume '%s' created", name))
 	} else {
 		pterm.Info.Printfln("Persistent volume '%s' already exists", name)
