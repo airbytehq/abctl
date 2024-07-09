@@ -8,6 +8,8 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
@@ -46,6 +48,9 @@ type Client interface {
 	ContainerExecCreate(ctx context.Context, container string, config types.ExecConfig) (types.IDResponse, error)
 	ContainerExecInspect(ctx context.Context, execID string) (types.ContainerExecInspect, error)
 	ContainerExecStart(ctx context.Context, execID string, config types.ExecStartCheck) error
+
+	ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error)
+	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
 
 	ServerVersion(ctx context.Context) (types.Version, error)
 	VolumeInspect(ctx context.Context, volumeID string) (volume.Volume, error)
@@ -176,7 +181,11 @@ func (d *Docker) Port(ctx context.Context, container string) (int, error) {
 	return 0, errors.New("could not determine port for container")
 }
 
-const migratePGDATA = "/var/lib/postgresql/data"
+const (
+	migratePGDATA = "/var/lib/postgresql/data"
+	imgAlpine     = "alpine:3.20"
+	imgPostgres   = "postgres:13-alpine"
+)
 
 // MigrateComposeDB handles migrating the existing docker compose database into the abctl managed k8s cluster.
 // TODO: move this method out of the the docker class?
@@ -185,12 +194,19 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 		return errors.New(fmt.Sprintf("volume %s does not exist", volume))
 	}
 
+	if err := d.ensureImage(ctx, imgAlpine); err != nil {
+		return err
+	}
+	if err := d.ensureImage(ctx, imgPostgres); err != nil {
+		return err
+	}
+
 	// create a container for running the `docker cp` command
 	// docker run -d -v airbyte_db:/var/lib/postgresql/data alpine:3.20 tail -f /dev/null
 	conCopy, err := d.Client.ContainerCreate(
 		ctx,
 		&container.Config{
-			Image:      "alpine:3.20",
+			Image:      imgAlpine,
 			Entrypoint: []string{"tail", "-f", "/dev/null"},
 		},
 		&container.HostConfig{
@@ -227,7 +243,7 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 	conTransform, err := d.Client.ContainerCreate(
 		ctx,
 		&container.Config{
-			Image: "postgres:13-alpine",
+			Image: imgPostgres,
 			Env: []string{
 				"POSTGRES_USER=docker",
 				"POSTGRES_PASSWORD=docker",
@@ -282,6 +298,39 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 		return fmt.Errorf("could not rename postgres database: %w", err)
 	}
 	pterm.Debug.Println(fmt.Sprintf("Renaming database completed in %s", time.Since(now)))
+
+	return nil
+}
+
+func (d *Docker) ensureImage(ctx context.Context, img string) error {
+	// check if an image already exists on the host
+	pterm.Debug.Println(fmt.Sprintf("Checking if the image '%s' already exists", img))
+	filter := filters.NewArgs()
+	filter.Add("reference", img)
+	imgs, err := d.Client.ImageList(ctx, image.ListOptions{Filters: filter})
+	if err != nil {
+		pterm.Error.Println(fmt.Sprintf("Could not list docker images when checking for '%s'", img))
+		return fmt.Errorf("could not list image '%s': %w", img, err)
+	}
+
+	// if it does exist, there is nothing else to do
+	if len(imgs) > 0 {
+		pterm.Debug.Println(fmt.Sprintf("Image '%s' already exists", img))
+		return nil
+	}
+
+	pterm.Debug.Println(fmt.Sprintf("Image '%s' not found, pulling it", img))
+	// if we're here, then we need to pull the image
+	reader, err := d.Client.ImagePull(ctx, img, image.PullOptions{})
+	if err != nil {
+		pterm.Error.Println(fmt.Sprintf("Could not pull the docker image '%s'", img))
+		return fmt.Errorf("could not pull image '%s': %w", img, err)
+	}
+	pterm.Debug.Println(fmt.Sprintf("Successfully pulled the docker image '%s'", img))
+	defer reader.Close()
+	if _, err := io.Copy(io.Discard, reader); err != nil {
+		return fmt.Errorf("error fetching output: %w", err)
+	}
 
 	return nil
 }

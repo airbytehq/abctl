@@ -6,6 +6,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -332,6 +334,9 @@ type mockPinger struct {
 	containerExecInspect func(ctx context.Context, execID string) (types.ContainerExecInspect, error)
 	containerExecStart   func(ctx context.Context, execID string, config types.ExecStartCheck) error
 
+	imageList func(ctx context.Context, options image.ListOptions) ([]image.Summary, error)
+	imagePull func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
+
 	serverVersion func(ctx context.Context) (types.Version, error)
 	volumeInspect func(ctx context.Context, volumeID string) (volume.Volume, error)
 
@@ -368,6 +373,22 @@ func (m mockPinger) ContainerExecInspect(ctx context.Context, execID string) (ty
 
 func (m mockPinger) ContainerExecStart(ctx context.Context, execID string, config types.ExecStartCheck) error {
 	return m.containerExecStart(ctx, execID, config)
+}
+
+func (m mockPinger) ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error) {
+	// by default return a list with one (empty) item in it
+	if m.imageList == nil {
+		return []image.Summary{{}}, nil
+	}
+	return m.imageList(ctx, options)
+}
+
+func (m mockPinger) ImagePull(ctx context.Context, img string, options image.PullOptions) (io.ReadCloser, error) {
+	// by default return a nop closer (with an empty string)
+	if m.imagePull == nil {
+		return io.NopCloser(strings.NewReader("")), nil
+	}
+	return m.imagePull(ctx, img, options)
 }
 
 func (m mockPinger) VolumeInspect(ctx context.Context, volumeID string) (volume.Volume, error) {
