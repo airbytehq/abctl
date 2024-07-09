@@ -53,6 +53,8 @@ func TestCommand_Install(t *testing.T) {
 				Timeout:         10 * time.Minute,
 				ValuesOptions: values.Options{Values: []string{
 					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
+					"global.jobs.resources.limits.cpu=3",
+					"global.jobs.resources.limits.memory=4Gi",
 				}},
 			},
 			release: release.Release{
@@ -189,8 +191,12 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         10 * time.Minute,
-				ValuesOptions:   values.Options{Values: []string{"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String()}},
-				ValuesYaml:      "global:\n  edition: \"test\"\n",
+				ValuesOptions: values.Options{Values: []string{
+					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
+					"global.jobs.resources.limits.cpu=3",
+					"global.jobs.resources.limits.memory=4Gi",
+				}},
+				ValuesYaml: "global:\n  edition: \"test\"\n",
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
