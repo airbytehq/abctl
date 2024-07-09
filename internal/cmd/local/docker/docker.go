@@ -19,7 +19,6 @@ import (
 	"github.com/pterm/pterm"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -226,6 +225,15 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 
 	// docker cp [conCopy.ID]]:/$migratePGDATA/. ~/.airbyte/abctl/data/airbyte-volume-db/pgdata
 	dst := filepath.Join(paths.Data, "airbyte-volume-db", "pgdata")
+	// ensure dst directory exists
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return fmt.Errorf("could not create directory '%s': %w", dst, err)
+	}
+	// ensure the permissions are correct
+	if err := os.Chmod(dst, 0777); err != nil {
+		return fmt.Errorf("could not chmod directory '%s': %w", dst, err)
+	}
+
 	// note the src must end with a `.`, due to how docker cp works with directories
 	if err := d.copyFromContainer(ctx, conCopy.ID, migratePGDATA+"/.", dst); err != nil {
 		return fmt.Errorf("could not copy airbyte db data from container %s: %w", conCopy.ID, err)
@@ -390,11 +398,6 @@ func (d *Docker) exec(ctx context.Context, container string, cmd []string) error
 // copyFromContainer emulates the `docker cp` command.
 // The dst will be treated as a directory.
 func (d *Docker) copyFromContainer(ctx context.Context, container, src, dst string) error {
-	// ensure dst directory exists
-	if err := os.MkdirAll(path.Dir(dst), 0755); err != nil {
-		return fmt.Errorf("could not create directory '%s': %w", dst, err)
-	}
-
 	reader, stat, err := d.Client.CopyFromContainer(ctx, container, src)
 	if err != nil {
 		return fmt.Errorf("could not copy from container '%s': %w", container, err)
