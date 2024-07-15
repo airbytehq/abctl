@@ -2,14 +2,10 @@ package k8s
 
 import (
 	"fmt"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"os"
 	"path/filepath"
 	"sigs.k8s.io/kind/pkg/cluster"
-)
-
-const (
-	Kind = "kind"
-	Test = "test"
 )
 
 // Provider represents a k8s provider.
@@ -26,35 +22,23 @@ type Provider struct {
 	HelmNginx []string
 }
 
-// mkDirs creates the directories for this providers kubeconfig.
-// The kubeconfigs are always scoped to the user's home directory.
-func (p Provider) mkDirs(userHome string) error {
-	const permissions = 0700
-	kubeconfig := filepath.Join(userHome, p.Kubeconfig)
-	if err := os.MkdirAll(filepath.Dir(kubeconfig), permissions); err != nil {
-		return fmt.Errorf("could not create directory %s: %v", kubeconfig, err)
-	}
-
-	return nil
-}
-
 // Cluster returns a kubernetes cluster for this provider.
 func (p Provider) Cluster() (Cluster, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("could not determine user home directory: %w", err)
-	}
-
-	if err := p.mkDirs(home); err != nil {
-		return nil, fmt.Errorf("could not create directory %s: %w", home, err)
+	if err := os.MkdirAll(filepath.Dir(p.Kubeconfig), 766); err != nil {
+		return nil, fmt.Errorf("could not create directory %s: %v", p.Kubeconfig, err)
 	}
 
 	return &kindCluster{
 		p:           cluster.NewProvider(),
-		kubeconfig:  filepath.Join(home, p.Kubeconfig),
+		kubeconfig:  p.Kubeconfig,
 		clusterName: p.ClusterName,
 	}, nil
 }
+
+const (
+	Kind = "kind"
+	Test = "test"
+)
 
 var (
 	// DefaultProvider represents the kind (https://kind.sigs.k8s.io/) provider.
@@ -62,7 +46,7 @@ var (
 		Name:        Kind,
 		ClusterName: "airbyte-abctl",
 		Context:     "kind-airbyte-abctl",
-		Kubeconfig:  filepath.Join(".airbyte", "abctl", "abctl.kubeconfig"),
+		Kubeconfig:  paths.Kubeconfig,
 		HelmNginx: []string{
 			"controller.hostPort.enabled=true",
 			"controller.service.httpsPort.enable=false",
@@ -73,9 +57,9 @@ var (
 	// TestProvider represents a test provider, for testing purposes
 	TestProvider = Provider{
 		Name:        Test,
-		ClusterName: "test",
-		Context:     "test-abctl",
-		Kubeconfig:  filepath.Join(os.TempDir(), "abctl.kubeconfig"),
+		ClusterName: "test-airbyte-abctl",
+		Context:     "test-airbyte-abctl",
+		Kubeconfig:  filepath.Join(os.TempDir(), "abctl", paths.FileKubeconfig),
 		HelmNginx:   []string{},
 	}
 )
