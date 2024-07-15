@@ -137,18 +137,24 @@ func loadConfigFromFile(path string) (Config, error) {
 		return Config{}, fmt.Errorf("could not unmarshal yaml: %w", err)
 	}
 	if v, ok := c.Other[fieldUserID]; ok {
-		if parsed, err := ulid.Parse(v.(string)); err != nil {
-			return Config{}, fmt.Errorf("could not parse ulid (%s): %w", v, err)
-		} else {
-			c.UserID = ULID(parsed)
+		// the field can exist with a nil value, verify the value is a string before using it as a string
+		if s, ok := v.(string); ok {
+			if parsed, err := ulid.Parse(s); err != nil {
+				return Config{}, fmt.Errorf("could not parse ulid (%s): %w", v, err)
+			} else {
+				c.UserID = ULID(parsed)
+			}
 		}
 	}
 
 	if v, ok := c.Other[fieldAnalyticsID]; ok {
-		if parsed, err := uuid.Parse(v.(string)); err != nil {
-			return Config{}, fmt.Errorf("could not parse uuid (%s): %w", v, err)
-		} else {
-			c.AnalyticsID = UUID(parsed)
+		// the field can exist with a nil value, verify the value is a string before using it as a string
+		if s, ok := v.(string); ok {
+			if parsed, err := uuid.Parse(s); err != nil {
+				return Config{}, fmt.Errorf("could not parse uuid (%s): %w", v, err)
+			} else {
+				c.AnalyticsID = UUID(parsed)
+			}
 		}
 	}
 
