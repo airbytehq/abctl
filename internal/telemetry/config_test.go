@@ -198,6 +198,65 @@ total: 300`,
 	})
 }
 
+func TestLoadConfigWithNilFields(t *testing.T) {
+	t.Run("nil anonymous_user_id", func(t *testing.T) {
+		f, err := os.CreateTemp(t.TempDir(), "analytics-")
+		if err != nil {
+			t.Fatal("could not create temp file", err)
+		}
+		defer f.Close()
+
+		cfgData := fmt.Sprintf(`# comments
+%s: %s
+%s:
+`,
+			fieldAnalyticsID, uuidID.String(), fieldUserID)
+
+		if _, err := f.WriteString(cfgData); err != nil {
+			t.Fatal("could not write to temp file", err)
+		}
+
+		cfg, err := loadConfigFromFile(f.Name())
+		if d := cmp.Diff(nil, err); d != "" {
+			t.Error("failed to load file", d)
+		}
+
+		if d := cmp.Diff(uuidID.String(), cfg.AnalyticsID.String()); d != "" {
+			t.Error("analyticsID is incorrect", d)
+		}
+
+		if d := cmp.Diff(true, cfg.UserID.IsZero()); d != "" {
+			t.Error("userID is incorrect", d)
+		}
+	})
+
+	t.Run("nil analytics_id", func(t *testing.T) {
+		f, err := os.CreateTemp(t.TempDir(), "analytics-")
+		if err != nil {
+			t.Fatal("could not create temp file", err)
+		}
+		defer f.Close()
+
+		cfgData := fmt.Sprintf(`# comments
+%s:
+`,
+			fieldAnalyticsID)
+
+		if _, err := f.WriteString(cfgData); err != nil {
+			t.Fatal("could not write to temp file", err)
+		}
+
+		cfg, err := loadConfigFromFile(f.Name())
+		if d := cmp.Diff(nil, err); d != "" {
+			t.Error("failed to load file", d)
+		}
+
+		if d := cmp.Diff(true, cfg.AnalyticsID.IsZero()); d != "" {
+			t.Error("id is incorrect", d)
+		}
+	})
+}
+
 func TestWriteConfig(t *testing.T) {
 	t.Run("ulid", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "nested", "deeply", ConfigFile)
