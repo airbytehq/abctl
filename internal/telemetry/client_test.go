@@ -79,7 +79,7 @@ func TestGet_SameInstance(t *testing.T) {
 	cli1 := Get(WithUserHome(home))
 	cli2 := Get(WithUserHome(home))
 	cli3 := Get()
-	cli4 := Get(WithDnt())
+	cli4 := Get(WithDNT())
 
 	if cli1 != cli2 {
 		t.Error("expected same client")
@@ -95,7 +95,7 @@ func TestGet_SameInstance(t *testing.T) {
 func TestGet_Dnt(t *testing.T) {
 	instance = nil
 	home := t.TempDir()
-	cli := Get(WithUserHome(home), WithDnt())
+	cli := Get(WithUserHome(home), WithDNT())
 
 	if _, ok := cli.(NoopClient); !ok {
 		t.Error(fmt.Sprintf("expected NoopClient; received: %T", cli))

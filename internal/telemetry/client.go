@@ -51,8 +51,10 @@ type getConfig struct {
 // GetOption is for optional configuration of the Get call.
 type GetOption func(*getConfig)
 
-// WithDnt tells the Get call to enable the do-not-track configuration.
-func WithDnt() GetOption {
+// WithDNT tells the Get call to enable the do-not-track configuration.
+// If the DNT method returns true, there method is implicitly called.
+// This method exists to explicitly ensuring the client is running in dnt mode
+func WithDNT() GetOption {
 	return func(gc *getConfig) {
 		gc.dnt = true
 	}
@@ -88,7 +90,7 @@ func Get(opts ...GetOption) Client {
 		opt(&getCfg)
 	}
 
-	if getCfg.dnt {
+	if getCfg.dnt || DNT() {
 		instance = NoopClient{}
 		return instance
 	}

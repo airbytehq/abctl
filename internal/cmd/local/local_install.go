@@ -178,6 +178,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		},
 	}
 
+	cmd.FParseErrWhitelist.UnknownFlags = true
+
 	cmd.Flags().StringVarP(&flagBasicAuthUser, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	cmd.Flags().StringVarP(&flagBasicAuthPass, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")

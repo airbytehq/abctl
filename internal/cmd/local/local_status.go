@@ -89,5 +89,7 @@ func NewCmdStatus(provider k8s.Provider) *cobra.Command {
 		},
 	}
 
+	cmd.FParseErrWhitelist.UnknownFlags = true
+
 	return cmd
 }

@@ -76,6 +76,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 		},
 	}
 
+	cmd.FParseErrWhitelist.UnknownFlags = true
 	cmd.Flags().BoolVar(&flagPersisted, "persisted", false, "remove persisted data")
 
 	return cmd
