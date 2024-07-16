@@ -24,6 +24,7 @@ type EventType string
 
 const (
 	Install   EventType = "install"
+	Migrate   EventType = "migrate"
 	Status    EventType = "status"
 	Uninstall EventType = "uninstall"
 )
@@ -40,6 +41,10 @@ type Client interface {
 	Attr(key, val string)
 	// User returns the user identifier being used by this client
 	User() uuid.UUID
+	// Wrap wraps the func() error with the EventType,
+	//  calling the Start, Failure or Success methods correctly based on
+	// the behavior of the func() error
+	Wrap(context.Context, EventType, func() error) error
 }
 
 type getConfig struct {

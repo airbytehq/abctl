@@ -69,7 +69,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return telemetry.Wrapper(cmd.Context(), telemetry.Install, func() error {
+			return telClient.Wrap(cmd.Context(), telemetry.Install, func() error {
 				spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
 				cluster, err := provider.Cluster()

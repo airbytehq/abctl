@@ -59,6 +59,11 @@ func TestProvider_Defaults(t *testing.T) {
 }
 
 func TestProvider_Cluster(t *testing.T) {
+	// go will reuse TempDir directories between runs, ensure it is clean before running this test
+	if err := os.RemoveAll(filepath.Dir(TestProvider.Kubeconfig)); err != nil {
+		t.Fatalf("failed to remove temp kubeconfig dir: %s", err)
+	}
+
 	if dirExists(filepath.Dir(TestProvider.Kubeconfig)) {
 		t.Fatal("Kubeconfig should not exist")
 	}

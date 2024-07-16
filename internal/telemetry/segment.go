@@ -7,6 +7,7 @@ import (
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/google/uuid"
 	"github.com/pbnjay/memory"
+	"github.com/pterm/pterm"
 	"k8s.io/apimachinery/pkg/util/json"
 	"maps"
 	"net/http"
@@ -82,6 +83,33 @@ func (s *SegmentClient) Attr(key, val string) {
 
 func (s *SegmentClient) User() uuid.UUID {
 	return s.cfg.AnalyticsID.toUUID()
+}
+
+func (s *SegmentClient) Wrap(ctx context.Context, et EventType, f func() error) error {
+	attemptSuccessFailure := true
+
+	if err := s.Start(ctx, et); err != nil {
+		pterm.Debug.Printfln("Unable to send telemetry start data: %s", err)
+		attemptSuccessFailure = false
+	}
+
+	if err := f(); err != nil {
+		if attemptSuccessFailure {
+			if errTel := s.Failure(ctx, et, err); errTel != nil {
+				pterm.Debug.Printfln("Unable to send telemetry failure data: %s", errTel)
+			}
+		}
+
+		return err
+	}
+
+	if attemptSuccessFailure {
+		if err := s.Success(ctx, et); err != nil {
+			pterm.Debug.Printfln("Unable to send telemetry success data: %s", err)
+		}
+	}
+
+	return nil
 }
 
 const (

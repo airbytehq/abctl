@@ -346,7 +346,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 
 	if opts.Migrate {
 		c.spinner.UpdateText("Migrating airbyte data")
-		if err := opts.Docker.MigrateComposeDB(ctx, "airbyte_db"); err != nil {
+		if err := c.tel.Wrap(ctx, telemetry.Migrate, func() error { return opts.Docker.MigrateComposeDB(ctx, "airbyte_db") }); err != nil {
 			pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
 			return fmt.Errorf("could not migrate data from previous airbyte installation: %w", err)
 		}
