@@ -2,10 +2,10 @@ package local
 
 import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"os"
 	"path/filepath"
 )
 
@@ -41,7 +41,6 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 }
 
 func printProviderDetails(p k8s.Provider) {
-	userHome, _ := os.UserHomeDir()
-	configPath := filepath.Join(userHome, p.Kubeconfig)
+	configPath := filepath.Join(paths.UserHome, p.Kubeconfig)
 	pterm.Info.Printfln("Using Kubernetes provider:\n  Provider: %s\n  Kubeconfig: %s\n  Context: %s", p.Name, configPath, p.Context)
 }

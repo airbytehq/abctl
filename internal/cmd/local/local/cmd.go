@@ -148,10 +148,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 
 	// determine userhome if not defined
 	if c.userHome == "" {
-		var err error
-		if c.userHome, err = os.UserHomeDir(); err != nil {
-			return nil, fmt.Errorf("could not determine user home directory: %w", err)
-		}
+		c.userHome = paths.UserHome
 	}
 
 	// set http client, if not defined
