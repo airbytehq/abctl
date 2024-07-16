@@ -743,7 +743,7 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 		// don't consider a failed web-browser to be a failed installation
 	}
 
-	pterm.Success.Println("Launched web-browser successfully")
+	pterm.Success.Println(fmt.Sprintf("Launched web-browser successfully for %s", url))
 
 	return nil
 }
