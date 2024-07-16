@@ -50,7 +50,7 @@ func TestCommand_Install(t *testing.T) {
 				Namespace:       airbyteNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         10 * time.Minute,
+				Timeout:         30 * time.Minute,
 				ValuesOptions: values.Options{Values: []string{
 					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
 					"global.jobs.resources.limits.cpu=3",
@@ -71,7 +71,7 @@ func TestCommand_Install(t *testing.T) {
 				Namespace:       nginxNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         10 * time.Minute,
+				Timeout:         30 * time.Minute,
 				ValuesOptions:   values.Options{Values: []string{fmt.Sprintf("controller.service.ports.http=%d", portTest)}},
 			},
 			release: release.Release{
@@ -190,7 +190,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 				Namespace:       airbyteNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         10 * time.Minute,
+				Timeout:         30 * time.Minute,
 				ValuesOptions: values.Options{Values: []string{
 					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
 					"global.jobs.resources.limits.cpu=3",
@@ -212,7 +212,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 				Namespace:       nginxNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         10 * time.Minute,
+				Timeout:         30 * time.Minute,
 				ValuesOptions:   values.Options{Values: []string{fmt.Sprintf("controller.service.ports.http=%d", portTest)}},
 			},
 			release: release.Release{
