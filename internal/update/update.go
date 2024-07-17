@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-var ErrDevVersion = errors.New("dev version support not supported")
+var ErrDevVersion = errors.New("dev version not supported")
 
 type doer interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -42,17 +42,17 @@ const url = "https://api.github.com/repos/airbytehq/abctl/releases/latest"
 func latest(ctx context.Context, doer doer) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return "", fmt.Errorf("unable to create request: %w", err)
 	}
 
 	res, err := doer.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to do request: %w", err)
+		return "", fmt.Errorf("unable to do request: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to do request, status code: %d", res.StatusCode)
+		return "", fmt.Errorf("unable to do request, status code: %d", res.StatusCode)
 	}
 
 	var latest struct {
@@ -61,7 +61,7 @@ func latest(ctx context.Context, doer doer) (string, error) {
 
 	decoder := json.NewDecoder(res.Body)
 	if err := decoder.Decode(&latest); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
+		return "", fmt.Errorf("unable to decode response: %w", err)
 	}
 
 	if !semver.IsValid(latest.TagName) {
