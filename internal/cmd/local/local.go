@@ -20,7 +20,7 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 			{
 				var telOpts []telemetry.GetOption
 				// This is deprecated as the telemetry.Client now checks itself if the DO_NOT_TRACK env-var is defined.
-				// Currently leaving this here to output the message about the --dnt trag no longer being supported.
+				// Currently leaving this here to output the message about the --dnt flag no longer being supported.
 				dntFlag, _ := cmd.Flags().GetBool("dnt")
 				if dntFlag {
 					pterm.Warning.Println("The --dnt flag has been deprecated. Use DO_NOT_TRACK environment-variable instead.")
