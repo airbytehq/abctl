@@ -109,7 +109,7 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 			var err2 error
 			dockerCli, err2 = createAndPing(ctx, newPing, fmt.Sprintf("unix://%s/.docker/run/docker.sock", paths.UserHome), dockerOpts)
 			if err2 != nil {
-				return nil, fmt.Errorf("%w: could not create docker client: (%w, %w)", localerr.ErrDocker, err, err2)
+				return nil, fmt.Errorf("%w: unable to create docker client: (%w, %w)", localerr.ErrDocker, err, err2)
 			}
 			// if we made it here, clear out the original error,
 			// as we were able to successfully connect on the second attempt
@@ -122,7 +122,7 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: could not create docker client: %w", localerr.ErrDocker, err)
+		return nil, fmt.Errorf("%w: unable to create docker client: %w", localerr.ErrDocker, err)
 	}
 
 	return &Docker{Client: dockerCli}, nil
@@ -132,11 +132,11 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 func createAndPing(ctx context.Context, newPing newPing, host string, opts []client.Opt) (Client, error) {
 	cli, err := newPing(append(opts, client.WithHost(host))...)
 	if err != nil {
-		return nil, fmt.Errorf("could not create docker client: %w", err)
+		return nil, fmt.Errorf("unable to create docker client: %w", err)
 	}
 
 	if _, err := cli.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("could not ping docker client: %w", err)
+		return nil, fmt.Errorf("unable to ping docker client: %w", err)
 	}
 
 	return cli, nil
@@ -146,7 +146,7 @@ func createAndPing(ctx context.Context, newPing newPing, host string, opts []cli
 func (d *Docker) Version(ctx context.Context) (Version, error) {
 	ver, err := d.Client.ServerVersion(ctx)
 	if err != nil {
-		return Version{}, fmt.Errorf("could not determine server version: %w", err)
+		return Version{}, fmt.Errorf("unable to determine server version: %w", err)
 	}
 
 	return Version{
@@ -162,7 +162,7 @@ func (d *Docker) Version(ctx context.Context) (Version, error) {
 func (d *Docker) Port(ctx context.Context, container string) (int, error) {
 	ci, err := d.Client.ContainerInspect(ctx, container)
 	if err != nil {
-		return 0, fmt.Errorf("could not inspect container: %w", err)
+		return 0, fmt.Errorf("unable to inspect container: %w", err)
 	}
 
 	for _, bindings := range ci.NetworkSettings.Ports {
@@ -170,14 +170,14 @@ func (d *Docker) Port(ctx context.Context, container string) (int, error) {
 			if ipPort.HostIP == "0.0.0.0" {
 				port, err := strconv.Atoi(ipPort.HostPort)
 				if err != nil {
-					return 0, fmt.Errorf("could not convert host port %s to integer: %w", ipPort.HostPort, err)
+					return 0, fmt.Errorf("unable to convert host port %s to integer: %w", ipPort.HostPort, err)
 				}
 				return port, nil
 			}
 		}
 	}
 
-	return 0, errors.New("could not determine port for container")
+	return 0, errors.New("unable to determine port for container")
 }
 
 const (
@@ -219,7 +219,7 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 		nil,
 		"")
 	if err != nil {
-		return fmt.Errorf("could not create initial docker migration container: %w", err)
+		return fmt.Errorf("unable to create initial docker migration container: %w", err)
 	}
 	pterm.Debug.Println(fmt.Sprintf("Created initial migration container '%s'", conCopy.ID))
 
@@ -227,16 +227,16 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 	dst := filepath.Join(paths.Data, "airbyte-volume-db", "pgdata")
 	// ensure dst directory exists
 	if err := os.MkdirAll(dst, 0755); err != nil {
-		return fmt.Errorf("could not create directory '%s': %w", dst, err)
+		return fmt.Errorf("unable to create directory '%s': %w", dst, err)
 	}
 	// ensure the permissions are correct
 	if err := os.Chmod(dst, 0777); err != nil {
-		return fmt.Errorf("could not chmod directory '%s': %w", dst, err)
+		return fmt.Errorf("unable to chmod directory '%s': %w", dst, err)
 	}
 
 	// note the src must end with a `.`, due to how docker cp works with directories
 	if err := d.copyFromContainer(ctx, conCopy.ID, migratePGDATA+"/.", dst); err != nil {
-		return fmt.Errorf("could not copy airbyte db data from container %s: %w", conCopy.ID, err)
+		return fmt.Errorf("unable to copy airbyte db data from container %s: %w", conCopy.ID, err)
 	}
 	pterm.Debug.Println(fmt.Sprintf("Copied airbyte db data from container '%s' to '%s'", conCopy.ID, dst))
 
@@ -270,12 +270,12 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 		nil,
 		"")
 	if err != nil {
-		return fmt.Errorf("could not create docker container: %w", err)
+		return fmt.Errorf("unable to create docker container: %w", err)
 	}
 	pterm.Debug.Println(fmt.Sprintf("Created secondary migration container '%s'", conTransform.ID))
 	pterm.Debug.Println(fmt.Sprintf("Container was created with the following warnings: %s", conTransform.Warnings))
 	if err := d.Client.ContainerStart(ctx, conTransform.ID, container.StartOptions{}); err != nil {
-		return fmt.Errorf("could not start container %s: %w", conTransform.ID, err)
+		return fmt.Errorf("unable to start container %s: %w", conTransform.ID, err)
 	}
 	// cleanup and remove container when we're done
 	defer func() { d.stopAndRemoveContainer(ctx, conTransform.ID) }()
@@ -294,7 +294,7 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 	pterm.Debug.Println("Adding Airbyte postgres user")
 	if err := d.exec(ctx, conTransform.ID, cmdPsqlUser); err != nil {
 		pterm.Debug.Println("Failed to add postgres user")
-		return fmt.Errorf("could not update postgres user: %w", err)
+		return fmt.Errorf("unable to update postgres user: %w", err)
 	}
 	pterm.Debug.Println(fmt.Sprintf("Adding Airbyte postgres user completed in %s", time.Since(now)))
 
@@ -303,7 +303,7 @@ func (d *Docker) MigrateComposeDB(ctx context.Context, volume string) error {
 	now = time.Now()
 	if err := d.exec(ctx, conTransform.ID, cmdPsqlRename); err != nil {
 		pterm.Debug.Println("Failed to rename database")
-		return fmt.Errorf("could not rename postgres database: %w", err)
+		return fmt.Errorf("unable to rename postgres database: %w", err)
 	}
 	pterm.Debug.Println(fmt.Sprintf("Renaming database completed in %s", time.Since(now)))
 
@@ -317,8 +317,8 @@ func (d *Docker) ensureImage(ctx context.Context, img string) error {
 	filter.Add("reference", img)
 	imgs, err := d.Client.ImageList(ctx, image.ListOptions{Filters: filter})
 	if err != nil {
-		pterm.Error.Println(fmt.Sprintf("Could not list docker images when checking for '%s'", img))
-		return fmt.Errorf("could not list image '%s': %w", img, err)
+		pterm.Error.Println(fmt.Sprintf("unable to list docker images when checking for '%s'", img))
+		return fmt.Errorf("unable to list image '%s': %w", img, err)
 	}
 
 	// if it does exist, there is nothing else to do
@@ -331,8 +331,8 @@ func (d *Docker) ensureImage(ctx context.Context, img string) error {
 	// if we're here, then we need to pull the image
 	reader, err := d.Client.ImagePull(ctx, img, image.PullOptions{})
 	if err != nil {
-		pterm.Error.Println(fmt.Sprintf("Could not pull the docker image '%s'", img))
-		return fmt.Errorf("could not pull image '%s': %w", img, err)
+		pterm.Error.Println(fmt.Sprintf("unable to pull the docker image '%s'", img))
+		return fmt.Errorf("unable to pull image '%s': %w", img, err)
 	}
 	pterm.Debug.Println(fmt.Sprintf("Successfully pulled the docker image '%s'", img))
 	defer reader.Close()
@@ -357,16 +357,16 @@ func (d *Docker) volumeExists(ctx context.Context, volumeID string) string {
 // Largely inspired by the official docker client - https://github.com/docker/cli/blob/d69d501f699efb0cc1f16274e368e09ef8927840/cli/command/container/exec.go#L93
 func (d *Docker) exec(ctx context.Context, container string, cmd []string) error {
 	if _, err := d.Client.ContainerInspect(ctx, container); err != nil {
-		return fmt.Errorf("could not inspect container '%s': %w", container, err)
+		return fmt.Errorf("unable to inspect container '%s': %w", container, err)
 	}
 
 	resCreate, err := d.Client.ContainerExecCreate(ctx, container, types.ExecConfig{Cmd: cmd})
 	if err != nil {
-		return fmt.Errorf("could not create exec for container '%s': %w", container, err)
+		return fmt.Errorf("unable to create exec for container '%s': %w", container, err)
 	}
 
 	if err := d.Client.ContainerExecStart(ctx, resCreate.ID, types.ExecStartCheck{}); err != nil {
-		return fmt.Errorf("could not start exec for container '%s': %w", container, err)
+		return fmt.Errorf("unable to start exec for container '%s': %w", container, err)
 	}
 
 	ticker := time.NewTicker(500 * time.Millisecond) // how often to check
@@ -379,7 +379,7 @@ func (d *Docker) exec(ctx context.Context, container string, cmd []string) error
 		case <-ticker.C:
 			res, err := d.Client.ContainerExecInspect(ctx, resCreate.ID)
 			if err != nil {
-				return fmt.Errorf("could not inspect container '%s': %w", container, err)
+				return fmt.Errorf("unable to inspect container '%s': %w", container, err)
 			}
 			running = res.Running
 			if res.ExitCode != 0 {
@@ -400,7 +400,7 @@ func (d *Docker) exec(ctx context.Context, container string, cmd []string) error
 func (d *Docker) copyFromContainer(ctx context.Context, container, src, dst string) error {
 	reader, stat, err := d.Client.CopyFromContainer(ctx, container, src)
 	if err != nil {
-		return fmt.Errorf("could not copy from container '%s': %w", container, err)
+		return fmt.Errorf("unable to copy from container '%s': %w", container, err)
 	}
 	defer reader.Close()
 
@@ -411,7 +411,7 @@ func (d *Docker) copyFromContainer(ctx context.Context, container, src, dst stri
 	}
 
 	if err := archive.CopyTo(reader, copyInfo, dst); err != nil {
-		return fmt.Errorf("could not copy from container '%s': %w", container, err)
+		return fmt.Errorf("unable to copy from container '%s': %w", container, err)
 	}
 
 	return nil
@@ -421,10 +421,10 @@ func (d *Docker) copyFromContainer(ctx context.Context, container, src, dst stri
 func (d *Docker) stopAndRemoveContainer(ctx context.Context, containerID string) {
 	pterm.Debug.Println(fmt.Sprintf("Stopping container '%s'", containerID))
 	if err := d.Client.ContainerStop(ctx, containerID, container.StopOptions{}); err != nil {
-		pterm.Debug.Println(fmt.Sprintf("Could not stop docker container %s: %s", containerID, err))
+		pterm.Debug.Println(fmt.Sprintf("Unable to stop docker container %s: %s", containerID, err))
 	}
 	pterm.Debug.Println(fmt.Sprintf("Removing container '%s'", containerID))
 	if err := d.Client.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true}); err != nil {
-		pterm.Debug.Println(fmt.Sprintf("Could not remove docker container %s: %s", containerID, err))
+		pterm.Debug.Println(fmt.Sprintf("Unable to remove docker container %s: %s", containerID, err))
 	}
 }
