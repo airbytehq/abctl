@@ -207,6 +207,7 @@ type mockTelemetryClient struct {
 	failure func(ctx context.Context, eventType telemetry.EventType, err error) error
 	attr    func(key, val string)
 	user    func() uuid.UUID
+	wrap    func(context.Context, telemetry.EventType, func() error) error
 }
 
 func (m *mockTelemetryClient) Start(ctx context.Context, eventType telemetry.EventType) error {
@@ -227,4 +228,8 @@ func (m *mockTelemetryClient) Attr(key, val string) {
 
 func (m *mockTelemetryClient) User() uuid.UUID {
 	return m.user()
+}
+
+func (m *mockTelemetryClient) Wrap(ctx context.Context, et telemetry.EventType, f func() error) error {
+	return m.wrap(ctx, et, f)
 }

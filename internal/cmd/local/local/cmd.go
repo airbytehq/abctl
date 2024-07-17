@@ -148,10 +148,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 
 	// determine userhome if not defined
 	if c.userHome == "" {
-		var err error
-		if c.userHome, err = os.UserHomeDir(); err != nil {
-			return nil, fmt.Errorf("could not determine user home directory: %w", err)
-		}
+		c.userHome = paths.UserHome
 	}
 
 	// set http client, if not defined
@@ -165,18 +162,16 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 
 	// set k8s client, if not defined
 	if c.k8s == nil {
-		kubecfg := filepath.Join(c.userHome, provider.Kubeconfig)
 		var err error
-		if c.k8s, err = defaultK8s(kubecfg, provider.Context); err != nil {
+		if c.k8s, err = defaultK8s(provider.Kubeconfig, provider.Context); err != nil {
 			return nil, err
 		}
 	}
 
 	// set the helm client, if not defined
 	if c.helm == nil {
-		kubecfg := filepath.Join(c.userHome, provider.Kubeconfig)
 		var err error
-		if c.helm, err = defaultHelm(kubecfg, provider.Context); err != nil {
+		if c.helm, err = defaultHelm(provider.Kubeconfig, provider.Context); err != nil {
 			return nil, err
 		}
 	}
@@ -346,7 +341,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 
 	if opts.Migrate {
 		c.spinner.UpdateText("Migrating airbyte data")
-		if err := opts.Docker.MigrateComposeDB(ctx, "airbyte_db"); err != nil {
+		if err := c.tel.Wrap(ctx, telemetry.Migrate, func() error { return opts.Docker.MigrateComposeDB(ctx, "airbyte_db") }); err != nil {
 			pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
 			return fmt.Errorf("could not migrate data from previous airbyte installation: %w", err)
 		}
@@ -663,14 +658,14 @@ func (c *Command) handleChart(
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
 
-	c.spinner.UpdateText(fmt.Sprintf("Installing '%s' (version: %s) Helm Chart", req.chartName, helmChart.Metadata.Version))
+	c.spinner.UpdateText(fmt.Sprintf("Installing '%s' (version: %s) Helm Chart (this may take serveral minutes)", req.chartName, helmChart.Metadata.Version))
 	helmRelease, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
 		ReleaseName:     req.chartRelease,
 		ChartName:       req.chartName,
 		CreateNamespace: true,
 		Namespace:       req.namespace,
 		Wait:            true,
-		Timeout:         10 * time.Minute,
+		Timeout:         30 * time.Minute,
 		ValuesOptions:   values.Options{Values: req.values},
 		ValuesYaml:      req.valuesYAML,
 		Version:         req.chartVersion,
@@ -743,7 +738,7 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 		// don't consider a failed web-browser to be a failed installation
 	}
 
-	pterm.Success.Println("Launched web-browser successfully")
+	pterm.Success.Println(fmt.Sprintf("Launched web-browser successfully for %s", url))
 
 	return nil
 }

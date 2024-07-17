@@ -70,7 +70,6 @@ Available Commands:
   version     Print version information
 
 Flags:
-      --dnt       opt out of telemetry data collection
   -h, --help      help for abctl
   -v, --verbose   enable verbose output
 ```
@@ -88,7 +87,6 @@ Flags:
   -u, --username string        basic auth username, can also be specified via ABCTL_LOCAL_INSTALL_USERNAME (default "airbyte")
 
 Global Flags:
-      --dnt       opt out of telemetry data collection
   -v, --verbose   enable verbose output
 
 ```

@@ -34,7 +34,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return telemetry.Wrapper(cmd.Context(), telemetry.Uninstall, func() error {
+			return telClient.Wrap(cmd.Context(), telemetry.Uninstall, func() error {
 				spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
 				cluster, err := provider.Cluster()
@@ -76,6 +76,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 		},
 	}
 
+	cmd.FParseErrWhitelist.UnknownFlags = true
 	cmd.Flags().BoolVar(&flagPersisted, "persisted", false, "remove persisted data")
 
 	return cmd

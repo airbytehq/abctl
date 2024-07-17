@@ -28,3 +28,7 @@ func (n NoopClient) Attr(_, _ string) {}
 func (n NoopClient) User() uuid.UUID {
 	return uuid.Nil
 }
+
+func (n NoopClient) Wrap(ctx context.Context, et EventType, f func() error) error {
+	return f()
+}

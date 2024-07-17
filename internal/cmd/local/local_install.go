@@ -69,7 +69,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return telemetry.Wrapper(cmd.Context(), telemetry.Install, func() error {
+			return telClient.Wrap(cmd.Context(), telemetry.Install, func() error {
 				spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
 				cluster, err := provider.Cluster()
@@ -177,6 +177,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 			})
 		},
 	}
+
+	cmd.FParseErrWhitelist.UnknownFlags = true
 
 	cmd.Flags().StringVarP(&flagBasicAuthUser, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	cmd.Flags().StringVarP(&flagBasicAuthPass, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)

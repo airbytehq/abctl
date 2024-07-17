@@ -24,6 +24,7 @@ type EventType string
 
 const (
 	Install   EventType = "install"
+	Migrate   EventType = "migrate"
 	Status    EventType = "status"
 	Uninstall EventType = "uninstall"
 )
@@ -40,6 +41,10 @@ type Client interface {
 	Attr(key, val string)
 	// User returns the user identifier being used by this client
 	User() uuid.UUID
+	// Wrap wraps the func() error with the EventType,
+	// calling the Start, Failure or Success methods correctly based on
+	// the behavior of the func() error
+	Wrap(context.Context, EventType, func() error) error
 }
 
 type getConfig struct {
@@ -51,8 +56,10 @@ type getConfig struct {
 // GetOption is for optional configuration of the Get call.
 type GetOption func(*getConfig)
 
-// WithDnt tells the Get call to enable the do-not-track configuration.
-func WithDnt() GetOption {
+// WithDNT tells the Get call to enable the do-not-track configuration.
+// If the DNT method returns true, there method is implicitly called.
+// This method exists to explicitly ensuring the client is running in dnt mode
+func WithDNT() GetOption {
 	return func(gc *getConfig) {
 		gc.dnt = true
 	}
@@ -88,7 +95,7 @@ func Get(opts ...GetOption) Client {
 		opt(&getCfg)
 	}
 
-	if getCfg.dnt {
+	if getCfg.dnt || DNT() {
 		instance = NoopClient{}
 		return instance
 	}

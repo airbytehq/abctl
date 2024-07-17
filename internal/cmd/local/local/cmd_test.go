@@ -50,7 +50,7 @@ func TestCommand_Install(t *testing.T) {
 				Namespace:       airbyteNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         10 * time.Minute,
+				Timeout:         30 * time.Minute,
 				ValuesOptions: values.Options{Values: []string{
 					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
 					"global.jobs.resources.limits.cpu=3",
@@ -71,7 +71,7 @@ func TestCommand_Install(t *testing.T) {
 				Namespace:       nginxNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         10 * time.Minute,
+				Timeout:         30 * time.Minute,
 				ValuesOptions:   values.Options{Values: []string{fmt.Sprintf("controller.service.ports.http=%d", portTest)}},
 			},
 			release: release.Release{
@@ -190,7 +190,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 				Namespace:       airbyteNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         10 * time.Minute,
+				Timeout:         30 * time.Minute,
 				ValuesOptions: values.Options{Values: []string{
 					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
 					"global.jobs.resources.limits.cpu=3",
@@ -212,7 +212,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 				Namespace:       nginxNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         10 * time.Minute,
+				Timeout:         30 * time.Minute,
 				ValuesOptions:   values.Options{Values: []string{fmt.Sprintf("controller.service.ports.http=%d", portTest)}},
 			},
 			release: release.Release{
@@ -511,6 +511,7 @@ type mockTelemetryClient struct {
 	failure func(context.Context, telemetry.EventType, error) error
 	attr    func(key, val string)
 	user    func() uuid.UUID
+	wrap    func(context.Context, telemetry.EventType, func() error) error
 }
 
 func (m *mockTelemetryClient) Start(ctx context.Context, eventType telemetry.EventType) error {
@@ -533,6 +534,10 @@ func (m *mockTelemetryClient) Attr(key, val string) {
 
 func (m *mockTelemetryClient) User() uuid.UUID {
 	return m.user()
+}
+
+func (m *mockTelemetryClient) Wrap(ctx context.Context, et telemetry.EventType, f func() error) error {
+	return m.wrap(ctx, et, f)
 }
 
 var _ HTTPClient = (*mockHTTP)(nil)
