@@ -31,7 +31,10 @@ type kindCluster struct {
 	clusterName string
 }
 
-const k8sVersion = "v1.29.1"
+// k8sVersion is the kind node version being used.
+// Note that the sha256 must match the version listed on the release for the specific version of kind
+// that we're currently using (e.g. https://github.com/kubernetes-sigs/kind/releases/tag/v0.23.0)
+const k8sVersion = "v1.29.4@sha256:3abb816a5b1061fb15c6e9e60856ec40d56b7b52bcea5f5f1350bc6e2320b6f8"
 
 func (k *kindCluster) Create(port int) error {
 	// Create the data directory before the cluster does to ensure that it's owned by the correct user.
