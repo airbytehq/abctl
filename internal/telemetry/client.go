@@ -42,7 +42,7 @@ type Client interface {
 	// User returns the user identifier being used by this client
 	User() uuid.UUID
 	// Wrap wraps the func() error with the EventType,
-	//  calling the Start, Failure or Success methods correctly based on
+	// calling the Start, Failure or Success methods correctly based on
 	// the behavior of the func() error
 	Wrap(context.Context, EventType, func() error) error
 }
