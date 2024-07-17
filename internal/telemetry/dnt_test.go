@@ -13,7 +13,7 @@ func TestDNT(t *testing.T) {
 	if origEnvVar, ok := os.LookupEnv(envVarDNT); ok {
 		origEnvVars[envVarDNT] = origEnvVar
 		if err := os.Unsetenv(envVarDNT); err != nil {
-			t.Fatal("could not unset environment variable:", err)
+			t.Fatal("unable to unset environment variable:", err)
 		}
 	}
 
@@ -47,11 +47,11 @@ func TestDNT(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envVar == nil {
 				if err := os.Unsetenv(envVarDNT); err != nil {
-					t.Fatal("could not unset environment variable:", err)
+					t.Fatal("unable to unset environment variable:", err)
 				}
 			} else {
 				if err := os.Setenv(envVarDNT, *tt.envVar); err != nil {
-					t.Fatal("could not set environment variable:", err)
+					t.Fatal("unable to set environment variable:", err)
 				}
 			}
 

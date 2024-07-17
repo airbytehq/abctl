@@ -146,18 +146,18 @@ func (s *SegmentClient) send(ctx context.Context, es EventState, et EventType, e
 
 	data, err := json.Marshal(body)
 	if err != nil {
-		return fmt.Errorf("could not create request body: %w", err)
+		return fmt.Errorf("unable to create request body: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
 	if err != nil {
-		return fmt.Errorf("could not create request: %w", err)
+		return fmt.Errorf("unable to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := s.doer.Do(req)
 	if err != nil {
-		return fmt.Errorf("could not post: %w", err)
+		return fmt.Errorf("unable to post: %w", err)
 	}
 
 	defer resp.Body.Close()

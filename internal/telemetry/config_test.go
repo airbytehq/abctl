@@ -20,13 +20,13 @@ func TestLoadConfigWithULID(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "analytics-")
 		if err != nil {
-			t.Fatal("could not create temp file", err)
+			t.Fatal("unable to create temp file", err)
 		}
 		defer f.Close()
 
 		if _, err := f.WriteString(`# comments
 anonymous_user_id: ` + ulidID.String()); err != nil {
-			t.Fatal("could not write to temp file", err)
+			t.Fatal("unable to write to temp file", err)
 		}
 
 		cfg, err := loadConfigFromFile(f.Name())
@@ -53,12 +53,12 @@ anonymous_user_id: ` + ulidID.String()); err != nil {
 	t.Run("incorrect format returns err", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "analytics-")
 		if err != nil {
-			t.Fatal("could not create temp file", err)
+			t.Fatal("unable to create temp file", err)
 		}
 		defer f.Close()
 
 		if _, err := f.WriteString(`This is a regular file, not a configuration file!`); err != nil {
-			t.Fatal("could not write to temp file", err)
+			t.Fatal("unable to write to temp file", err)
 		}
 
 		_, err = loadConfigFromFile(f.Name())
@@ -70,13 +70,13 @@ anonymous_user_id: ` + ulidID.String()); err != nil {
 	t.Run("unreadable file returns err", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "analytics-")
 		if err != nil {
-			t.Fatal("could not create temp file", err)
+			t.Fatal("unable to create temp file", err)
 		}
 		defer f.Close()
 
 		// remove read permissions from file
 		if err := f.Chmod(0222); err != nil {
-			t.Fatal("could not chmod temp file", err)
+			t.Fatal("unable to chmod temp file", err)
 		}
 
 		_, err = loadConfigFromFile(f.Name())
@@ -90,7 +90,7 @@ func TestLoadConfigWithUUID(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "analytics-")
 		if err != nil {
-			t.Fatal("could not create temp file", err)
+			t.Fatal("unable to create temp file", err)
 		}
 		defer f.Close()
 
@@ -98,7 +98,7 @@ func TestLoadConfigWithUUID(t *testing.T) {
 %s: %s`, fieldAnalyticsID, uuidID.String())
 
 		if _, err := f.WriteString(cfgData); err != nil {
-			t.Fatal("could not write to temp file", err)
+			t.Fatal("unable to write to temp file", err)
 		}
 
 		cfg, err := loadConfigFromFile(f.Name())
@@ -114,7 +114,7 @@ func TestLoadConfigWithUUID(t *testing.T) {
 	t.Run("happy path with extra fields", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "analytics-")
 		if err != nil {
-			t.Fatal("could not create temp file", err)
+			t.Fatal("unable to create temp file", err)
 		}
 		defer f.Close()
 
@@ -126,7 +126,7 @@ total: 300`,
 			fieldAnalyticsID, uuidID.String())
 
 		if _, err := f.WriteString(cfgData); err != nil {
-			t.Fatal("could not write to temp file", err)
+			t.Fatal("unable to write to temp file", err)
 		}
 
 		cfg, err := loadConfigFromFile(f.Name())
@@ -165,12 +165,12 @@ total: 300`,
 	t.Run("incorrect format returns err", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "analytics-")
 		if err != nil {
-			t.Fatal("could not create temp file", err)
+			t.Fatal("unable to create temp file", err)
 		}
 		defer f.Close()
 
 		if _, err := f.WriteString(`This is a regular file, not a configuration file!`); err != nil {
-			t.Fatal("could not write to temp file", err)
+			t.Fatal("unable to write to temp file", err)
 		}
 
 		_, err = loadConfigFromFile(f.Name())
@@ -182,13 +182,13 @@ total: 300`,
 	t.Run("unreadable file returns err", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "analytics-")
 		if err != nil {
-			t.Fatal("could not create temp file", err)
+			t.Fatal("unable to create temp file", err)
 		}
 		defer f.Close()
 
 		// remove read permissions from file
 		if err := f.Chmod(0222); err != nil {
-			t.Fatal("could not chmod temp file", err)
+			t.Fatal("unable to chmod temp file", err)
 		}
 
 		_, err = loadConfigFromFile(f.Name())
@@ -202,7 +202,7 @@ func TestLoadConfigWithNilFields(t *testing.T) {
 	t.Run("nil anonymous_user_id", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "analytics-")
 		if err != nil {
-			t.Fatal("could not create temp file", err)
+			t.Fatal("unable to create temp file", err)
 		}
 		defer f.Close()
 
@@ -213,7 +213,7 @@ func TestLoadConfigWithNilFields(t *testing.T) {
 			fieldAnalyticsID, uuidID.String(), fieldUserID)
 
 		if _, err := f.WriteString(cfgData); err != nil {
-			t.Fatal("could not write to temp file", err)
+			t.Fatal("unable to write to temp file", err)
 		}
 
 		cfg, err := loadConfigFromFile(f.Name())
@@ -233,7 +233,7 @@ func TestLoadConfigWithNilFields(t *testing.T) {
 	t.Run("nil analytics_id", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "analytics-")
 		if err != nil {
-			t.Fatal("could not create temp file", err)
+			t.Fatal("unable to create temp file", err)
 		}
 		defer f.Close()
 
@@ -243,7 +243,7 @@ func TestLoadConfigWithNilFields(t *testing.T) {
 			fieldAnalyticsID)
 
 		if _, err := f.WriteString(cfgData); err != nil {
-			t.Fatal("could not write to temp file", err)
+			t.Fatal("unable to write to temp file", err)
 		}
 
 		cfg, err := loadConfigFromFile(f.Name())

@@ -113,18 +113,18 @@ func Get(opts ...GetOption) Client {
 			// file not found, create a new one
 			analyticsCfg = Config{AnalyticsID: NewUUID()}
 			if err := writeConfigToFile(configPath, analyticsCfg); err != nil {
-				return analyticsCfg, fmt.Errorf("could not write file to %s: %w", configPath, err)
+				return analyticsCfg, fmt.Errorf("unable to write file to %s: %w", configPath, err)
 			}
 			pterm.Info.Println(Welcome)
 		} else if err != nil {
-			return Config{}, fmt.Errorf("could not load config from %s: %w", configPath, err)
+			return Config{}, fmt.Errorf("unable to load config from %s: %w", configPath, err)
 		}
 
 		// if a file exists but doesn't have a uuid, create a new uuid
 		if analyticsCfg.AnalyticsID.IsZero() {
 			analyticsCfg.AnalyticsID = NewUUID()
 			if err := writeConfigToFile(configPath, analyticsCfg); err != nil {
-				return analyticsCfg, fmt.Errorf("could not write file to %s: %w", configPath, err)
+				return analyticsCfg, fmt.Errorf("unable to write file to %s: %w", configPath, err)
 			}
 		}
 
@@ -133,7 +133,7 @@ func Get(opts ...GetOption) Client {
 
 	cfg, err := getOrCreateConfigFile(getCfg)
 	if err != nil {
-		pterm.Warning.Printfln("could not create telemetry config file: %s", err.Error())
+		pterm.Warning.Printfln("unable to create telemetry config file: %s", err.Error())
 		instance = NoopClient{}
 	} else {
 		instance = NewSegmentClient(cfg)
