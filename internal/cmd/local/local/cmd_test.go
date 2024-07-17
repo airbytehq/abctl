@@ -329,7 +329,7 @@ func TestCommand_Install_InvalidValuesFile(t *testing.T) {
 	if err == nil {
 		t.Fatal("expecting an error, received none")
 	}
-	if !strings.Contains(err.Error(), fmt.Sprintf("could not read values file '%s'", valuesFile)) {
+	if !strings.Contains(err.Error(), fmt.Sprintf("unable to read values file '%s'", valuesFile)) {
 		t.Error("unexpected error:", err)
 	}
 
