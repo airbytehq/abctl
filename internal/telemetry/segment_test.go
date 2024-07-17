@@ -7,7 +7,7 @@ import (
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/oklog/ulid/v2"
+	"github.com/google/uuid"
 	"github.com/pbnjay/memory"
 	"io"
 	"net/http"
@@ -18,8 +18,8 @@ import (
 	"time"
 )
 
-var userID = ulid.Make()
-var sessionID = ulid.Make()
+var userID = uuid.New()
+var sessionID = uuid.New()
 
 func TestSegmentClient_Options(t *testing.T) {
 	mDoer := &mockDoer{}
@@ -53,7 +53,7 @@ func TestSegmentClient_Start(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserID: ULID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 
@@ -155,7 +155,7 @@ func TestSegmentClient_StartWithAttr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserID: ULID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 	cli.Attr("key1", "val1")
 	cli.Attr("key2", "val2")
 
@@ -264,7 +264,7 @@ func TestSegmentClient_StartErr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserID: ULID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 
@@ -289,7 +289,7 @@ func TestSegmentClient_Success(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserID: ULID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 
@@ -391,7 +391,7 @@ func TestSegmentClient_SuccessWithAttr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserID: ULID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 	cli.Attr("key1", "val1")
 	cli.Attr("key2", "val2")
 
@@ -500,7 +500,7 @@ func TestSegmentClient_SuccessErr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserID: ULID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 
@@ -525,7 +525,7 @@ func TestSegmentClient_Failure(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserID: ULID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 	failure := errors.New("failure reason")
@@ -628,7 +628,7 @@ func TestSegmentClient_FailureWithAttr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserID: ULID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 	cli.Attr("key1", "val1")
 	cli.Attr("key2", "val2")
 
@@ -738,7 +738,7 @@ func TestSegmentClient_FailureErr(t *testing.T) {
 		WithHTTPClient(mDoer),
 	}
 
-	cli := NewSegmentClient(Config{UserID: ULID(userID)}, opts...)
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
 	ctx := context.Background()
 	failure := errors.New("failure reason")
@@ -747,6 +747,119 @@ func TestSegmentClient_FailureErr(t *testing.T) {
 		t.Error("start call should have failed")
 	} else if !errors.Is(err, httpErr) {
 		t.Error("start call error should contain http error", err)
+	}
+}
+
+func TestSegmentClient_Wrap(t *testing.T) {
+	var eventType *string
+	var eventStates []string
+
+	mDoer := &mockDoer{
+		do: func(r *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatal("failed to read body", err)
+			}
+			var body body
+			if err := json.Unmarshal(raw, &body); err != nil {
+				t.Fatal("failed to unmarshal body", err)
+			}
+
+			if eventType == nil {
+				eventType = &body.Event
+			} else if d := cmp.Diff(*eventType, body.Event); d != "" {
+				t.Errorf("event type mismatch (-want +got): %s", d)
+			}
+			eventStates = append(eventStates, body.Properties["state"])
+
+			return &http.Response{Body: io.NopCloser(&strings.Reader{})}, nil
+		},
+	}
+
+	opts := []Option{
+		WithSessionID(sessionID),
+		WithHTTPClient(mDoer),
+	}
+
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
+
+	ctx := context.Background()
+
+	// a Wrap call where the func() error doesn't return an error
+	// should call Start and Success
+	if err := cli.Wrap(ctx, Install, func() error { return nil }); err != nil {
+		t.Error("Wrap call failed")
+	}
+
+	if d := cmp.Diff(string(Install), *eventType); d != "" {
+		t.Error("event type mismatch (-want +got):", d)
+	}
+	if d := cmp.Diff(2, len(eventStates)); d != "" {
+		t.Fatal("eventStates size mismatch (-want +got):", d)
+	}
+	if d := cmp.Diff(string(Start), eventStates[0]); d != "" {
+		t.Error("start mismatch (-want +got):", d)
+	}
+	if d := cmp.Diff(string(Success), eventStates[1]); d != "" {
+		t.Error("success mismatch (-want +got):", d)
+	}
+}
+
+func TestSegmentClient_WrapErr(t *testing.T) {
+	var eventType *string
+	var eventStates []string
+
+	mDoer := &mockDoer{
+		do: func(r *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatal("failed to read body", err)
+			}
+			var body body
+			if err := json.Unmarshal(raw, &body); err != nil {
+				t.Fatal("failed to unmarshal body", err)
+			}
+
+			if eventType == nil {
+				eventType = &body.Event
+			} else if d := cmp.Diff(*eventType, body.Event); d != "" {
+				t.Errorf("event type mismatch (-want +got): %s", d)
+			}
+			eventStates = append(eventStates, body.Properties["state"])
+
+			return &http.Response{Body: io.NopCloser(&strings.Reader{})}, nil
+		},
+	}
+
+	opts := []Option{
+		WithSessionID(sessionID),
+		WithHTTPClient(mDoer),
+	}
+
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
+
+	ctx := context.Background()
+
+	actualErr := errors.New("test failure")
+
+	// a Wrap call where the func() error returns asn error
+	// should call Start and Failure
+	err := cli.Wrap(ctx, Uninstall, func() error { return actualErr })
+	if d := cmp.Diff(actualErr, err, cmpopts.EquateErrors()); d != "" {
+		t.Errorf("error mismatch (-want +got): %s", err)
+	}
+
+	if d := cmp.Diff(string(Uninstall), *eventType); d != "" {
+		t.Error("event type mismatch (-want +got):", d)
+	}
+	if d := cmp.Diff(2, len(eventStates)); d != "" {
+		t.Fatal("eventStates size mismatch (-want +got):", d)
+	}
+	if d := cmp.Diff(string(Start), eventStates[0]); d != "" {
+		t.Error("start mismatch (-want +got):", d)
+	}
+	if d := cmp.Diff(string(Failed), eventStates[1]); d != "" {
+		t.Error("failed mismatch (-want +got):", d)
 	}
 }
 

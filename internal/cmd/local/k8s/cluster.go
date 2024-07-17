@@ -2,6 +2,9 @@ package k8s
 
 import (
 	"fmt"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/pterm/pterm"
+	"os"
 	"sigs.k8s.io/kind/pkg/cluster"
 	"time"
 )
@@ -31,6 +34,15 @@ type kindCluster struct {
 const k8sVersion = "v1.30.0"
 
 func (k *kindCluster) Create(port int) error {
+	// Create the data directory before the cluster does to ensure that it's owned by the correct user.
+	// If the cluster creates it and docker is running as root, it's possible that root will own this directory
+	// which will cause minio and postgres to break.
+	pterm.Debug.Println(fmt.Sprintf("Creating data directory '%s'", paths.Data))
+	if err := os.MkdirAll(paths.Data, 0755); err != nil {
+		pterm.Error.Println(fmt.Sprintf("Error creating data directory '%s'", paths.Data))
+		return fmt.Errorf("unable to create directory '%s': %w", paths.Data, err)
+	}
+
 	// see https://kind.sigs.k8s.io/docs/user/ingress/#create-cluster
 	rawCfg := fmt.Sprintf(`kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -42,10 +54,14 @@ nodes:
       nodeRegistration:
         kubeletExtraArgs:
           node-labels: "ingress-ready=true"
+    extraMounts:
+      - hostPath: %s
+        containerPath: /var/local-path-provisioner
     extraPortMappings:
       - containerPort: 80
         hostPort: %d
         protocol: TCP`,
+		paths.Data,
 		port)
 
 	opts := []cluster.CreateOption{

@@ -5,8 +5,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/build"
-	"github.com/oklog/ulid/v2"
+	"github.com/google/uuid"
 	"github.com/pbnjay/memory"
+	"github.com/pterm/pterm"
 	"k8s.io/apimachinery/pkg/util/json"
 	"maps"
 	"net/http"
@@ -33,16 +34,18 @@ func WithHTTPClient(d Doer) Option {
 }
 
 // WithSessionID overrides the default ulid session, primarily for testing purposes.
-func WithSessionID(sessionID ulid.ULID) Option {
+func WithSessionID(sessionID uuid.UUID) Option {
 	return func(client *SegmentClient) {
 		client.sessionID = sessionID
 	}
 }
 
+var _ Client = (*SegmentClient)(nil)
+
 // SegmentClient client, all methods communicate with segment.
 type SegmentClient struct {
 	doer      Doer
-	sessionID ulid.ULID
+	sessionID uuid.UUID
 	cfg       Config
 	attrs     map[string]string
 }
@@ -51,7 +54,7 @@ func NewSegmentClient(cfg Config, opts ...Option) *SegmentClient {
 	cli := &SegmentClient{
 		doer:      &http.Client{Timeout: 10 * time.Second},
 		cfg:       cfg,
-		sessionID: ulid.Make(),
+		sessionID: uuid.New(),
 		attrs:     map[string]string{},
 	}
 
@@ -76,6 +79,37 @@ func (s *SegmentClient) Failure(ctx context.Context, et EventType, err error) er
 
 func (s *SegmentClient) Attr(key, val string) {
 	s.attrs[key] = val
+}
+
+func (s *SegmentClient) User() uuid.UUID {
+	return s.cfg.AnalyticsID.toUUID()
+}
+
+func (s *SegmentClient) Wrap(ctx context.Context, et EventType, f func() error) error {
+	attemptSuccessFailure := true
+
+	if err := s.Start(ctx, et); err != nil {
+		pterm.Debug.Printfln("Unable to send telemetry start data: %s", err)
+		attemptSuccessFailure = false
+	}
+
+	if err := f(); err != nil {
+		if attemptSuccessFailure {
+			if errTel := s.Failure(ctx, et, err); errTel != nil {
+				pterm.Debug.Printfln("Unable to send telemetry failure data: %s", errTel)
+			}
+		}
+
+		return err
+	}
+
+	if attemptSuccessFailure {
+		if err := s.Success(ctx, et); err != nil {
+			pterm.Debug.Printfln("Unable to send telemetry success data: %s", err)
+		}
+	}
+
+	return nil
 }
 
 const (
@@ -103,7 +137,7 @@ func (s *SegmentClient) send(ctx context.Context, es EventState, et EventType, e
 	}
 
 	body := body{
-		ID:         s.cfg.UserID.String(),
+		ID:         s.cfg.AnalyticsID.String(),
 		Event:      string(et),
 		Properties: properties,
 		Timestamp:  time.Now().UTC().Format(time.RFC3339),

@@ -53,7 +53,7 @@ These credentials can be changed either of the following
    ```shell
    ABCTL_LOCAL_INSTALL_USERNAME=foo
    ABCTL_LOCAL_INSTALL_PASSWORD=bar
-   abc local install
+   abctl local install
    ```
   
 ### Additional Options
@@ -67,26 +67,28 @@ Usage:
 Available Commands:
   help        Help about any command
   local       Manages local Airbyte installations
-  version     Print the version number
+  version     Print version information
 
 Flags:
-      --dnt    opt out of telemetry data collection
-  -h, --help   help for abctl
+  -h, --help      help for abctl
+  -v, --verbose   enable verbose output
 ```
 ```
 abctl local install --help
 
 Usage:
-
   abctl local install [flags]
 
 Flags:
-  -h, --help              help for install
-  -p, --password string   basic auth password, can also be specified via ABCTL_LOCAL_INSTALL_PASSWORD (default "password")
-  -u, --username string   basic auth username, can also be specified via ABCTL_LOCAL_INSTALL_USERNAME (default "airbyte")
+      --chart-version string   specify the specific Airbyte helm chart version to install (default "latest")
+  -h, --help                   help for install
+  -p, --password string        basic auth password, can also be specified via ABCTL_LOCAL_INSTALL_PASSWORD (default "password")
+      --port int               ingress http port (default 8000)
+  -u, --username string        basic auth username, can also be specified via ABCTL_LOCAL_INSTALL_USERNAME (default "airbyte")
 
 Global Flags:
-      --dnt   opt out of telemetry data collection
+  -v, --verbose   enable verbose output
+
 ```
 
 ## Contributing

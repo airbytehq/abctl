@@ -5,8 +5,6 @@ import (
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"os"
-	"path/filepath"
 )
 
 var telClient telemetry.Client
@@ -18,11 +16,12 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// telemetry client configuration
 			{
-				// ignore the error as it will default to false if an error returns
-				dnt, _ := cmd.Flags().GetBool("dnt")
 				var telOpts []telemetry.GetOption
-				if dnt {
-					telOpts = append(telOpts, telemetry.WithDnt())
+				// This is deprecated as the telemetry.Client now checks itself if the DO_NOT_TRACK env-var is defined.
+				// Currently leaving this here to output the message about the --dnt flag no longer being supported.
+				dntFlag, _ := cmd.Flags().GetBool("dnt")
+				if dntFlag {
+					pterm.Warning.Println("The --dnt flag has been deprecated. Use DO_NOT_TRACK environment-variable instead.")
 				}
 
 				telClient = telemetry.Get(telOpts...)
@@ -34,13 +33,11 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 		Short: "Manages local Airbyte installations",
 	}
 
-	cmd.AddCommand(NewCmdInstall(provider), NewCmdUninstall(provider))
+	cmd.AddCommand(NewCmdInstall(provider), NewCmdUninstall(provider), NewCmdStatus(provider))
 
 	return cmd
 }
 
 func printProviderDetails(p k8s.Provider) {
-	userHome, _ := os.UserHomeDir()
-	configPath := filepath.Join(userHome, p.Kubeconfig)
-	pterm.Info.Printfln("Using Kubernetes provider:\n\tProvider: %s\n\tKubeconfig: %s\n\tContext: %s", p.Name, configPath, p.Context)
+	pterm.Info.Printfln("Using Kubernetes provider:\n  Provider: %s\n  Kubeconfig: %s\n  Context: %s", p.Name, p.Kubeconfig, p.Context)
 }

@@ -38,6 +38,9 @@ func main() {
 		cancel()
 	}()
 
+	// ensure the pterm info width matches the other printers
+	pterm.Info.Prefix.Text = " INFO  "
+
 	root := cmd.NewCmd()
 	cmd.Execute(ctx, root)
 

@@ -12,6 +12,8 @@ import (
 func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
+	var flagPersisted bool
+
 	cmd := &cobra.Command{
 		Use:   "uninstall",
 		Short: "Uninstall Airbyte locally",
@@ -32,7 +34,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return telemetry.Wrapper(cmd.Context(), telemetry.Uninstall, func() error {
+			return telClient.Wrap(cmd.Context(), telemetry.Uninstall, func() error {
 				spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
 				cluster, err := provider.Cluster()
@@ -54,7 +56,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 					pterm.Warning.Printfln("Failed to initialize 'local' command\nUninstallation attempt will continue")
 					pterm.Debug.Printfln("Initialization of 'local' failed with %s", err.Error())
 				} else {
-					if err := lc.Uninstall(cmd.Context()); err != nil {
+					if err := lc.Uninstall(cmd.Context(), local.UninstallOpts{Persisted: flagPersisted}); err != nil {
 						pterm.Warning.Printfln("could not complete uninstall: %s", err.Error())
 						pterm.Warning.Println("will still attempt to uninstall the cluster")
 					}
@@ -62,10 +64,10 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 
 				spinner.UpdateText(fmt.Sprintf("Verifying uninstallation status of cluster '%s'", provider.ClusterName))
 				if err := cluster.Delete(); err != nil {
-					pterm.Error.Printfln("Uninstallation of cluster '%s' failed", provider.ClusterName)
+					pterm.Error.Printfln(fmt.Sprintf("Uninstallation of cluster '%s' failed", provider.ClusterName))
 					return fmt.Errorf("could not uninstall cluster %s", provider.ClusterName)
 				}
-				pterm.Success.Printfln("Uninstallation of cluster '%s' completed successfully", provider.ClusterName)
+				pterm.Success.Printfln(fmt.Sprintf("Uninstallation of cluster '%s' completed successfully", provider.ClusterName))
 
 				spinner.Success("Airbyte uninstallation complete")
 
@@ -73,6 +75,9 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 			})
 		},
 	}
+
+	cmd.FParseErrWhitelist.UnknownFlags = true
+	cmd.Flags().BoolVar(&flagPersisted, "persisted", false, "remove persisted data")
 
 	return cmd
 }

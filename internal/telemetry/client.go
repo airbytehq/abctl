@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 	"net/http"
 	"os"
@@ -23,6 +24,8 @@ type EventType string
 
 const (
 	Install   EventType = "install"
+	Migrate   EventType = "migrate"
+	Status    EventType = "status"
 	Uninstall EventType = "uninstall"
 )
 
@@ -36,6 +39,12 @@ type Client interface {
 	Failure(context.Context, EventType, error) error
 	// Attr should be called to add additional attributes to this activity.
 	Attr(key, val string)
+	// User returns the user identifier being used by this client
+	User() uuid.UUID
+	// Wrap wraps the func() error with the EventType,
+	// calling the Start, Failure or Success methods correctly based on
+	// the behavior of the func() error
+	Wrap(context.Context, EventType, func() error) error
 }
 
 type getConfig struct {
@@ -47,8 +56,10 @@ type getConfig struct {
 // GetOption is for optional configuration of the Get call.
 type GetOption func(*getConfig)
 
-// WithDnt tells the Get call to enable the do-not-track configuration.
-func WithDnt() GetOption {
+// WithDNT tells the Get call to enable the do-not-track configuration.
+// If the DNT method returns true, there method is implicitly called.
+// This method exists to explicitly ensuring the client is running in dnt mode
+func WithDNT() GetOption {
 	return func(gc *getConfig) {
 		gc.dnt = true
 	}
@@ -84,7 +95,7 @@ func Get(opts ...GetOption) Client {
 		opt(&getCfg)
 	}
 
-	if getCfg.dnt {
+	if getCfg.dnt || DNT() {
 		instance = NoopClient{}
 		return instance
 	}
@@ -96,16 +107,25 @@ func Get(opts ...GetOption) Client {
 	getOrCreateConfigFile := func(getCfg getConfig) (Config, error) {
 		configPath := filepath.Join(getCfg.userHome, ConfigFile)
 
+		// if no file exists, create a new one
 		analyticsCfg, err := loadConfigFromFile(configPath)
 		if errors.Is(err, os.ErrNotExist) {
 			// file not found, create a new one
-			analyticsCfg = Config{UserID: NewULID()}
+			analyticsCfg = Config{AnalyticsID: NewUUID()}
 			if err := writeConfigToFile(configPath, analyticsCfg); err != nil {
 				return analyticsCfg, fmt.Errorf("could not write file to %s: %w", configPath, err)
 			}
 			pterm.Info.Println(Welcome)
 		} else if err != nil {
 			return Config{}, fmt.Errorf("could not load config from %s: %w", configPath, err)
+		}
+
+		// if a file exists but doesn't have a uuid, create a new uuid
+		if analyticsCfg.AnalyticsID.IsZero() {
+			analyticsCfg.AnalyticsID = NewUUID()
+			if err := writeConfigToFile(configPath, analyticsCfg); err != nil {
+				return analyticsCfg, fmt.Errorf("could not write file to %s: %w", configPath, err)
+			}
 		}
 
 		return analyticsCfg, nil
