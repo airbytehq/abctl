@@ -162,18 +162,16 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 
 	// set k8s client, if not defined
 	if c.k8s == nil {
-		kubecfg := filepath.Join(c.userHome, provider.Kubeconfig)
 		var err error
-		if c.k8s, err = defaultK8s(kubecfg, provider.Context); err != nil {
+		if c.k8s, err = defaultK8s(provider.Kubeconfig, provider.Context); err != nil {
 			return nil, err
 		}
 	}
 
 	// set the helm client, if not defined
 	if c.helm == nil {
-		kubecfg := filepath.Join(c.userHome, provider.Kubeconfig)
 		var err error
-		if c.helm, err = defaultHelm(kubecfg, provider.Context); err != nil {
+		if c.helm, err = defaultHelm(provider.Kubeconfig, provider.Context); err != nil {
 			return nil, err
 		}
 	}
