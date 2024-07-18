@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	"github.com/airbytehq/abctl/internal/cmd/local/migrate"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	corev1 "k8s.io/api/core/v1"
 	"net/http"
@@ -260,12 +261,12 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 		pterm.Debug.Println(fmt.Sprintf("Creating directory '%s'", path))
 		if err := os.MkdirAll(path, 0755); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Could not create directory '%s'", name))
-			return fmt.Errorf("could not create persistent volume '%s': %w", name, err)
+			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
 
 		if err := c.k8s.PersistentVolumeCreate(ctx, namespace, name); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume '%s'", name))
-			return fmt.Errorf("could not create persistent volume '%s': %w", name, err)
+			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
 
 		// Update the permissions of the volume directory to be globally writable (0777).
@@ -282,7 +283,7 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 		pterm.Debug.Println(fmt.Sprintf("Updating permissions for '%s'", path))
 		if err := os.Chmod(path, 0777); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Could not set permissions for '%s'", path))
-			return fmt.Errorf("could not set permissions for '%s': %w", path, err)
+			return fmt.Errorf("unable to set permissions for '%s': %w", path, err)
 		}
 
 		pterm.Info.Println(fmt.Sprintf("Persistent volume '%s' created", name))
@@ -298,7 +299,7 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume claim '%s'", name))
 		if err := c.k8s.PersistentVolumeClaimCreate(ctx, namespace, name, volumeName); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume claim '%s'", name))
-			return fmt.Errorf("could not create persistent volume claim '%s': %w", name, err)
+			return fmt.Errorf("unable to create persistent volume claim '%s': %w", name, err)
 		}
 		pterm.Info.Println(fmt.Sprintf("Persistent volume claim '%s' created", name))
 	} else {
@@ -314,7 +315,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	if opts.ValuesFile != "" {
 		raw, err := os.ReadFile(opts.ValuesFile)
 		if err != nil {
-			return fmt.Errorf("could not read values file '%s': %w", opts.ValuesFile, err)
+			return fmt.Errorf("unable to read values file '%s': %w", opts.ValuesFile, err)
 		}
 		values = string(raw)
 	}
@@ -325,7 +326,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		c.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", airbyteNamespace))
 		if err := c.k8s.NamespaceCreate(ctx, airbyteNamespace); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Could not create namespace '%s'", airbyteNamespace))
-			return fmt.Errorf("could not create airbyte namespace: %w", err)
+			return fmt.Errorf("unable to create airbyte namespace: %w", err)
 		}
 		pterm.Info.Println(fmt.Sprintf("Namespace '%s' created", airbyteNamespace))
 	} else {
@@ -341,9 +342,10 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 
 	if opts.Migrate {
 		c.spinner.UpdateText("Migrating airbyte data")
-		if err := c.tel.Wrap(ctx, telemetry.Migrate, func() error { return opts.Docker.MigrateComposeDB(ctx, "airbyte_db") }); err != nil {
+		//if err := c.tel.Wrap(ctx, telemetry.Migrate, func() error { return opts.Docker.MigrateComposeDB(ctx, "airbyte_db") }); err != nil {
+		if err := c.tel.Wrap(ctx, telemetry.Migrate, func() error { return migrate.FromDockerVolume(ctx, opts.Docker.Client, "airbyte_db") }); err != nil {
 			pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
-			return fmt.Errorf("could not migrate data from previous airbyte installation: %w", err)
+			return fmt.Errorf("unable to migrate data from previous airbyte installation: %w", err)
 		}
 	}
 
@@ -370,7 +372,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		pterm.Debug.Println(fmt.Sprintf("Creating '%s' secret", dockerAuthSecretName))
 		if err := c.handleDockerSecret(ctx, opts.DockerServer, opts.DockerUser, opts.DockerPass, opts.DockerEmail); err != nil {
 			pterm.Debug.Println(fmt.Sprintf("Could not create '%s' secret", dockerAuthSecretName))
-			return fmt.Errorf("could not create '%s' secret: %w", dockerAuthSecretName, err)
+			return fmt.Errorf("unable to create '%s' secret: %w", dockerAuthSecretName, err)
 		}
 		pterm.Debug.Println(fmt.Sprintf("Created '%s' secret", dockerAuthSecretName))
 		airbyteValues = append(airbyteValues, fmt.Sprintf("global.imagePullSecrets[0].name=%s", dockerAuthSecretName))
@@ -387,7 +389,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		values:       airbyteValues,
 		valuesYAML:   values,
 	}); err != nil {
-		return fmt.Errorf("could not install airbyte chart: %w", err)
+		return fmt.Errorf("unable to install airbyte chart: %w", err)
 	}
 
 	if err := c.handleChart(ctx, chartRequest{
@@ -417,13 +419,13 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 				}
 			}
 		}
-		return fmt.Errorf("could not install nginx chart: %w", err)
+		return fmt.Errorf("unable to install nginx chart: %w", err)
 	}
 
 	c.spinner.UpdateText("Configuring Basic-Auth")
 	// basic auth
 	if err := c.handleBasicAuthSecret(ctx, opts.BasicAuthUser, opts.BasicAuthPass); err != nil {
-		return fmt.Errorf("could not create or update basic-auth secret: %w", err)
+		return fmt.Errorf("unable to create or update basic-auth secret: %w", err)
 	}
 
 	if err := c.handleIngress(ctx); err != nil {
@@ -445,7 +447,7 @@ func (c *Command) handleIngress(ctx context.Context) error {
 		pterm.Success.Println("Found existing Ingress")
 		if err := c.k8s.IngressUpdate(ctx, airbyteNamespace, ingress()); err != nil {
 			pterm.Error.Printfln("Unable to update existing Ingress")
-			return fmt.Errorf("could not update existing ingress: %w", err)
+			return fmt.Errorf("unable to update existing ingress: %w", err)
 		}
 		pterm.Success.Println("Updated existing Ingress")
 		return nil
@@ -454,7 +456,7 @@ func (c *Command) handleIngress(ctx context.Context) error {
 	pterm.Info.Println("No existing Ingress found, creating one")
 	if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress()); err != nil {
 		pterm.Error.Println("Unable to create ingress")
-		return fmt.Errorf("could not create ingress: %w", err)
+		return fmt.Errorf("unable to create ingress: %w", err)
 	}
 	pterm.Success.Println("Ingress created")
 	return nil
@@ -549,13 +551,13 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 			"This may indicate an issue with the username or password provided.\n" +
 			"Please provider different credentials and try again.")
 
-		return fmt.Errorf("could not hash basic auth password: %w", err)
+		return fmt.Errorf("unable to hash basic auth password: %w", err)
 	}
 
 	data := map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))}
 	if err := c.k8s.SecretCreateOrUpdate(ctx, corev1.SecretTypeOpaque, airbyteNamespace, "basic-auth", data); err != nil {
 		pterm.Error.Println("Could not create Basic-Auth secret")
-		return fmt.Errorf("could not create Basic-Auth secret: %w", err)
+		return fmt.Errorf("unable to create Basic-Auth secret: %w", err)
 	}
 	pterm.Success.Println("Basic-Auth secret created")
 	return nil
@@ -589,7 +591,7 @@ func (c *Command) Uninstall(_ context.Context, opts UninstallOpts) error {
 		c.spinner.UpdateText("Removing persisted data")
 		if err := os.RemoveAll(paths.Data); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Unable to remove persisted data '%s'", paths.Data))
-			return fmt.Errorf("could not remove persisted data '%s': %w", paths.Data, err)
+			return fmt.Errorf("unable to remove persisted data '%s': %w", paths.Data, err)
 		}
 		pterm.Success.Println("Removed persisted data")
 	}
@@ -606,7 +608,7 @@ func (c *Command) Status(_ context.Context) error {
 		rel, err := c.helm.GetRelease(name)
 		if err != nil {
 			pterm.Warning.Println("Could not get airbyte release")
-			pterm.Debug.Printfln("could not get airbyte release: %s", err)
+			pterm.Debug.Printfln("unable to get airbyte release: %s", err)
 			continue
 		}
 
@@ -646,14 +648,14 @@ func (c *Command) handleChart(
 		URL:  req.repoURL,
 	}); err != nil {
 		pterm.Error.Printfln("Unable to configure %s Helm repository", req.repoName)
-		return fmt.Errorf("could not add %s chart repo: %w", req.name, err)
+		return fmt.Errorf("unable to add %s chart repo: %w", req.name, err)
 	}
 
 	c.spinner.UpdateText(fmt.Sprintf("Fetching %s Helm Chart", req.chartName))
 	helmChart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{Version: req.chartVersion})
 	if err != nil {
 		pterm.Error.Printfln("Unable to fetch %s Helm Chart", req.chartName)
-		return fmt.Errorf("could not fetch chart %s: %w", req.chartName, err)
+		return fmt.Errorf("unable to fetch chart %s: %w", req.chartName, err)
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
@@ -674,7 +676,7 @@ func (c *Command) handleChart(
 	)
 	if err != nil {
 		pterm.Error.Printfln("Failed to install %s Helm Chart", req.chartName)
-		return fmt.Errorf("could not install helm: %w", err)
+		return fmt.Errorf("unable to install helm: %w", err)
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
@@ -702,7 +704,7 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 			case <-tick:
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 				if err != nil {
-					alive <- fmt.Errorf("could not create request: %w", err)
+					alive <- fmt.Errorf("unable to create request: %w", err)
 				}
 				res, _ := c.http.Do(req)
 				// if no auth, we should get a 200
@@ -779,7 +781,7 @@ func defaultHelm(kubecfg, kubectx string) (HelmClient, error) {
 		RestConfig: restCfg,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not create helm client: %w", err)
+		return nil, fmt.Errorf("unable to create helm client: %w", err)
 	}
 
 	return helm, nil

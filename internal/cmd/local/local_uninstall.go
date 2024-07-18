@@ -24,7 +24,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 			dockerVersion, err := dockerInstalled(cmd.Context())
 			if err != nil {
 				pterm.Error.Println("Unable to determine if Docker is installed")
-				return fmt.Errorf("could not determine docker installation status: %w", err)
+				return fmt.Errorf("unable to determine docker installation status: %w", err)
 			}
 
 			telClient.Attr("docker_version", dockerVersion.Version)
@@ -57,7 +57,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 					pterm.Debug.Printfln("Initialization of 'local' failed with %s", err.Error())
 				} else {
 					if err := lc.Uninstall(cmd.Context(), local.UninstallOpts{Persisted: flagPersisted}); err != nil {
-						pterm.Warning.Printfln("could not complete uninstall: %s", err.Error())
+						pterm.Warning.Printfln("unable to complete uninstall: %s", err.Error())
 						pterm.Warning.Println("will still attempt to uninstall the cluster")
 					}
 				}
@@ -65,7 +65,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 				spinner.UpdateText(fmt.Sprintf("Verifying uninstallation status of cluster '%s'", provider.ClusterName))
 				if err := cluster.Delete(); err != nil {
 					pterm.Error.Printfln(fmt.Sprintf("Uninstallation of cluster '%s' failed", provider.ClusterName))
-					return fmt.Errorf("could not uninstall cluster %s", provider.ClusterName)
+					return fmt.Errorf("unable to uninstall cluster %s", provider.ClusterName)
 				}
 				pterm.Success.Printfln(fmt.Sprintf("Uninstallation of cluster '%s' completed successfully", provider.ClusterName))
 

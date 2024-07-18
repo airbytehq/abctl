@@ -77,11 +77,11 @@ func TestPortAvailable_Available(t *testing.T) {
 	// spin up a listener to find a port and then shut it down to ensure that port is available
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
-		t.Fatal("could not create listener", err)
+		t.Fatal("unable to create listener", err)
 	}
 	p := port(listener.Addr().String())
 	if err := listener.Close(); err != nil {
-		t.Fatal("could not close listener", err)
+		t.Fatal("unable to close listener", err)
 	}
 
 	err = portAvailable(context.Background(), p)
@@ -94,7 +94,7 @@ func TestPortAvailable_Unavailable(t *testing.T) {
 	// spin up a listener to find a port, and leave it running so that port is unavailable
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		t.Fatal("could not create listener", err)
+		t.Fatal("unable to create listener", err)
 	}
 	defer listener.Close()
 	p := port(listener.Addr().String())

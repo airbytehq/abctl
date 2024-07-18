@@ -76,11 +76,11 @@ func TestSegmentClient_Start(t *testing.T) {
 	// body
 	reqBodyRaw, err := io.ReadAll(req.Body)
 	if err != nil {
-		t.Error("could not read request body", err)
+		t.Error("unable to read request body", err)
 	}
 	var reqBody body
 	if err := json.Unmarshal(reqBodyRaw, &reqBody); err != nil {
-		t.Error("could not unmarshal request body", err)
+		t.Error("unable to unmarshal request body", err)
 	}
 
 	if d := cmp.Diff(userID.String(), reqBody.ID); d != "" {
@@ -180,11 +180,11 @@ func TestSegmentClient_StartWithAttr(t *testing.T) {
 	// body
 	reqBodyRaw, err := io.ReadAll(req.Body)
 	if err != nil {
-		t.Error("could not read request body", err)
+		t.Error("unable to read request body", err)
 	}
 	var reqBody body
 	if err := json.Unmarshal(reqBodyRaw, &reqBody); err != nil {
-		t.Error("could not unmarshal request body", err)
+		t.Error("unable to unmarshal request body", err)
 	}
 
 	if d := cmp.Diff(userID.String(), reqBody.ID); d != "" {
@@ -312,11 +312,11 @@ func TestSegmentClient_Success(t *testing.T) {
 	// body
 	reqBodyRaw, err := io.ReadAll(req.Body)
 	if err != nil {
-		t.Error("could not read request body", err)
+		t.Error("unable to read request body", err)
 	}
 	var reqBody body
 	if err := json.Unmarshal(reqBodyRaw, &reqBody); err != nil {
-		t.Error("could not unmarshal request body", err)
+		t.Error("unable to unmarshal request body", err)
 	}
 
 	if d := cmp.Diff(userID.String(), reqBody.ID); d != "" {
@@ -416,11 +416,11 @@ func TestSegmentClient_SuccessWithAttr(t *testing.T) {
 	// body
 	reqBodyRaw, err := io.ReadAll(req.Body)
 	if err != nil {
-		t.Error("could not read request body", err)
+		t.Error("unable to read request body", err)
 	}
 	var reqBody body
 	if err := json.Unmarshal(reqBodyRaw, &reqBody); err != nil {
-		t.Error("could not unmarshal request body", err)
+		t.Error("unable to unmarshal request body", err)
 	}
 
 	if d := cmp.Diff(userID.String(), reqBody.ID); d != "" {
@@ -549,11 +549,11 @@ func TestSegmentClient_Failure(t *testing.T) {
 	// body
 	reqBodyRaw, err := io.ReadAll(req.Body)
 	if err != nil {
-		t.Error("could not read request body", err)
+		t.Error("unable to read request body", err)
 	}
 	var reqBody body
 	if err := json.Unmarshal(reqBodyRaw, &reqBody); err != nil {
-		t.Error("could not unmarshal request body", err)
+		t.Error("unable to unmarshal request body", err)
 	}
 
 	if d := cmp.Diff(userID.String(), reqBody.ID); d != "" {
@@ -654,11 +654,11 @@ func TestSegmentClient_FailureWithAttr(t *testing.T) {
 	// body
 	reqBodyRaw, err := io.ReadAll(req.Body)
 	if err != nil {
-		t.Error("could not read request body", err)
+		t.Error("unable to read request body", err)
 	}
 	var reqBody body
 	if err := json.Unmarshal(reqBodyRaw, &reqBody); err != nil {
-		t.Error("could not unmarshal request body", err)
+		t.Error("unable to unmarshal request body", err)
 	}
 
 	if d := cmp.Diff(userID.String(), reqBody.ID); d != "" {

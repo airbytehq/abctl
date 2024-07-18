@@ -39,12 +39,12 @@ func (u UUID) String() string {
 func (u *UUID) UnmarshalYAML(node *yaml.Node) error {
 	var s string
 	if err := node.Decode(&s); err != nil {
-		return fmt.Errorf("could not unmarshal yaml: %w", err)
+		return fmt.Errorf("unable to unmarshal yaml: %w", err)
 	}
 
 	parsed, err := uuid.Parse(s)
 	if err != nil {
-		return fmt.Errorf("could not parse uuid (%s): %w", s, err)
+		return fmt.Errorf("unable to parse uuid (%s): %w", s, err)
 	}
 
 	*u = UUID(parsed)
@@ -87,12 +87,12 @@ func (u ULID) String() string {
 func (u *ULID) UnmarshalYAML(node *yaml.Node) error {
 	var s string
 	if err := node.Decode(&s); err != nil {
-		return fmt.Errorf("could not unmarshal yaml: %w", err)
+		return fmt.Errorf("unable to unmarshal yaml: %w", err)
 	}
 
 	parsed, err := ulid.Parse(s)
 	if err != nil {
-		return fmt.Errorf("could not parse ulid (%s): %w", s, err)
+		return fmt.Errorf("unable to parse ulid (%s): %w", s, err)
 	}
 
 	*u = ULID(parsed)
@@ -123,24 +123,24 @@ const permissions = 0777
 // loadConfigFromFile reads the file located at path and returns a Config based on it.
 func loadConfigFromFile(path string) (Config, error) {
 	if _, err := os.Stat(path); err != nil {
-		return Config{}, fmt.Errorf("could not location file %s: %w", path, err)
+		return Config{}, fmt.Errorf("unable to locate file %s: %w", path, err)
 	}
 
 	analytics, err := os.ReadFile(path)
 	if err != nil {
-		return Config{}, fmt.Errorf("could not read analytics file: %w", err)
+		return Config{}, fmt.Errorf("unable to read analytics file: %w", err)
 	}
 
 	var c Config
 
 	if err := yaml.Unmarshal(analytics, &c.Other); err != nil {
-		return Config{}, fmt.Errorf("could not unmarshal yaml: %w", err)
+		return Config{}, fmt.Errorf("unable to unmarshal yaml: %w", err)
 	}
 	if v, ok := c.Other[fieldUserID]; ok {
 		// the field can exist with a nil value, verify the value is a string before using it as a string
 		if s, ok := v.(string); ok {
 			if parsed, err := ulid.Parse(s); err != nil {
-				return Config{}, fmt.Errorf("could not parse ulid (%s): %w", v, err)
+				return Config{}, fmt.Errorf("unable to parse ulid (%s): %w", v, err)
 			} else {
 				c.UserID = ULID(parsed)
 			}
@@ -151,7 +151,7 @@ func loadConfigFromFile(path string) (Config, error) {
 		// the field can exist with a nil value, verify the value is a string before using it as a string
 		if s, ok := v.(string); ok {
 			if parsed, err := uuid.Parse(s); err != nil {
-				return Config{}, fmt.Errorf("could not parse uuid (%s): %w", v, err)
+				return Config{}, fmt.Errorf("unable to parse uuid (%s): %w", v, err)
 			} else {
 				c.AnalyticsID = UUID(parsed)
 			}
@@ -174,17 +174,17 @@ const header = `# This file is used by Airbyte to track anonymous usage statisti
 func writeConfigToFile(path string, cfg Config) error {
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
-		return fmt.Errorf("could not marshal config: %w", err)
+		return fmt.Errorf("unable to marshal config: %w", err)
 	}
 
 	parent := filepath.Dir(path)
 	// create necessary directories
 	if err := os.MkdirAll(parent, permissions); err != nil {
-		return fmt.Errorf("could not create directories %s: %w", parent, err)
+		return fmt.Errorf("unable to create directories %s: %w", parent, err)
 	}
 
 	if err := os.WriteFile(path, append([]byte(header), data...), permissions); err != nil {
-		return fmt.Errorf("could not write config to file %s: %w", path, err)
+		return fmt.Errorf("unable to write config to file %s: %w", path, err)
 	}
 
 	return nil

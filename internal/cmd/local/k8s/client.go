@@ -189,7 +189,7 @@ func (d *DefaultK8sClient) SecretCreateOrUpdate(ctx context.Context, secretType 
 	if err == nil {
 		// update
 		if _, err := d.ClientSet.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("could not update the secret %s: %w", name, err)
+			return fmt.Errorf("unable to update the secret %s: %w", name, err)
 		}
 
 		return nil
@@ -197,7 +197,7 @@ func (d *DefaultK8sClient) SecretCreateOrUpdate(ctx context.Context, secretType 
 
 	if k8serrors.IsNotFound(err) {
 		if _, err := d.ClientSet.CoreV1().Secrets(namespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
-			return fmt.Errorf("could not create the secret %s: %w", name, err)
+			return fmt.Errorf("unable to create the secret %s: %w", name, err)
 		}
 
 		return nil
@@ -227,12 +227,12 @@ func (d *DefaultK8sClient) LogsGet(ctx context.Context, namespace string, name s
 	req := d.ClientSet.CoreV1().Pods(namespace).GetLogs(name, &corev1.PodLogOptions{})
 	reader, err := req.Stream(ctx)
 	if err != nil {
-		return "", fmt.Errorf("could not get logs for pod %s: %w", name, err)
+		return "", fmt.Errorf("unable to get logs for pod %s: %w", name, err)
 	}
 	defer reader.Close()
 	buf := new(strings.Builder)
 	if _, err := io.Copy(buf, reader); err != nil {
-		return "", fmt.Errorf("could not copy logs from pod %s: %w", name, err)
+		return "", fmt.Errorf("unable to copy logs from pod %s: %w", name, err)
 	}
 	return buf.String(), nil
 }

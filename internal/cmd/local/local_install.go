@@ -55,7 +55,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 			dockerVersion, err := dockerInstalled(cmd.Context())
 			if err != nil {
 				pterm.Error.Println("Unable to determine if Docker is installed")
-				return fmt.Errorf("could not determine docker installation status: %w", err)
+				return fmt.Errorf("unable to determine docker installation status: %w", err)
 			}
 
 			telClient.Attr("docker_version", dockerVersion.Version)
@@ -89,7 +89,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 							dockerClient, err = docker.New(cmd.Context())
 							if err != nil {
 								pterm.Error.Printfln("Could not connect to Docker daemon")
-								return fmt.Errorf("could not connect to docker: %w", err)
+								return fmt.Errorf("unable to connect to docker: %w", err)
 							}
 						}
 
@@ -126,7 +126,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 				)
 				if err != nil {
 					pterm.Error.Printfln("Failed to initialize 'local' command")
-					return fmt.Errorf("could not initialize local command: %w", err)
+					return fmt.Errorf("unable to initialize local command: %w", err)
 				}
 
 				opts := local.InstallOpts{
