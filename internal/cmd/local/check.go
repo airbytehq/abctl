@@ -6,6 +6,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/pterm/pterm"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -61,17 +62,21 @@ func portAvailable(ctx context.Context, port int) error {
 		return nil
 	}
 
-	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+	// net.Listen doesn't support providing a context
+	lc := &net.ListenConfig{}
+	listener, err := lc.Listen(ctx, "tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
+		pterm.Debug.Println(fmt.Sprintf("Unable to listen on port '%d': %s", port, err))
+
 		// check if an existing airbyte installation is already listening on this port
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d", port), nil)
-		if err != nil {
+		req, errInner := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d", port), nil)
+		if errInner != nil {
 			pterm.Error.Printfln("Port %d request could not be created", port)
 			return fmt.Errorf("%w: could not create request: %w", localerr.ErrPort, err)
 		}
 
-		res, err := httpClient.Do(req)
-		if err != nil {
+		res, errInner := httpClient.Do(req)
+		if errInner != nil {
 			pterm.Error.Printfln("Port %d appears to already be in use", port)
 			return fmt.Errorf("%w: could not send request: %w", localerr.ErrPort, err)
 		}
@@ -80,6 +85,19 @@ func portAvailable(ctx context.Context, port int) error {
 			pterm.Success.Printfln("Port %d appears to be running a previous Airbyte installation", port)
 			return nil
 		}
+
+		// if we're here, we haven't been able to determine why this port may or may not be available
+		body, errInner := io.ReadAll(res.Body)
+		if errInner != nil {
+			pterm.Debug.Println(fmt.Sprintf("Unable to read response body: %s", errInner))
+		}
+		pterm.Debug.Println(fmt.Sprintf(
+			"Unable to determine if port '%d' is in use:\n  StatusCode: %d\n  Body: %s",
+			port, res.StatusCode, body,
+		))
+
+		pterm.Error.Println(fmt.Sprintf("Unable to determine if port '%d' is available", port))
+		return fmt.Errorf("unable to determine if port '%d' is available: %w", port, err)
 	}
 	// if we're able to bind to the port (and then release it), it should be available
 	defer func() {
