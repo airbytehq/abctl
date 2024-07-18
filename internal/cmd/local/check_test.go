@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
-	"github.com/airbytehq/abctl/internal/cmd/local/dockertest"
+	"github.com/airbytehq/abctl/internal/cmd/local/docker/dockertest"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
