@@ -330,7 +330,7 @@ func TestPort_Err(t *testing.T) {
 	}
 }
 
-// -- mocks
+// --- mocks
 var _ pinger = (*mockPinger)(nil)
 
 type mockPinger struct {
