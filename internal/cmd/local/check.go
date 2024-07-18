@@ -96,7 +96,10 @@ func portAvailable(ctx context.Context, port int) error {
 			port, res.StatusCode, body,
 		))
 
-		pterm.Error.Println(fmt.Sprintf("Unable to determine if port '%d' is available", port))
+		pterm.Error.Println(fmt.Sprintf(
+			"Unable to determine if port '%d' is available, consider specifying a different port",
+			port,
+		))
 		return fmt.Errorf("unable to determine if port '%d' is available: %w", port, err)
 	}
 	// if we're able to bind to the port (and then release it), it should be available
