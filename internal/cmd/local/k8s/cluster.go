@@ -68,7 +68,7 @@ nodes:
 		port)
 
 	opts := []cluster.CreateOption{
-		cluster.CreateWithWaitForReady(120 * time.Second),
+		cluster.CreateWithWaitForReady(5 * time.Minute),
 		cluster.CreateWithKubeconfigPath(k.kubeconfig),
 		cluster.CreateWithNodeImage("kindest/node:" + k8sVersion),
 		cluster.CreateWithRawConfig([]byte(rawCfg)),
