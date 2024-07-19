@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"testing"
 )
@@ -16,5 +17,5 @@ func TestRegistry_Start(t *testing.T) {
 	d, _ := docker.New(ctx)
 	r := &Registry{d: d}
 
-	r.Start(ctx)
+	fmt.Println(r.Start(ctx))
 }

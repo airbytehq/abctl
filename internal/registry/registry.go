@@ -17,30 +17,38 @@ type Registry struct {
 const (
 	dockerImage = "registry:2.8"
 	port        = 6598
-	name        = "abctl-registry"
+	name        = "airbyte-abctl-registry"
 )
 
+// docker run -d -p 6598:5000 --restart always --name abctl-registry registry:2.8
 func (r *Registry) Start(ctx context.Context) error {
 	// check if the registry is already running
 	if c, err := r.d.Client.ContainerInspect(ctx, name); err == nil {
+		fmt.Println("id", c.ID)
+		fmt.Println("name", c.Name)
 		fmt.Println("found labels", c.Config.Labels)
-		// container already running
-		return nil
+		fmt.Println("running", c.State.Running)
+
+		if c.State.Running {
+			// already running nothing to do
+			return nil
+		}
+
+		return r.start(ctx, c.ID)
 	}
 
 	if err := r.d.ImagePullIfMissing(ctx, dockerImage); err != nil {
 		return fmt.Errorf("unable to pull image '%s': %w", dockerImage, err)
 	}
 
-	if err := r.createContainer(ctx); err != nil {
-		return fmt.Errorf("unable to create container: %w", err)
+	if containerID, err := r.create(ctx); err != nil {
+		return err
+	} else {
+		return r.start(ctx, containerID)
 	}
-
-	return nil
 }
 
-func (r *Registry) createContainer(ctx context.Context) error {
-	// docker run -d -p 6598:5000 --restart always --name abctl-registry registry:2.8
+func (r *Registry) create(ctx context.Context) (string, error) {
 	con, err := r.d.Client.ContainerCreate(
 		ctx,
 		&container.Config{
@@ -65,11 +73,15 @@ func (r *Registry) createContainer(ctx context.Context) error {
 		name,
 	)
 	if err != nil {
-		return fmt.Errorf("unable to create container for image '%s': %w", dockerImage, err)
+		return "", fmt.Errorf("unable to create container for image '%s': %w", dockerImage, err)
 	}
 
-	if err := r.d.Client.ContainerStart(ctx, con.ID, container.StartOptions{}); err != nil {
-		return fmt.Errorf("unable to start container '%s': %w", con, err)
+	return con.ID, nil
+}
+
+func (r *Registry) start(ctx context.Context, containerID string) error {
+	if err := r.d.Client.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
+		return fmt.Errorf("unable to start container '%s': %w", containerID, err)
 	}
 
 	return nil
