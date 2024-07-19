@@ -8,11 +8,13 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pterm/pterm"
 	"io"
 	"runtime"
 	"strconv"
@@ -135,6 +137,39 @@ func createAndPing(ctx context.Context, newPing newPing, host string, opts []cli
 	return cli, nil
 }
 
+// ImagePullIfMissing will pull the specific img if it is not already on the host machine
+func (d *Docker) ImagePullIfMissing(ctx context.Context, img string) error {
+	pterm.Debug.Println(fmt.Sprintf("Checking if the image '%s' already exists", img))
+	filter := filters.NewArgs()
+	filter.Add("reference", img)
+	imgs, err := d.Client.ImageList(ctx, image.ListOptions{Filters: filter})
+	if err != nil {
+		pterm.Error.Println(fmt.Sprintf("Unable to list docker images when checking for '%s'", img))
+		return fmt.Errorf("unable to list image '%s': %w", img, err)
+	}
+
+	// if it does exist, there is nothing else to do
+	if len(imgs) > 0 {
+		pterm.Debug.Println(fmt.Sprintf("Image '%s' already exists", img))
+		return nil
+	}
+
+	pterm.Debug.Println(fmt.Sprintf("Image '%s' not found, pulling it", img))
+	// if we're here, then we need to pull the image
+	reader, err := d.Client.ImagePull(ctx, img, image.PullOptions{})
+	if err != nil {
+		pterm.Error.Println(fmt.Sprintf("unable to pull the docker image '%s'", img))
+		return fmt.Errorf("unable to pull image '%s': %w", img, err)
+	}
+	pterm.Debug.Println(fmt.Sprintf("Successfully pulled the docker image '%s'", img))
+	defer reader.Close()
+	if _, err := io.Copy(io.Discard, reader); err != nil {
+		return fmt.Errorf("error fetching output: %w", err)
+	}
+
+	return nil
+}
+
 // Version returns the version information from the underlying docker process.
 func (d *Docker) Version(ctx context.Context) (Version, error) {
 	ver, err := d.Client.ServerVersion(ctx)
@@ -147,7 +182,6 @@ func (d *Docker) Version(ctx context.Context) (Version, error) {
 		Arch:     ver.Arch,
 		Platform: ver.Platform.Name,
 	}, nil
-
 }
 
 // Port returns the host-port the underlying docker process is currently bound to, for the given container.

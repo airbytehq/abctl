@@ -8,12 +8,9 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/pterm/pterm"
-	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -26,21 +23,21 @@ const (
 )
 
 // FromDockerVolume handles migrating the existing docker compose database into the abctl managed k8s cluster.
-func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume string) error {
-	if v := volumeExists(ctx, dockerCli, volume); v == "" {
+func FromDockerVolume(ctx context.Context, dockerCli docker.Docker, volume string) error {
+	if v := volumeExists(ctx, dockerCli.Client, volume); v == "" {
 		return errors.New(fmt.Sprintf("volume %s does not exist", volume))
 	}
 
-	if err := ensureImage(ctx, dockerCli, imgAlpine); err != nil {
+	if err := dockerCli.ImagePullIfMissing(ctx, imgAlpine); err != nil {
 		return err
 	}
-	if err := ensureImage(ctx, dockerCli, imgPostgres); err != nil {
+	if err := dockerCli.ImagePullIfMissing(ctx, imgPostgres); err != nil {
 		return err
 	}
 
 	// create a container for running the `docker cp` command
 	// docker run -d -v airbyte_db:/var/lib/postgresql/data alpine:3.20 tail -f /dev/null
-	conCopy, err := dockerCli.ContainerCreate(
+	conCopy, err := dockerCli.Client.ContainerCreate(
 		ctx,
 		&container.Config{
 			Image:      imgAlpine,
@@ -73,12 +70,12 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 	}
 
 	// note the src must end with a `.`, due to how docker cp works with directories
-	if err := copyFromContainer(ctx, dockerCli, conCopy.ID, migratePGDATA+"/.", dst); err != nil {
+	if err := copyFromContainer(ctx, dockerCli.Client, conCopy.ID, migratePGDATA+"/.", dst); err != nil {
 		return fmt.Errorf("unable to copy airbyte db data from container %s: %w", conCopy.ID, err)
 	}
 	pterm.Debug.Println(fmt.Sprintf("Copied airbyte db data from container '%s' to '%s'", conCopy.ID, dst))
 
-	stopAndRemoveContainer(ctx, dockerCli, conCopy.ID)
+	stopAndRemoveContainer(ctx, dockerCli.Client, conCopy.ID)
 
 	// Create a container for adding the correct db user and renaming the database.
 	// We have inconsistencies between our docker and helm default database credentials and even our database name.
@@ -86,7 +83,7 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 	// -e POSTGRES_USER=docker -e POSTGRES_PASSWORD=docker -e POSTGRES_DB=airbyte -e PGDATA=/var/lib/postgresql/data \
 	// -v ~/.airbyte/abctl/data/airbyte-volume-db/pgdata:/var/lib/postgresql/data
 	// postgres:13-alpine
-	conTransform, err := dockerCli.ContainerCreate(
+	conTransform, err := dockerCli.Client.ContainerCreate(
 		ctx,
 		&container.Config{
 			Image: imgPostgres,
@@ -112,11 +109,11 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 	}
 	pterm.Debug.Println(fmt.Sprintf("Created secondary migration container '%s'", conTransform.ID))
 	pterm.Debug.Println(fmt.Sprintf("Container was created with the following warnings: %s", conTransform.Warnings))
-	if err := dockerCli.ContainerStart(ctx, conTransform.ID, container.StartOptions{}); err != nil {
+	if err := dockerCli.Client.ContainerStart(ctx, conTransform.ID, container.StartOptions{}); err != nil {
 		return fmt.Errorf("unable to start container %s: %w", conTransform.ID, err)
 	}
 	// cleanup and remove container when we're done
-	defer func() { stopAndRemoveContainer(ctx, dockerCli, conTransform.ID) }()
+	defer func() { stopAndRemoveContainer(ctx, dockerCli.Client, conTransform.ID) }()
 
 	// TODO figure out a better way to determine when the container has successfully started
 	time.Sleep(10 * time.Second)
@@ -130,7 +127,7 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 	// add a new database user to match the default helm user
 	now := time.Now()
 	pterm.Debug.Println("Adding Airbyte postgres user")
-	if err := exec(ctx, dockerCli, conTransform.ID, cmdPsqlUser); err != nil {
+	if err := exec(ctx, dockerCli.Client, conTransform.ID, cmdPsqlUser); err != nil {
 		pterm.Debug.Println("Failed to add postgres user")
 		return fmt.Errorf("unable to update postgres user: %w", err)
 	}
@@ -139,7 +136,7 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 	// rename the database to match the default helm database name
 	pterm.Debug.Println("Renaming database")
 	now = time.Now()
-	if err := exec(ctx, dockerCli, conTransform.ID, cmdPsqlRename); err != nil {
+	if err := exec(ctx, dockerCli.Client, conTransform.ID, cmdPsqlRename); err != nil {
 		pterm.Debug.Println("Failed to rename database")
 		return fmt.Errorf("unable to rename postgres database: %w", err)
 	}
@@ -156,39 +153,6 @@ func volumeExists(ctx context.Context, d docker.Client, volumeID string) string 
 	} else {
 		return v.Mountpoint
 	}
-}
-
-func ensureImage(ctx context.Context, d docker.Client, img string) error {
-	// check if an image already exists on the host
-	pterm.Debug.Println(fmt.Sprintf("Checking if the image '%s' already exists", img))
-	filter := filters.NewArgs()
-	filter.Add("reference", img)
-	imgs, err := d.ImageList(ctx, image.ListOptions{Filters: filter})
-	if err != nil {
-		pterm.Error.Println(fmt.Sprintf("unable to list docker images when checking for '%s'", img))
-		return fmt.Errorf("unable to list image '%s': %w", img, err)
-	}
-
-	// if it does exist, there is nothing else to do
-	if len(imgs) > 0 {
-		pterm.Debug.Println(fmt.Sprintf("Image '%s' already exists", img))
-		return nil
-	}
-
-	pterm.Debug.Println(fmt.Sprintf("Image '%s' not found, pulling it", img))
-	// if we're here, then we need to pull the image
-	reader, err := d.ImagePull(ctx, img, image.PullOptions{})
-	if err != nil {
-		pterm.Error.Println(fmt.Sprintf("unable to pull the docker image '%s'", img))
-		return fmt.Errorf("unable to pull image '%s': %w", img, err)
-	}
-	pterm.Debug.Println(fmt.Sprintf("Successfully pulled the docker image '%s'", img))
-	defer reader.Close()
-	if _, err := io.Copy(io.Discard, reader); err != nil {
-		return fmt.Errorf("error fetching output: %w", err)
-	}
-
-	return nil
 }
 
 // copyFromContainer emulates the `docker cp` command.

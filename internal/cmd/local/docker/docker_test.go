@@ -6,9 +6,13 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/docker/dockertest"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"io"
+	"strings"
 	"testing"
 )
 
@@ -218,6 +222,71 @@ func TestNewWithOptions_DarwinPingErrFirstAttemptOnly(t *testing.T) {
 	}
 	if cli == nil {
 		t.Error("client should not be nil")
+	}
+}
+
+func TestImagePullIfMissing(t *testing.T) {
+	errTest := errors.New("error")
+	tests := []struct {
+		name           string
+		img            string
+		imgListSummary []image.Summary
+		imgListErr     error
+		imgPull        io.ReadCloser
+		imgPullErr     error
+		exp            error
+	}{
+		{
+			name:           "image already exists",
+			img:            "image",
+			imgListSummary: []image.Summary{{ID: "imageID"}},
+		},
+		{
+			name:       "error listing images",
+			img:        "image",
+			imgListErr: errTest,
+			exp:        errTest, // the actual error will wrap this one
+		},
+		{
+			name:       "error pulling image",
+			img:        "image",
+			imgPullErr: errTest,
+			exp:        errTest,
+		},
+		{
+			name:    "successfully pulled image",
+			img:     "image-success",
+			imgPull: io.NopCloser(strings.NewReader("image-success")),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cli := Docker{
+				Client: dockertest.MockClient{
+					FnImageList: func(ctx context.Context, options image.ListOptions) ([]image.Summary, error) {
+						if d := cmp.Diff([]string{tt.img}, options.Filters.Get("reference")); d != "" {
+							t.Errorf("image filter mismatch (-want +got): %s", d)
+						}
+
+						return tt.imgListSummary, tt.imgListErr
+					},
+
+					FnImagePull: func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error) {
+						if d := cmp.Diff(tt.img, refStr); d != "" {
+							t.Errorf("image mismatch (-want +got): %s", d)
+						}
+
+						return tt.imgPull, tt.imgPullErr
+					},
+				},
+			}
+
+			err := cli.ImagePullIfMissing(context.Background(), tt.img)
+			if d := cmp.Diff(tt.exp, err, cmpopts.EquateErrors()); d != "" {
+				t.Errorf("error mismatch (-want +got): %s", d)
+			}
+		})
 	}
 }
 
