@@ -22,7 +22,6 @@ import (
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
-	"golang.org/x/crypto/bcrypt"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
@@ -422,12 +421,6 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		return fmt.Errorf("unable to install nginx chart: %w", err)
 	}
 
-	c.spinner.UpdateText("Configuring Basic-Auth")
-	// basic auth
-	if err := c.handleBasicAuthSecret(ctx, opts.BasicAuthUser, opts.BasicAuthPass); err != nil {
-		return fmt.Errorf("unable to create or update basic-auth secret: %w", err)
-	}
-
 	if err := c.handleIngress(ctx); err != nil {
 		return err
 	}
@@ -541,26 +534,6 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	default:
 		pterm.Debug.Printfln("Received an unsupported event type: %s", e.Type)
 	}
-}
-
-// handleBasicAuthSecret creates or updates the appropriate basic auth credentials for ingress.
-func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) error {
-	hashedPass, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
-	if err != nil {
-		pterm.Error.Println("Basic Auth secret could not be hashed.\n" +
-			"This may indicate an issue with the username or password provided.\n" +
-			"Please provider different credentials and try again.")
-
-		return fmt.Errorf("unable to hash basic auth password: %w", err)
-	}
-
-	data := map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))}
-	if err := c.k8s.SecretCreateOrUpdate(ctx, corev1.SecretTypeOpaque, airbyteNamespace, "basic-auth", data); err != nil {
-		pterm.Error.Println("Could not create Basic-Auth secret")
-		return fmt.Errorf("unable to create Basic-Auth secret: %w", err)
-	}
-	pterm.Success.Println("Basic-Auth secret created")
-	return nil
 }
 
 func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {

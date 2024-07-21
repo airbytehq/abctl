@@ -16,11 +16,6 @@ func ingress() *networkingv1.Ingress {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      airbyteIngress,
 			Namespace: airbyteNamespace,
-			Annotations: map[string]string{
-				"nginx.ingress.kubernetes.io/auth-type":   "basic",
-				"nginx.ingress.kubernetes.io/auth-secret": "basic-auth",
-				"nginx.ingress.kubernetes.io/auth-realm":  "Authentication Required - Airbyte (abctl)",
-			},
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &ingressClassName,
