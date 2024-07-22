@@ -214,6 +214,7 @@ type InstallOpts struct {
 	HelmChartVersion string
 	ValuesFile       string
 	Migrate          bool
+	Host             string
 
 	Docker *docker.Docker
 
@@ -428,7 +429,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		return fmt.Errorf("unable to create or update basic-auth secret: %w", err)
 	}
 
-	if err := c.handleIngress(ctx); err != nil {
+	if err := c.handleIngress(ctx, opts.Host); err != nil {
 		return err
 	}
 
@@ -440,12 +441,12 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	return nil
 }
 
-func (c *Command) handleIngress(ctx context.Context) error {
+func (c *Command) handleIngress(ctx context.Context, host string) error {
 	c.spinner.UpdateText("Checking for existing Ingress")
 
 	if c.k8s.IngressExists(ctx, airbyteNamespace, airbyteIngress) {
 		pterm.Success.Println("Found existing Ingress")
-		if err := c.k8s.IngressUpdate(ctx, airbyteNamespace, ingress()); err != nil {
+		if err := c.k8s.IngressUpdate(ctx, airbyteNamespace, ingress(host)); err != nil {
 			pterm.Error.Printfln("Unable to update existing Ingress")
 			return fmt.Errorf("unable to update existing ingress: %w", err)
 		}
@@ -454,7 +455,7 @@ func (c *Command) handleIngress(ctx context.Context) error {
 	}
 
 	pterm.Info.Println("No existing Ingress found, creating one")
-	if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress()); err != nil {
+	if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress(host)); err != nil {
 		pterm.Error.Println("Unable to create ingress")
 		return fmt.Errorf("unable to create ingress: %w", err)
 	}
