@@ -38,6 +38,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		flagChartVersion    string
 		flagMigrate         bool
 		flagPort            int
+		flagHost            string
 
 		flagDockerServer string
 		flagDockerUser   string
@@ -136,6 +137,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					ValuesFile:       flagChartValuesFile,
 					Migrate:          flagMigrate,
 					Docker:           dockerClient,
+					Host:             flagHost,
 
 					DockerServer: flagDockerServer,
 					DockerUser:   flagDockerUser,
@@ -183,6 +185,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVarP(&flagBasicAuthUser, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	cmd.Flags().StringVarP(&flagBasicAuthPass, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
+	cmd.Flags().StringVar(&flagHost, "host", "localhost", "ingress http host")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")

@@ -7,7 +7,7 @@ import (
 )
 
 // ingress creates an ingress type for defining the webapp ingress rules.
-func ingress() *networkingv1.Ingress {
+func ingress(host string) *networkingv1.Ingress {
 	var pathType = networkingv1.PathType("Prefix")
 	var ingressClassName = "nginx"
 
@@ -26,7 +26,7 @@ func ingress() *networkingv1.Ingress {
 			IngressClassName: &ingressClassName,
 			Rules: []networkingv1.IngressRule{
 				{
-					Host: "localhost",
+					Host: host,
 					IngressRuleValue: networkingv1.IngressRuleValue{
 						HTTP: &networkingv1.HTTPIngressRuleValue{
 							Paths: []networkingv1.HTTPIngressPath{
