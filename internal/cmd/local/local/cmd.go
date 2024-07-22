@@ -434,7 +434,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	c.spinner.UpdateText("Verifying ingress")
-	if err := c.openBrowser(ctx, fmt.Sprintf("http://localhost:%d", c.portHTTP)); err != nil {
+	if err := c.openBrowser(ctx, fmt.Sprintf("http://%s:%d", opts.Host, c.portHTTP)); err != nil {
 		return err
 	}
 
