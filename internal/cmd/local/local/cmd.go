@@ -8,6 +8,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/migrate"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -203,6 +204,7 @@ type InstallOpts struct {
 
 	HelmChartVersion string
 	ValuesFile       string
+	SecretsFile      string
 	Migrate          bool
 	Host             string
 
@@ -302,13 +304,13 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
-	var values string
+	var vals string
 	if opts.ValuesFile != "" {
 		raw, err := os.ReadFile(opts.ValuesFile)
 		if err != nil {
 			return fmt.Errorf("unable to read values file '%s': %w", opts.ValuesFile, err)
 		}
-		values = string(raw)
+		vals = string(raw)
 	}
 
 	go c.watchEvents(ctx)
@@ -369,6 +371,43 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		airbyteValues = append(airbyteValues, fmt.Sprintf("global.imagePullSecrets[0].name=%s", dockerAuthSecretName))
 	}
 
+	{
+		if opts.SecretsFile != "" {
+			c.spinner.UpdateText("Creating secrets from --secrets")
+
+			raw, err := os.ReadFile(opts.SecretsFile)
+			if err != nil {
+				pterm.Error.Println(fmt.Sprintf("Unable to read secrets file '%s': %s", opts.SecretsFile, err))
+				return fmt.Errorf("unable to read secrets file '%s': %w", opts.SecretsFile, err)
+			}
+			pterm.Debug.Println(string(raw))
+
+			var secret corev1.Secret
+			if err := yaml.Unmarshal(raw, &secret); err != nil {
+				pterm.Error.Println(fmt.Sprintf("Unable to unmarshal secrets file '%s': %s", opts.SecretsFile, err))
+				return fmt.Errorf("unable to unmarshal secrets file '%s': %w", opts.SecretsFile, err)
+			}
+
+			pterm.Debug.Println(fmt.Sprintf("%+v", secret))
+
+			pterm.Debug.Println(fmt.Sprintf("Found secret\n  name: %s\n  type: %s", secret.ObjectMeta.Name, secret.Type))
+			data := secret.Data
+			if len(secret.StringData) > 0 {
+				data = map[string][]byte{}
+				for k, v := range secret.StringData {
+					data[k] = []byte(v)
+				}
+			}
+
+			if err := c.k8s.SecretCreateOrUpdate(ctx, secret.Type, airbyteNamespace, secret.ObjectMeta.Name, data); err != nil {
+				pterm.Error.Println(fmt.Sprintf("Unable to create secret from file '%s'", opts.SecretsFile))
+				return fmt.Errorf("unable to create secret from file '%s': %w", opts.SecretsFile, err)
+			}
+
+			pterm.Success.Println("Secrets created or updated successfully")
+		}
+	}
+
 	if err := c.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     airbyteRepoName,
@@ -378,7 +417,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		chartVersion: opts.HelmChartVersion,
 		namespace:    airbyteNamespace,
 		values:       airbyteValues,
-		valuesYAML:   values,
+		valuesYAML:   vals,
 	}); err != nil {
 		return fmt.Errorf("unable to install airbyte chart: %w", err)
 	}
