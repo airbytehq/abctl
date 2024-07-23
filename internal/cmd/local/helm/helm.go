@@ -17,10 +17,10 @@ import (
 // Client primarily for testing purposes
 type Client interface {
 	AddOrUpdateChartRepo(entry repo.Entry) error
-	GetChart(string, *action.ChartPathOptions) (*chart.Chart, string, error)
+	GetChart(name string, options *action.ChartPathOptions) (*chart.Chart, string, error)
 	GetRelease(name string) (*release.Release, error)
 	InstallOrUpgradeChart(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error)
-	UninstallReleaseByName(string) error
+	UninstallReleaseByName(name string) error
 }
 
 // New returns the default helm client
