@@ -34,8 +34,14 @@ func New(kubecfg, kubectx, namespace string) (Client, error) {
 		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
 	}
 
+	logger := &helmLogger{}
 	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
-		Options:    &helmclient.Options{Namespace: namespace, Output: &helmLogger{}, DebugLog: func(format string, v ...interface{}) {}},
+		Options: &helmclient.Options{
+			Namespace: namespace,
+			Output:    logger,
+			DebugLog:  logger.Debug,
+			Debug:     true,
+		},
 		RestConfig: restCfg,
 	})
 	if err != nil {
@@ -52,4 +58,8 @@ type helmLogger struct {
 func (d *helmLogger) Write(p []byte) (int, error) {
 	pterm.Debug.Println(fmt.Sprintf("helm: %s", string(p)))
 	return len(p), nil
+}
+
+func (d *helmLogger) Debug(format string, v ...interface{}) {
+	pterm.Debug.Println(fmt.Sprintf("helm - DEBUG: "+format, v...))
 }
