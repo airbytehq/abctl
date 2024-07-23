@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
@@ -338,7 +339,7 @@ func TestCommand_Install_InvalidValuesFile(t *testing.T) {
 // ---
 // only mocks below here
 // ---
-var _ HelmClient = (*mockHelmClient)(nil)
+var _ helm.Client = (*mockHelmClient)(nil)
 
 type mockHelmClient struct {
 	addOrUpdateChartRepo   func(entry repo.Entry) error

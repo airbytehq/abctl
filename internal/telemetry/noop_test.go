@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
 	"testing"
 )
 
@@ -22,6 +23,10 @@ func TestNoopClient(t *testing.T) {
 	}
 
 	cli.Attr("k", "v'")
+
+	if d := cmp.Diff(uuid.Nil, cli.User()); d != "" {
+		t.Errorf("user should be nil (-want +got): %s", d)
+	}
 }
 
 // Verify that the func() error is actually called for the NoopClient.Wrap

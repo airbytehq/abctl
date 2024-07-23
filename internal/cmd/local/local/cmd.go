@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/migrate"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	corev1 "k8s.io/api/core/v1"
@@ -23,8 +24,6 @@ import (
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,15 +51,6 @@ const Port = 8000
 // dockerAuthSecretName is the name of the secret which holds the docker authentication information.
 const dockerAuthSecretName = "docker-auth"
 
-// HelmClient primarily for testing purposes
-type HelmClient interface {
-	AddOrUpdateChartRepo(entry repo.Entry) error
-	GetChart(string, *action.ChartPathOptions) (*chart.Chart, string, error)
-	GetRelease(name string) (*release.Release, error)
-	InstallOrUpgradeChart(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error)
-	UninstallReleaseByName(string) error
-}
-
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -73,7 +63,7 @@ type Command struct {
 	provider k8s.Provider
 	cluster  k8s.Cluster
 	http     HTTPClient
-	helm     HelmClient
+	helm     helm.Client
 	k8s      k8s.Client
 	portHTTP int
 	spinner  *pterm.SpinnerPrinter
@@ -100,7 +90,7 @@ func WithHTTPClient(client HTTPClient) Option {
 }
 
 // WithHelmClient define the helm client for this command.
-func WithHelmClient(client HelmClient) Option {
+func WithHelmClient(client helm.Client) Option {
 	return func(c *Command) {
 		c.helm = client
 	}
@@ -171,7 +161,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	// set the helm client, if not defined
 	if c.helm == nil {
 		var err error
-		if c.helm, err = defaultHelm(provider.Kubeconfig, provider.Context); err != nil {
+		if c.helm, err = helm.New(provider.Kubeconfig, provider.Context, airbyteNamespace); err != nil {
 			return nil, err
 		}
 	}
@@ -213,6 +203,7 @@ type InstallOpts struct {
 	HelmChartVersion string
 	ValuesFile       string
 	Migrate          bool
+	Host             string
 
 	Docker *docker.Docker
 
@@ -258,7 +249,7 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 		path := filepath.Join(paths.Data, name)
 
 		pterm.Debug.Println(fmt.Sprintf("Creating directory '%s'", path))
-		if err := os.MkdirAll(path, 0755); err != nil {
+		if err := os.MkdirAll(path, 0766); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Could not create directory '%s'", name))
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
@@ -421,24 +412,24 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		return fmt.Errorf("unable to install nginx chart: %w", err)
 	}
 
-	if err := c.handleIngress(ctx); err != nil {
+	if err := c.handleIngress(ctx, opts.Host); err != nil {
 		return err
 	}
 
 	c.spinner.UpdateText("Verifying ingress")
-	if err := c.openBrowser(ctx, fmt.Sprintf("http://localhost:%d", c.portHTTP)); err != nil {
+	if err := c.openBrowser(ctx, fmt.Sprintf("http://%s:%d", opts.Host, c.portHTTP)); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (c *Command) handleIngress(ctx context.Context) error {
+func (c *Command) handleIngress(ctx context.Context, host string) error {
 	c.spinner.UpdateText("Checking for existing Ingress")
 
 	if c.k8s.IngressExists(ctx, airbyteNamespace, airbyteIngress) {
 		pterm.Success.Println("Found existing Ingress")
-		if err := c.k8s.IngressUpdate(ctx, airbyteNamespace, ingress()); err != nil {
+		if err := c.k8s.IngressUpdate(ctx, airbyteNamespace, ingress(host)); err != nil {
 			pterm.Error.Printfln("Unable to update existing Ingress")
 			return fmt.Errorf("unable to update existing ingress: %w", err)
 		}
@@ -447,7 +438,7 @@ func (c *Command) handleIngress(ctx context.Context) error {
 	}
 
 	pterm.Info.Println("No existing Ingress found, creating one")
-	if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress()); err != nil {
+	if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress(host)); err != nil {
 		pterm.Error.Println("Unable to create ingress")
 		return fmt.Errorf("unable to create ingress: %w", err)
 	}
@@ -737,41 +728,10 @@ func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
 }
 
-// defaultHelm returns the default helm client
-func defaultHelm(kubecfg, kubectx string) (HelmClient, error) {
-	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
-	}
-
-	restCfg, err := k8sCfg.ClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
-	}
-
-	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
-		Options:    &helmclient.Options{Namespace: airbyteNamespace, Output: &noopWriter{}, DebugLog: func(format string, v ...interface{}) {}},
-		RestConfig: restCfg,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("unable to create helm client: %w", err)
-	}
-
-	return helm, nil
-}
-
 // k8sClientConfig returns a k8s client config using the ~/.kube/config file and the k8sContext context.
 func k8sClientConfig(kubecfg, kubectx string) (clientcmd.ClientConfig, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
 		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
 	), nil
-}
-
-// noopWriter is used by the helm client to suppress its verbose output
-type noopWriter struct {
-}
-
-func (w *noopWriter) Write(p []byte) (int, error) {
-	return len(p), nil
 }
