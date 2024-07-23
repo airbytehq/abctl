@@ -35,11 +35,11 @@ type Client interface {
 	ContainerRemove(ctx context.Context, container string, options container.RemoveOptions) error
 	ContainerStart(ctx context.Context, container string, options container.StartOptions) error
 	ContainerStop(ctx context.Context, container string, options container.StopOptions) error
-	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, types.ContainerPathStat, error)
+	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, container.PathStat, error)
 
-	ContainerExecCreate(ctx context.Context, container string, config types.ExecConfig) (types.IDResponse, error)
-	ContainerExecInspect(ctx context.Context, execID string) (types.ContainerExecInspect, error)
-	ContainerExecStart(ctx context.Context, execID string, config types.ExecStartCheck) error
+	ContainerExecCreate(ctx context.Context, container string, config container.ExecOptions) (types.IDResponse, error)
+	ContainerExecInspect(ctx context.Context, execID string) (container.ExecInspect, error)
+	ContainerExecStart(ctx context.Context, execID string, config container.ExecStartOptions) error
 
 	ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error)
 	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
