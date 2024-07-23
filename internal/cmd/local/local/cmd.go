@@ -755,41 +755,10 @@ func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
 }
 
-// defaultHelm returns the default helm client
-func defaultHelm(kubecfg, kubectx string) (helm.Client, error) {
-	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
-	}
-
-	restCfg, err := k8sCfg.ClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
-	}
-
-	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
-		Options:    &helmclient.Options{Namespace: airbyteNamespace, Output: &noopWriter{}, DebugLog: func(format string, v ...interface{}) {}},
-		RestConfig: restCfg,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("unable to create helm client: %w", err)
-	}
-
-	return helm, nil
-}
-
 // k8sClientConfig returns a k8s client config using the ~/.kube/config file and the k8sContext context.
 func k8sClientConfig(kubecfg, kubectx string) (clientcmd.ClientConfig, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
 		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
 	), nil
-}
-
-// noopWriter is used by the helm client to suppress its verbose output
-type noopWriter struct {
-}
-
-func (w *noopWriter) Write(p []byte) (int, error) {
-	return len(p), nil
 }

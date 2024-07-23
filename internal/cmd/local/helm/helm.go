@@ -50,6 +50,6 @@ type helmLogger struct {
 }
 
 func (d *helmLogger) Write(p []byte) (int, error) {
-	pterm.Debug.Println(fmt.Sprintf("helm: %s", string(p))))
+	pterm.Debug.Println(fmt.Sprintf("helm: %s", string(p)))
 	return len(p), nil
 }
