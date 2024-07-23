@@ -3,9 +3,11 @@ package k8s
 import (
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/pterm/pterm"
 	"os"
 	"path/filepath"
 	"sigs.k8s.io/kind/pkg/cluster"
+	"sigs.k8s.io/kind/pkg/log"
 )
 
 // Provider represents a k8s provider.
@@ -29,10 +31,51 @@ func (p Provider) Cluster() (Cluster, error) {
 	}
 
 	return &kindCluster{
-		p:           cluster.NewProvider(),
+		p:           cluster.NewProvider(cluster.ProviderWithLogger(&kindLogger{pterm: pterm.Debug})),
 		kubeconfig:  p.Kubeconfig,
 		clusterName: p.ClusterName,
 	}, nil
+}
+
+var _ log.Logger = (*kindLogger)(nil)
+var _ log.InfoLogger = (*kindLogger)(nil)
+
+// kindLogger implements the k8s logger interfaces.
+// Necessarily in order to capture kind specify logging for debug purposes
+type kindLogger struct {
+	pterm pterm.PrefixPrinter
+}
+
+func (k *kindLogger) Info(message string) {
+	k.pterm.Println("kind - INFO: " + message)
+}
+
+func (k *kindLogger) Infof(format string, args ...interface{}) {
+	k.pterm.Println(fmt.Sprintf("kind - INFO: "+format, args...))
+}
+
+func (k *kindLogger) Enabled() bool {
+	return true
+}
+
+func (k *kindLogger) Warn(message string) {
+	k.pterm.Println("kind - WARN: " + message)
+}
+
+func (k *kindLogger) Warnf(format string, args ...interface{}) {
+	k.pterm.Println(fmt.Sprintf("kind - WARN: "+format, args...))
+}
+
+func (k *kindLogger) Error(message string) {
+	k.pterm.Println("kind - ERROR: " + message)
+}
+
+func (k *kindLogger) Errorf(format string, args ...interface{}) {
+	k.pterm.Println(fmt.Sprintf("kind - ERROR: "+format, args...))
+}
+
+func (k *kindLogger) V(level log.Level) log.InfoLogger {
+	return k
 }
 
 const (
