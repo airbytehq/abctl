@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/migrate"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	corev1 "k8s.io/api/core/v1"
@@ -24,8 +25,6 @@ import (
 	"github.com/pterm/pterm"
 	"golang.org/x/crypto/bcrypt"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,15 +52,6 @@ const Port = 8000
 // dockerAuthSecretName is the name of the secret which holds the docker authentication information.
 const dockerAuthSecretName = "docker-auth"
 
-// HelmClient primarily for testing purposes
-type HelmClient interface {
-	AddOrUpdateChartRepo(entry repo.Entry) error
-	GetChart(string, *action.ChartPathOptions) (*chart.Chart, string, error)
-	GetRelease(name string) (*release.Release, error)
-	InstallOrUpgradeChart(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error)
-	UninstallReleaseByName(string) error
-}
-
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -74,7 +64,7 @@ type Command struct {
 	provider k8s.Provider
 	cluster  k8s.Cluster
 	http     HTTPClient
-	helm     HelmClient
+	helm     helm.Client
 	k8s      k8s.Client
 	portHTTP int
 	spinner  *pterm.SpinnerPrinter
@@ -101,7 +91,7 @@ func WithHTTPClient(client HTTPClient) Option {
 }
 
 // WithHelmClient define the helm client for this command.
-func WithHelmClient(client HelmClient) Option {
+func WithHelmClient(client helm.Client) Option {
 	return func(c *Command) {
 		c.helm = client
 	}
@@ -172,7 +162,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	// set the helm client, if not defined
 	if c.helm == nil {
 		var err error
-		if c.helm, err = defaultHelm(provider.Kubeconfig, provider.Context); err != nil {
+		if c.helm, err = helm.New(provider.Kubeconfig, provider.Context, airbyteNamespace); err != nil {
 			return nil, err
 		}
 	}
@@ -766,7 +756,7 @@ func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 }
 
 // defaultHelm returns the default helm client
-func defaultHelm(kubecfg, kubectx string) (HelmClient, error) {
+func defaultHelm(kubecfg, kubectx string) (helm.Client, error) {
 	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
