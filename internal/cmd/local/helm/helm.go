@@ -10,6 +10,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
+	"io"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -34,7 +35,7 @@ func New(kubecfg, kubectx, namespace string) (Client, error) {
 		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
 	}
 
-	logger := &helmLogger{}
+	logger := helmLogger{}
 	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
 		Options: &helmclient.Options{
 			Namespace: namespace,
@@ -51,15 +52,17 @@ func New(kubecfg, kubectx, namespace string) (Client, error) {
 	return helm, nil
 }
 
+var _ io.Writer = (*helmLogger)(nil)
+
 // helmLogger is used by the Client to convert all helm output into debug logs.
 type helmLogger struct {
 }
 
-func (d *helmLogger) Write(p []byte) (int, error) {
+func (d helmLogger) Write(p []byte) (int, error) {
 	pterm.Debug.Println(fmt.Sprintf("helm: %s", string(p)))
 	return len(p), nil
 }
 
-func (d *helmLogger) Debug(format string, v ...interface{}) {
+func (d helmLogger) Debug(format string, v ...interface{}) {
 	pterm.Debug.Println(fmt.Sprintf("helm - DEBUG: "+format, v...))
 }
