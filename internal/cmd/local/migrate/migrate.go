@@ -64,7 +64,7 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 	// docker cp [conCopy.ID]]:/$migratePGDATA/. ~/.airbyte/abctl/data/airbyte-volume-db/pgdata
 	dst := filepath.Join(paths.Data, "airbyte-volume-db", "pgdata")
 	// ensure dst directory exists
-	if err := os.MkdirAll(dst, 0755); err != nil {
+	if err := os.MkdirAll(dst, 0766); err != nil {
 		return fmt.Errorf("unable to create directory '%s': %w", dst, err)
 	}
 	// ensure the permissions are correct
