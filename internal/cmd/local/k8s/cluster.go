@@ -41,7 +41,7 @@ func (k *kindCluster) Create(port int) error {
 	// If the cluster creates it and docker is running as root, it's possible that root will own this directory
 	// which will cause minio and postgres to break.
 	pterm.Debug.Println(fmt.Sprintf("Creating data directory '%s'", paths.Data))
-	if err := os.MkdirAll(paths.Data, 0755); err != nil {
+	if err := os.MkdirAll(paths.Data, 0766); err != nil {
 		pterm.Error.Println(fmt.Sprintf("Error creating data directory '%s'", paths.Data))
 		return fmt.Errorf("unable to create directory '%s': %w", paths.Data, err)
 	}

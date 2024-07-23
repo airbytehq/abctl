@@ -250,7 +250,7 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 		path := filepath.Join(paths.Data, name)
 
 		pterm.Debug.Println(fmt.Sprintf("Creating directory '%s'", path))
-		if err := os.MkdirAll(path, 0755); err != nil {
+		if err := os.MkdirAll(path, 0766); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Could not create directory '%s'", name))
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
