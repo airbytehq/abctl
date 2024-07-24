@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
@@ -19,6 +20,10 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "local",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if err := checkAirbyteDir(); err != nil {
+				return fmt.Errorf("%w: %w", localerr.ErrAirbyteDir, err)
+			}
+
 			// telemetry client configuration
 			{
 				var telOpts []telemetry.GetOption
@@ -50,11 +55,17 @@ func printProviderDetails(p k8s.Provider) {
 	))
 }
 
-func checkAirbytePerms() error {
+// checkAirbyteDir verifies that, if the paths.Airbyte directory exists, that it has proper permissions.
+// If the directory does not have the proper permissions, this method will attempt to fix them.
+// A nil response either indicates that either:
+// - no paths.Airbyte directory exists
+// - the permissions are already correct
+// - this function was able to fix the incorrect permissions.
+func checkAirbyteDir() error {
 	fileInfo, err := os.Stat(paths.Airbyte)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			// nothing to do
+			// nothing to do, directory will be created later on
 			return nil
 		}
 		return fmt.Errorf("unable to determine status of '%s': %w", paths.Airbyte, err)
@@ -64,5 +75,14 @@ func checkAirbytePerms() error {
 		return errors.New(paths.Airbyte + " is not a directory")
 	}
 
-	perms := fileInfo.Mode().Perm()
+	if fileInfo.Mode().Perm() >= 0744 {
+		// directory has minimal permissions
+		return nil
+	}
+
+	if err := os.Chmod(paths.Airbyte, 0744); err != nil {
+		return fmt.Errorf("unable to change permissions of '%s': %w", paths.Airbyte, err)
+	}
+
+	return nil
 }
