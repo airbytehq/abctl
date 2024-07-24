@@ -187,7 +187,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	{
 		k8sVersion, err := c.k8s.ServerVersionGet()
 		if err != nil {
-			return nil, fmt.Errorf("%w: could not fetch kubernetes server version: %w", localerr.ErrKubernetes, err)
+			return nil, fmt.Errorf("%w: unable to fetch kubernetes server version: %w", localerr.ErrKubernetes, err)
 		}
 		c.tel.Attr("k8s_version", k8sVersion)
 	}
@@ -253,12 +253,12 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 
 		pterm.Debug.Println(fmt.Sprintf("Creating directory '%s'", path))
 		if err := os.MkdirAll(path, 0766); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Could not create directory '%s'", name))
+			pterm.Error.Println(fmt.Sprintf("Unable to create directory '%s'", name))
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
 
 		if err := c.k8s.PersistentVolumeCreate(ctx, namespace, name); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume '%s'", name))
+			pterm.Error.Println(fmt.Sprintf("Unable to create persistent volume '%s'", name))
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
 
@@ -275,7 +275,7 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 		// access to the persisted volume directory.
 		pterm.Debug.Println(fmt.Sprintf("Updating permissions for '%s'", path))
 		if err := os.Chmod(path, 0777); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Could not set permissions for '%s'", path))
+			pterm.Error.Println(fmt.Sprintf("Unable to set permissions for '%s'", path))
 			return fmt.Errorf("unable to set permissions for '%s': %w", path, err)
 		}
 
@@ -291,7 +291,7 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 	if !c.k8s.PersistentVolumeClaimExists(ctx, namespace, name, volumeName) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume claim '%s'", name))
 		if err := c.k8s.PersistentVolumeClaimCreate(ctx, namespace, name, volumeName); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume claim '%s'", name))
+			pterm.Error.Println(fmt.Sprintf("Unable to create persistent volume claim '%s'", name))
 			return fmt.Errorf("unable to create persistent volume claim '%s': %w", name, err)
 		}
 		pterm.Info.Println(fmt.Sprintf("Persistent volume claim '%s' created", name))
@@ -318,7 +318,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", airbyteNamespace))
 		if err := c.k8s.NamespaceCreate(ctx, airbyteNamespace); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Could not create namespace '%s'", airbyteNamespace))
+			pterm.Error.Println(fmt.Sprintf("Unable to create namespace '%s'", airbyteNamespace))
 			return fmt.Errorf("unable to create airbyte namespace: %w", err)
 		}
 		pterm.Info.Println(fmt.Sprintf("Namespace '%s' created", airbyteNamespace))
@@ -364,7 +364,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	if opts.dockerAuth() {
 		pterm.Debug.Println(fmt.Sprintf("Creating '%s' secret", dockerAuthSecretName))
 		if err := c.handleDockerSecret(ctx, opts.DockerServer, opts.DockerUser, opts.DockerPass, opts.DockerEmail); err != nil {
-			pterm.Debug.Println(fmt.Sprintf("Could not create '%s' secret", dockerAuthSecretName))
+			pterm.Debug.Println(fmt.Sprintf("Unable to create '%s' secret", dockerAuthSecretName))
 			return fmt.Errorf("unable to create '%s' secret: %w", dockerAuthSecretName, err)
 		}
 		pterm.Debug.Println(fmt.Sprintf("Created '%s' secret", dockerAuthSecretName))
@@ -387,19 +387,9 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 				pterm.Error.Println(fmt.Sprintf("Unable to unmarshal secrets file '%s': %s", opts.SecretsFile, err))
 				return fmt.Errorf("unable to unmarshal secrets file '%s': %w", opts.SecretsFile, err)
 			}
+			secret.ObjectMeta.Namespace = airbyteNamespace
 
-			pterm.Debug.Println(fmt.Sprintf("%+v", secret))
-
-			pterm.Debug.Println(fmt.Sprintf("Found secret\n  name: %s\n  type: %s", secret.ObjectMeta.Name, secret.Type))
-			data := secret.Data
-			if len(secret.StringData) > 0 {
-				data = map[string][]byte{}
-				for k, v := range secret.StringData {
-					data[k] = []byte(v)
-				}
-			}
-
-			if err := c.k8s.SecretCreateOrUpdate(ctx, secret.Type, airbyteNamespace, secret.ObjectMeta.Name, data); err != nil {
+			if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
 				pterm.Error.Println(fmt.Sprintf("Unable to create secret from file '%s'", opts.SecretsFile))
 				return fmt.Errorf("unable to create secret from file '%s': %w", opts.SecretsFile, err)
 			}
@@ -584,9 +574,19 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 		return fmt.Errorf("unable to hash basic auth password: %w", err)
 	}
 
-	data := map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))}
-	if err := c.k8s.SecretCreateOrUpdate(ctx, corev1.SecretTypeOpaque, airbyteNamespace, "basic-auth", data); err != nil {
-		pterm.Error.Println("Could not create Basic-Auth secret")
+	secret := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: airbyteNamespace,
+			Name:      "basic-auth",
+		},
+		Data:       map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))},
+		StringData: nil,
+		Type:       corev1.SecretTypeOpaque,
+	}
+
+	if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
+		pterm.Error.Println("Unable to create Basic-Auth secret")
 		return fmt.Errorf("unable to create Basic-Auth secret: %w", err)
 	}
 	pterm.Success.Println("Basic-Auth secret created")
@@ -594,16 +594,24 @@ func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) 
 }
 
 func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
-	data := map[string][]byte{}
-	secret, err := docker.Secret(server, user, pass, email)
+	secretBody, err := docker.Secret(server, user, pass, email)
 	if err != nil {
 		pterm.Error.Println("Unable to create docker secret")
 		return fmt.Errorf("unable to create docker secret: %w", err)
 	}
-	data[corev1.DockerConfigJsonKey] = secret
 
-	if err := c.k8s.SecretCreateOrUpdate(ctx, corev1.SecretTypeDockerConfigJson, airbyteNamespace, dockerAuthSecretName, data); err != nil {
-		pterm.Error.Println("Could not create Docker-auth secret")
+	secret := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: airbyteNamespace,
+			Name:      dockerAuthSecretName,
+		},
+		Data: map[string][]byte{corev1.DockerConfigJsonKey: secretBody},
+		Type: corev1.SecretTypeDockerConfigJson,
+	}
+
+	if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
+		pterm.Error.Println("Unable to create Docker-auth secret")
 		return fmt.Errorf("unable to create docker-auth secret: %w", err)
 	}
 	pterm.Success.Println("Docker-Auth secret created")
@@ -637,8 +645,8 @@ func (c *Command) Status(_ context.Context) error {
 
 		rel, err := c.helm.GetRelease(name)
 		if err != nil {
-			pterm.Warning.Println("Could not get airbyte release")
-			pterm.Debug.Printfln("unable to get airbyte release: %s", err)
+			pterm.Warning.Println("Unable to fetch airbyte release")
+			pterm.Debug.Printfln("unable to fetch airbyte release: %s", err)
 			continue
 		}
 

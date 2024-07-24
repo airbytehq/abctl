@@ -32,7 +32,7 @@ func New(kubecfg, kubectx, namespace string) (Client, error) {
 
 	restCfg, err := k8sCfg.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
+		return nil, fmt.Errorf("%w: unable to create rest config: %w", localerr.ErrKubernetes, err)
 	}
 
 	logger := helmLogger{}

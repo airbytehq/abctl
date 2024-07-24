@@ -39,7 +39,7 @@ func NewCmdUninstall(provider k8s.Provider) *cobra.Command {
 
 				cluster, err := provider.Cluster()
 				if err != nil {
-					pterm.Error.Printfln("Could not determine if the cluster '%s' exists", provider.ClusterName)
+					pterm.Error.Printfln("Unable to determine if the cluster '%s' exists", provider.ClusterName)
 					return err
 				}
 

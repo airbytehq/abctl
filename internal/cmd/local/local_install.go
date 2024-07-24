@@ -76,7 +76,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 				cluster, err := provider.Cluster()
 				if err != nil {
-					pterm.Error.Printfln("Could not determine status of any existing '%s' cluster", provider.ClusterName)
+					pterm.Error.Printfln("Unable to determine status of any existing '%s' cluster", provider.ClusterName)
 					return err
 				}
 
@@ -90,7 +90,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 						if dockerClient == nil {
 							dockerClient, err = docker.New(cmd.Context())
 							if err != nil {
-								pterm.Error.Printfln("Could not connect to Docker daemon")
+								pterm.Error.Printfln("Unable to connect to Docker daemon")
 								return fmt.Errorf("unable to connect to docker: %w", err)
 							}
 						}
