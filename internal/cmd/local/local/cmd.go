@@ -698,7 +698,14 @@ func (c *Command) handleChart(
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
 
-	c.spinner.UpdateText(fmt.Sprintf("Installing '%s' (version: %s) Helm Chart (this may take several minutes)", req.chartName, helmChart.Metadata.Version))
+	pterm.Info.Println(fmt.Sprintf(
+		"Starting Helm Chart installation of '%s' (version: %s)",
+		req.chartName, helmChart.Metadata.Version,
+	))
+	c.spinner.UpdateText(fmt.Sprintf(
+		"Installing '%s' (version: %s) Helm Chart (this may take several minutes)",
+		req.chartName, helmChart.Metadata.Version,
+	))
 	helmRelease, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
 		ReleaseName:     req.chartRelease,
 		ChartName:       req.chartName,

@@ -3,6 +3,9 @@ package localerr
 import "errors"
 
 var (
+	// ErrAirbyteDir is returned anytime an there is an issue in accessing the paths.Airbyte directory.
+	ErrAirbyteDir = errors.New("airbyte directory is inaccessible")
+
 	// ErrDocker is returned anytime an error occurs when attempting to communicate with docker.
 	ErrDocker = errors.New("error communicating with docker")
 
