@@ -124,7 +124,7 @@ func TestCommand_Install(t *testing.T) {
 		serverVersionGet: func() (string, error) {
 			return "test", nil
 		},
-		secretCreateOrUpdate: func(ctx context.Context, secretType coreV1.SecretType, namespace, name string, data map[string][]byte) error {
+		secretCreateOrUpdate: func(ctx context.Context, secret coreV1.Secret) error {
 			return nil
 		},
 		ingressExists: func(ctx context.Context, namespace string, ingress string) bool {
@@ -265,7 +265,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		serverVersionGet: func() (string, error) {
 			return "test", nil
 		},
-		secretCreateOrUpdate: func(ctx context.Context, secretType coreV1.SecretType, namespace, name string, data map[string][]byte) error {
+		secretCreateOrUpdate: func(ctx context.Context, secret coreV1.Secret) error {
 			return nil
 		},
 		ingressExists: func(ctx context.Context, namespace string, ingress string) bool {
