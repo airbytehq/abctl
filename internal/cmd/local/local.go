@@ -1,10 +1,15 @@
 package local
 
 import (
+	"errors"
+	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"io/fs"
+	"os"
 )
 
 var telClient telemetry.Client
@@ -39,5 +44,25 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 }
 
 func printProviderDetails(p k8s.Provider) {
-	pterm.Info.Printfln("Using Kubernetes provider:\n  Provider: %s\n  Kubeconfig: %s\n  Context: %s", p.Name, p.Kubeconfig, p.Context)
+	pterm.Info.Println(fmt.Sprintf(
+		"Using Kubernetes provider:\n  Provider: %s\n  Kubeconfig: %s\n  Context: %s",
+		p.Name, p.Kubeconfig, p.Context,
+	))
+}
+
+func checkAirbytePerms() error {
+	fileInfo, err := os.Stat(paths.Airbyte)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			// nothing to do
+			return nil
+		}
+		return fmt.Errorf("unable to determine status of '%s': %w", paths.Airbyte, err)
+	}
+
+	if !fileInfo.IsDir() {
+		return errors.New(paths.Airbyte + " is not a directory")
+	}
+
+	perms := fileInfo.Mode().Perm()
 }
