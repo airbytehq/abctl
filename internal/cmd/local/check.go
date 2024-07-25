@@ -9,7 +9,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -81,7 +80,7 @@ func portAvailable(ctx context.Context, port int) error {
 			return fmt.Errorf("%w: could not send request: %w", localerr.ErrPort, err)
 		}
 
-		if res.StatusCode == http.StatusUnauthorized && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {
+		if res.StatusCode == http.StatusOK {
 			pterm.Success.Printfln("Port %d appears to be running a previous Airbyte installation", port)
 			return nil
 		}

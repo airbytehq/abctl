@@ -16,6 +16,9 @@ func ingress(host string) *networkingv1.Ingress {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      airbyteIngress,
 			Namespace: airbyteNamespace,
+			Annotations: map[string]string{
+				"nginx.ingress.kubernetes.io/custom-headers": "airbyte-abctl-custom-headers",
+			},
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &ingressClassName,
