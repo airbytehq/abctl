@@ -25,14 +25,14 @@ func dockerInstalled(ctx context.Context) (docker.Version, error) {
 	var err error
 	if dockerClient == nil {
 		if dockerClient, err = docker.New(ctx); err != nil {
-			pterm.Error.Println("Could not create Docker client")
-			return docker.Version{}, fmt.Errorf("%w: could not create client: %w", localerr.ErrDocker, err)
+			pterm.Error.Println("Unable to create Docker client")
+			return docker.Version{}, fmt.Errorf("%w: unable to create client: %w", localerr.ErrDocker, err)
 		}
 	}
 
 	version, err := dockerClient.Version(ctx)
 	if err != nil {
-		pterm.Error.Println("Could not communicate with the Docker daemon")
+		pterm.Error.Println("Unable to communicate with the Docker daemon")
 		return docker.Version{}, fmt.Errorf("%w: %w", localerr.ErrDocker, err)
 	}
 	pterm.Success.Println(fmt.Sprintf("Found Docker installation: version %s", version.Version))
@@ -72,13 +72,13 @@ func portAvailable(ctx context.Context, port int) error {
 		req, errInner := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d", port), nil)
 		if errInner != nil {
 			pterm.Error.Printfln("Port %d request could not be created", port)
-			return fmt.Errorf("%w: could not create request: %w", localerr.ErrPort, err)
+			return fmt.Errorf("%w: unable to create request: %w", localerr.ErrPort, err)
 		}
 
 		res, errInner := httpClient.Do(req)
 		if errInner != nil {
 			pterm.Error.Printfln("Port %d appears to already be in use", port)
-			return fmt.Errorf("%w: could not send request: %w", localerr.ErrPort, err)
+			return fmt.Errorf("%w: unable to send request: %w", localerr.ErrPort, err)
 		}
 
 		if res.StatusCode == http.StatusUnauthorized && strings.Contains(res.Header.Get("WWW-Authenticate"), "abctl") {

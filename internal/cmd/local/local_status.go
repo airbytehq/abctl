@@ -38,7 +38,7 @@ func NewCmdStatus(provider k8s.Provider) *cobra.Command {
 
 				cluster, err := provider.Cluster()
 				if err != nil {
-					pterm.Error.Printfln("Could not determine status of any existing '%s' cluster", provider.ClusterName)
+					pterm.Error.Printfln("Unable to determine status of any existing '%s' cluster", provider.ClusterName)
 					return err
 				}
 
@@ -56,14 +56,14 @@ func NewCmdStatus(provider k8s.Provider) *cobra.Command {
 					if dockerClient == nil {
 						dockerClient, err = docker.New(cmd.Context())
 						if err != nil {
-							pterm.Error.Printfln("Could not connect to Docker daemon")
+							pterm.Error.Printfln("Unable to connect to Docker daemon")
 							return fmt.Errorf("unable to connect to docker: %w", err)
 						}
 					}
 
 					port, err = dockerClient.Port(cmd.Context(), fmt.Sprintf("%s-control-plane", provider.ClusterName))
 					if err != nil {
-						pterm.Warning.Printfln("Could not determine docker port for cluster '%s'", provider.ClusterName)
+						pterm.Warning.Printfln("Unable to determine docker port for cluster '%s'", provider.ClusterName)
 						return nil
 					}
 				}

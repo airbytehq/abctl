@@ -35,6 +35,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		flagBasicAuthPass string
 
 		flagChartValuesFile string
+		flagChartSecrets    []string
 		flagChartVersion    string
 		flagMigrate         bool
 		flagPort            int
@@ -75,7 +76,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 				cluster, err := provider.Cluster()
 				if err != nil {
-					pterm.Error.Printfln("Could not determine status of any existing '%s' cluster", provider.ClusterName)
+					pterm.Error.Printfln("Unable to determine status of any existing '%s' cluster", provider.ClusterName)
 					return err
 				}
 
@@ -89,7 +90,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 						if dockerClient == nil {
 							dockerClient, err = docker.New(cmd.Context())
 							if err != nil {
-								pterm.Error.Printfln("Could not connect to Docker daemon")
+								pterm.Error.Printfln("Unable to connect to Docker daemon")
 								return fmt.Errorf("unable to connect to docker: %w", err)
 							}
 						}
@@ -135,6 +136,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					BasicAuthPass:    flagBasicAuthPass,
 					HelmChartVersion: flagChartVersion,
 					ValuesFile:       flagChartValuesFile,
+					Secrets:          flagChartSecrets,
 					Migrate:          flagMigrate,
 					Docker:           dockerClient,
 					Host:             flagHost,
@@ -149,25 +151,12 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					opts.HelmChartVersion = ""
 				}
 
-				if env := os.Getenv(envBasicAuthUser); env != "" {
-					opts.BasicAuthUser = env
-				}
-				if env := os.Getenv(envBasicAuthPass); env != "" {
-					opts.BasicAuthPass = env
-				}
-
-				if env := os.Getenv(envDockerServer); env != "" {
-					opts.DockerServer = env
-				}
-				if env := os.Getenv(envDockerUser); env != "" {
-					opts.DockerUser = env
-				}
-				if env := os.Getenv(envDockerPass); env != "" {
-					opts.DockerPass = env
-				}
-				if env := os.Getenv(envDockerEmail); env != "" {
-					opts.DockerEmail = env
-				}
+				envOverride(&opts.BasicAuthUser, envBasicAuthUser)
+				envOverride(&opts.BasicAuthPass, envBasicAuthPass)
+				envOverride(&opts.DockerServer, envDockerServer)
+				envOverride(&opts.DockerUser, envDockerUser)
+				envOverride(&opts.DockerPass, envDockerPass)
+				envOverride(&opts.DockerEmail, envDockerEmail)
 
 				if err := lc.Install(cmd.Context(), opts); err != nil {
 					spinner.Fail("Unable to install Airbyte locally")
@@ -189,6 +178,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
+	cmd.Flags().StringSliceVar(&flagChartSecrets, "secret", []string{}, "an Airbyte helm chart secret file")
 	cmd.Flags().BoolVar(&flagMigrate, "migrate", false, "migrate data from docker compose installation")
 
 	cmd.Flags().StringVar(&flagDockerServer, "docker-server", "https://index.docker.io/v1/", "docker registry, can also be specified via "+envDockerServer)
@@ -199,4 +189,13 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.MarkFlagsRequiredTogether("docker-username", "docker-password", "docker-email")
 
 	return cmd
+}
+
+// envOverride checks if the env exists and is not empty, if that is true
+// update the original value to be the value returned from the env environment variable.
+// Otherwise, leave the original value alone.
+func envOverride(original *string, env string) {
+	if v := os.Getenv(env); v != "" {
+		*original = v
+	}
 }
