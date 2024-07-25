@@ -371,10 +371,6 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		airbyteValues = append(airbyteValues, fmt.Sprintf("global.imagePullSecrets[0].name=%s", dockerAuthSecretName))
 	}
 
-	if len(opts.Secrets) > 0 {
-		c.spinner.UpdateText("Creating secrets from --secret flags")
-	}
-
 	for _, secretFile := range opts.Secrets {
 		c.spinner.UpdateText(fmt.Sprintf("Creating secret from '%s'", secretFile))
 		raw, err := os.ReadFile(secretFile)
