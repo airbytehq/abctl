@@ -109,6 +109,19 @@ func TestCommand_Install(t *testing.T) {
 			}
 		},
 
+		getRelease: func(name string) (*release.Release, error) {
+			switch {
+			case name == airbyteChartRelease:
+				t.Error("should not have been called", name)
+				return nil, errors.New("should not have been called")
+			case name == nginxChartRelease:
+				return nil, errors.New("not found")
+			default:
+				t.Error("unsupported chart name", name)
+				return nil, errors.New("unexpected chart name")
+			}
+		},
+
 		installOrUpgradeChart: func(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error) {
 			if d := cmp.Diff(&expChart[expChartCnt].chart, spec); d != "" {
 				t.Error("chart mismatch", d)
@@ -247,6 +260,19 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 			default:
 				t.Error("unsupported chart name", name)
 				return nil, "", errors.New("unexpected chart name")
+			}
+		},
+
+		getRelease: func(name string) (*release.Release, error) {
+			switch {
+			case name == airbyteChartRelease:
+				t.Error("should not have been called", name)
+				return nil, errors.New("should not have been called")
+			case name == nginxChartRelease:
+				return nil, errors.New("not found")
+			default:
+				t.Error("unsupported chart name", name)
+				return nil, errors.New("unexpected chart name")
 			}
 		},
 

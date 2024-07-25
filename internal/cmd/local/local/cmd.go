@@ -834,7 +834,7 @@ func checkHelmReleaseShouldInstall(helm helm.Client, chart *chart.Chart, release
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			// chart hasn't been installed previously
-			pterm.Debug.Println("Unable to find %s Helm Release", releaseName)
+			pterm.Debug.Println(fmt.Sprintf("Unable to find %s Helm Release", releaseName))
 		} else {
 			// chart may or may not exist, log error and ignore
 			pterm.Debug.Println(fmt.Sprintf("Unable to fetch %s Helm Release: %s", releaseName, err))
