@@ -34,12 +34,12 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		flagBasicAuthUser string
 		flagBasicAuthPass string
 
-		flagChartValuesFile  string
-		flagChartSecretsFile string
-		flagChartVersion     string
-		flagMigrate          bool
-		flagPort             int
-		flagHost             string
+		flagChartValuesFile string
+		flagChartSecrets    []string
+		flagChartVersion    string
+		flagMigrate         bool
+		flagPort            int
+		flagHost            string
 
 		flagDockerServer string
 		flagDockerUser   string
@@ -136,7 +136,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					BasicAuthPass:    flagBasicAuthPass,
 					HelmChartVersion: flagChartVersion,
 					ValuesFile:       flagChartValuesFile,
-					SecretsFile:      flagChartSecretsFile,
+					Secrets:          flagChartSecrets,
 					Migrate:          flagMigrate,
 					Docker:           dockerClient,
 					Host:             flagHost,
@@ -178,7 +178,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
-	cmd.Flags().StringVar(&flagChartSecretsFile, "secrets", "", "the Airbyte helm chart secrets file to load")
+	cmd.Flags().StringSliceVar(&flagChartSecrets, "secret", []string{}, "an Airbyte helm chart secret file")
 	cmd.Flags().BoolVar(&flagMigrate, "migrate", false, "migrate data from docker compose installation")
 
 	cmd.Flags().StringVar(&flagDockerServer, "docker-server", "https://index.docker.io/v1/", "docker registry, can also be specified via "+envDockerServer)

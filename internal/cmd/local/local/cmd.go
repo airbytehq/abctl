@@ -204,7 +204,7 @@ type InstallOpts struct {
 
 	HelmChartVersion string
 	ValuesFile       string
-	SecretsFile      string
+	Secrets          []string
 	Migrate          bool
 	Host             string
 
@@ -371,31 +371,31 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		airbyteValues = append(airbyteValues, fmt.Sprintf("global.imagePullSecrets[0].name=%s", dockerAuthSecretName))
 	}
 
-	{
-		if opts.SecretsFile != "" {
-			c.spinner.UpdateText("Creating secrets from --secrets")
+	if len(opts.Secrets) > 0 {
+		c.spinner.UpdateText("Creating secrets from --secret flags")
+	}
 
-			raw, err := os.ReadFile(opts.SecretsFile)
-			if err != nil {
-				pterm.Error.Println(fmt.Sprintf("Unable to read secrets file '%s': %s", opts.SecretsFile, err))
-				return fmt.Errorf("unable to read secrets file '%s': %w", opts.SecretsFile, err)
-			}
-			pterm.Debug.Println(string(raw))
-
-			var secret corev1.Secret
-			if err := yaml.Unmarshal(raw, &secret); err != nil {
-				pterm.Error.Println(fmt.Sprintf("Unable to unmarshal secrets file '%s': %s", opts.SecretsFile, err))
-				return fmt.Errorf("unable to unmarshal secrets file '%s': %w", opts.SecretsFile, err)
-			}
-			secret.ObjectMeta.Namespace = airbyteNamespace
-
-			if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
-				pterm.Error.Println(fmt.Sprintf("Unable to create secret from file '%s'", opts.SecretsFile))
-				return fmt.Errorf("unable to create secret from file '%s': %w", opts.SecretsFile, err)
-			}
-
-			pterm.Success.Println("Secrets created or updated successfully")
+	for _, secretFile := range opts.Secrets {
+		c.spinner.UpdateText(fmt.Sprintf("Creating secret from '%s'", secretFile))
+		raw, err := os.ReadFile(secretFile)
+		if err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to read secret file '%s': %s", secretFile, err))
+			return fmt.Errorf("unable to read secret file '%s': %w", secretFile, err)
 		}
+
+		var secret corev1.Secret
+		if err := yaml.Unmarshal(raw, &secret); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to unmarshal secret file '%s': %s", secretFile, err))
+			return fmt.Errorf("unable to unmarshal secret file '%s': %w", secretFile, err)
+		}
+		secret.ObjectMeta.Namespace = airbyteNamespace
+
+		if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to create secret from file '%s'", secretFile))
+			return fmt.Errorf("unable to create secret from file '%s': %w", secretFile, err)
+		}
+
+		pterm.Success.Println(fmt.Sprintf("Secret from '%s' created or updated", secretFile))
 	}
 
 	if err := c.handleChart(ctx, chartRequest{
