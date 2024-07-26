@@ -7,6 +7,8 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/migrate"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"net/http"
@@ -409,13 +411,14 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	if err := c.handleChart(ctx, chartRequest{
-		name:         "nginx",
-		repoName:     nginxRepoName,
-		repoURL:      nginxRepoURL,
-		chartName:    nginxChartName,
-		chartRelease: nginxChartRelease,
-		namespace:    nginxNamespace,
-		values:       append(c.provider.HelmNginx, fmt.Sprintf("controller.service.ports.http=%d", c.portHTTP)),
+		name:               "nginx",
+		checkShouldInstall: true,
+		repoName:           nginxRepoName,
+		repoURL:            nginxRepoURL,
+		chartName:          nginxChartName,
+		chartRelease:       nginxChartRelease,
+		namespace:          nginxNamespace,
+		values:             append(c.provider.HelmNginx, fmt.Sprintf("controller.service.ports.http=%d", c.portHTTP)),
 	}); err != nil {
 		// If we timed out, there is a good chance it's due to an unavailable port, check if this is the case.
 		// As the kubernetes client doesn't return usable error types, have to check for a specific string value.
@@ -659,15 +662,16 @@ func (c *Command) Status(_ context.Context) error {
 
 // chartRequest exists to make all the parameters to handleChart somewhat manageable
 type chartRequest struct {
-	name         string
-	repoName     string
-	repoURL      string
-	chartName    string
-	chartRelease string
-	chartVersion string
-	namespace    string
-	values       []string
-	valuesYAML   string
+	name               string
+	repoName           string
+	repoURL            string
+	chartName          string
+	chartRelease       string
+	chartVersion       string
+	namespace          string
+	values             []string
+	valuesYAML         string
+	checkShouldInstall bool
 }
 
 // handleChart will handle the installation of a chart
@@ -693,6 +697,14 @@ func (c *Command) handleChart(
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
+
+	if req.checkShouldInstall && !checkHelmReleaseShouldInstall(c.helm, helmChart, req.chartRelease) {
+		pterm.Success.Println(fmt.Sprintf(
+			"Found matching existing Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  AppVersion: %s",
+			req.chartName, req.chartName, req.namespace, helmChart.Metadata.Version, helmChart.Metadata.AppVersion,
+		))
+		return nil
+	}
 
 	pterm.Info.Println(fmt.Sprintf(
 		"Starting Helm Chart installation of '%s' (version: %s)",
@@ -722,9 +734,10 @@ func (c *Command) handleChart(
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 
-	pterm.Success.Printfln(
-		"Installed Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  Release: %d",
-		req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Chart.Metadata.Version, helmRelease.Version)
+	pterm.Success.Println(fmt.Sprintf(
+		"Installed Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  AppVersion: %s\n  Release: %d",
+		req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Chart.Metadata.Version, helmRelease.Chart.Metadata.AppVersion, helmRelease.Version,
+	))
 	return nil
 }
 
@@ -811,4 +824,50 @@ func k8sClientConfig(kubecfg, kubectx string) (clientcmd.ClientConfig, error) {
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
 		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
 	), nil
+}
+
+// checkHelmReleaseShouldInstall returns true if the provided release needs to be installed,
+// false otherwise.
+func checkHelmReleaseShouldInstall(helm helm.Client, chart *chart.Chart, releaseName string) bool {
+	// look for an existing release, see if it matches the existing chart
+	rel, err := helm.GetRelease(releaseName)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			// chart hasn't been installed previously
+			pterm.Debug.Println(fmt.Sprintf("Unable to find %s Helm Release", releaseName))
+		} else {
+			// chart may or may not exist, log error and ignore
+			pterm.Debug.Println(fmt.Sprintf("Unable to fetch %s Helm Release: %s", releaseName, err))
+		}
+		return true
+	}
+
+	if rel.Info.Status != release.StatusDeployed {
+		pterm.Debug.Println(fmt.Sprintf("Chart has the status of %s", rel.Info.Status))
+		return true
+	}
+
+	if rel.Chart.Metadata.Version != chart.Metadata.Version {
+		pterm.Debug.Println(fmt.Sprintf(
+			"Chart version (%s) does not match Helm Release (%s)",
+			chart.Metadata.Version, rel.Chart.Metadata.Version,
+		))
+		return true
+	}
+
+	if rel.Chart.Metadata.AppVersion != chart.Metadata.AppVersion {
+		pterm.Debug.Println(fmt.Sprintf(
+			"Chart app-version (%s) does not match Helm Release (%s)",
+			chart.Metadata.AppVersion, rel.Chart.Metadata.AppVersion,
+		))
+		return true
+	}
+
+	pterm.Debug.Println(fmt.Sprintf(
+		"Chart matched Helm Release\n  Version: %s - %s\n  AppVersion: %s - %s",
+		chart.Metadata.Version, rel.Chart.Metadata.Version,
+		chart.Metadata.AppVersion, rel.Chart.Metadata.AppVersion,
+	))
+
+	return false
 }
