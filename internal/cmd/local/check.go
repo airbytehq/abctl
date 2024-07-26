@@ -68,7 +68,7 @@ func portAvailable(ctx context.Context, port int) error {
 		pterm.Debug.Println(fmt.Sprintf("Unable to listen on port '%d': %s", port, err))
 
 		// check if an existing airbyte installation is already listening on this port
-		req, errInner := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d", port), nil)
+		req, errInner := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d/api/v1/instance_configuration", port), nil)
 		if errInner != nil {
 			pterm.Error.Printfln("Port %d request could not be created", port)
 			return fmt.Errorf("%w: could not create request: %w", localerr.ErrPort, err)
