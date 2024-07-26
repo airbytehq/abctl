@@ -356,9 +356,15 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	airbyteValues := []string{
-		fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser),
+		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + telUser,
+		// resources
 		"global.jobs.resources.limits.cpu=3",
 		"global.jobs.resources.limits.memory=4Gi",
+		"global.jobs.resources.requests.cpu=0.1",
+		"global.jobs.resources.requests.memory=100Mi",
+		"worker.env_vars.SIDECAR_KUBE_CPU_REQUEST=0.1",
+		"worker.env_vars.SIDECAR_KUBE_MEM_REQUEST=100Mi",
+		"worker.env_vars.SOCAT_KUBE_CPU_REQUEST=0.1",
 	}
 
 	if opts.dockerAuth() {
