@@ -23,7 +23,7 @@ const (
 )
 
 // FromDockerVolume handles migrating the existing docker compose database into the abctl managed k8s cluster.
-func FromDockerVolume(ctx context.Context, dockerCli docker.Docker, volume string) error {
+func FromDockerVolume(ctx context.Context, dockerCli *docker.Docker, volume string) error {
 	if v := volumeExists(ctx, dockerCli.Client, volume); v == "" {
 		return errors.New(fmt.Sprintf("volume %s does not exist", volume))
 	}
