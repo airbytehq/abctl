@@ -872,8 +872,8 @@ func checkHelmReleaseShouldInstall(helm helm.Client, chart *chart.Chart, release
 // priority than any values defined in a values.yaml file.
 // By default, the helm-client we're using reversed this priority, putting the values
 // defined in this code at a higher priority than the values defined in the values.yaml file.
-// This function returns a string representation of the value.yaml file after any
-// of values provided were overridden by the valuesYML file.
+// This function returns a string representation of the value.yaml file after all
+// values provided were potentially overridden by the valuesYML file.
 func mergeValuesWithValuesYAML(values []string, valuesYAML string) (string, error) {
 	a := maps.FromSlice(values)
 	b, err := maps.FromYAMLFile(valuesYAML)
