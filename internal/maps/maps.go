@@ -64,6 +64,10 @@ func FromYAMLFile(path string) (map[string]any, error) {
 	return m, nil
 }
 
+// ToYAML converts the m map into a yaml string.
+// E.g. map[string]any{"a" : 1, "b", 2} becomes
+// a: 1
+// b: 2
 func ToYAML(m map[string]any) (string, error) {
 	raw, err := yaml.Marshal(m)
 	if err != nil {
