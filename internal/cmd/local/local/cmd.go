@@ -306,13 +306,13 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
-	var vals string
+	var valuesYAML string
 	if opts.ValuesFile != "" {
 		raw, err := os.ReadFile(opts.ValuesFile)
 		if err != nil {
 			return fmt.Errorf("unable to read values file '%s': %w", opts.ValuesFile, err)
 		}
-		vals = string(raw)
+		valuesYAML = string(raw)
 	}
 
 	go c.watchEvents(ctx)
@@ -358,9 +358,9 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	airbyteValues := []string{
-		fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser),
-		fmt.Sprintf("global.jobs.resources.limits.cpu=3"),
-		fmt.Sprintf("global.jobs.resources.limits.memory=4Gi"),
+		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + telUser,
+		"global.jobs.resources.limits.cpu=3",
+		"global.jobs.resources.limits.memory=4Gi",
 	}
 
 	if opts.dockerAuth() {
@@ -405,7 +405,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		chartVersion: opts.HelmChartVersion,
 		namespace:    airbyteNamespace,
 		values:       airbyteValues,
-		valuesYAML:   vals,
+		valuesYAML:   valuesYAML,
 	}); err != nil {
 		return fmt.Errorf("unable to install airbyte chart: %w", err)
 	}
