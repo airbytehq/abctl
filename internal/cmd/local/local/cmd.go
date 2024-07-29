@@ -7,6 +7,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/migrate"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/maps"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
@@ -306,15 +307,6 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
-	var valuesYAML string
-	if opts.ValuesFile != "" {
-		raw, err := os.ReadFile(opts.ValuesFile)
-		if err != nil {
-			return fmt.Errorf("unable to read values file '%s': %w", opts.ValuesFile, err)
-		}
-		valuesYAML = string(raw)
-	}
-
 	go c.watchEvents(ctx)
 
 	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
@@ -396,6 +388,11 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		pterm.Success.Println(fmt.Sprintf("Secret from '%s' created or updated", secretFile))
 	}
 
+	valuesYAML, err := mergeValuesWithValuesYAML(airbyteValues, opts.ValuesFile)
+	if err != nil {
+		return fmt.Errorf("unable to merge values with values file '%s': %w", opts.ValuesFile, err)
+	}
+
 	if err := c.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     airbyteRepoName,
@@ -404,7 +401,6 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		chartRelease: airbyteChartRelease,
 		chartVersion: opts.HelmChartVersion,
 		namespace:    airbyteNamespace,
-		values:       airbyteValues,
 		valuesYAML:   valuesYAML,
 	}); err != nil {
 		return fmt.Errorf("unable to install airbyte chart: %w", err)
@@ -870,4 +866,27 @@ func checkHelmReleaseShouldInstall(helm helm.Client, chart *chart.Chart, release
 	))
 
 	return false
+}
+
+// mergeValuesWithValuesYAML ensures that the values defined within this code have a lower
+// priority than any values defined in a values.yaml file.
+// By default, the helm-client we're using reversed this priority, putting the values
+// defined in this code at a higher priority than the values defined in the values.yaml file.
+// This function returns a string representation of the value.yaml file after any
+// of values provided were overridden by the valuesYML file.
+func mergeValuesWithValuesYAML(values []string, valuesYAML string) (string, error) {
+	a := maps.FromSlice(values)
+	b, err := maps.FromYAMLFile(valuesYAML)
+	if err != nil {
+		return "", fmt.Errorf("unable to read values from yaml file '%s': %w", valuesYAML, err)
+	}
+	maps.Merge(a, b)
+
+	res, err := maps.ToYAML(a)
+	if err != nil {
+		return "", fmt.Errorf("unable to merge values from yaml file '%s': %w", valuesYAML, err)
+	}
+
+	return res, nil
+
 }
