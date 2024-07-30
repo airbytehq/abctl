@@ -74,7 +74,7 @@ func (k *kindLogger) Errorf(format string, args ...interface{}) {
 	k.pterm.Println(fmt.Sprintf("kind - ERROR: "+format, args...))
 }
 
-func (k *kindLogger) V(level log.Level) log.InfoLogger {
+func (k *kindLogger) V(_ log.Level) log.InfoLogger {
 	return k
 }
 
