@@ -45,6 +45,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		flagDockerUser   string
 		flagDockerPass   string
 		flagDockerEmail  string
+
+		flagNoBrowser bool
 	)
 
 	cmd := &cobra.Command{
@@ -145,6 +147,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					DockerUser:   flagDockerUser,
 					DockerPass:   flagDockerPass,
 					DockerEmail:  flagDockerEmail,
+
+					NoBrowser: flagNoBrowser,
 				}
 
 				if opts.HelmChartVersion == "latest" {
@@ -185,6 +189,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVar(&flagDockerUser, "docker-username", "", "docker username, can also be specified via "+envDockerEmail)
 	cmd.Flags().StringVar(&flagDockerPass, "docker-password", "", "docker password, can also be specified via "+envDockerPass)
 	cmd.Flags().StringVar(&flagDockerEmail, "docker-email", "", "docker email, can also be specified via "+envDockerEmail)
+
+	cmd.Flags().BoolVar(&flagNoBrowser, "no-browser", false, "disabling attempting to launch the web-browser")
 
 	cmd.MarkFlagsRequiredTogether("docker-username", "docker-password", "docker-email")
 

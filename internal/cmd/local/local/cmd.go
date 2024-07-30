@@ -217,6 +217,8 @@ type InstallOpts struct {
 	DockerUser   string
 	DockerPass   string
 	DockerEmail  string
+
+	NoBrowser bool
 }
 
 func (i *InstallOpts) dockerAuth() bool {
@@ -447,8 +449,17 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		return err
 	}
 
-	c.spinner.UpdateText("Verifying ingress")
-	if err := c.openBrowser(ctx, fmt.Sprintf("http://%s:%d", opts.Host, c.portHTTP)); err != nil {
+	url := fmt.Sprintf("http://%s:%d", opts.Host, c.portHTTP)
+	if err := c.verifyIngress(ctx, url); err != nil {
+		return err
+	}
+
+	if opts.NoBrowser {
+		pterm.Success.Println(fmt.Sprintf(
+			"Launching web-browser disabled. Airbyte should be accessible at\n  %s",
+			url,
+		))
+	} else if err := c.launch(url); err != nil {
 		return err
 	}
 
@@ -737,10 +748,12 @@ func (c *Command) handleChart(
 	return nil
 }
 
-// openBrowser will open the url in the user's browser but only if the url returns a 200 response code first
+// verifyIngress will open the url in the user's browser but only if the url returns a 200 response code first
 // TODO: clean up this method, make it testable
-func (c *Command) openBrowser(ctx context.Context, url string) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+func (c *Command) verifyIngress(ctx context.Context, url string) error {
+	c.spinner.UpdateText("Verifying ingress")
+
+	ingressCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
 	alive := make(chan error)
@@ -749,10 +762,10 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 		tick := time.Tick(1 * time.Second)
 		for {
 			select {
-			case <-ctx.Done():
-				alive <- fmt.Errorf("liveness check failed: %w", ctx.Err())
+			case <-ingressCtx.Done():
+				alive <- fmt.Errorf("liveness check failed: %w", ingressCtx.Err())
 			case <-tick:
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+				req, err := http.NewRequestWithContext(ingressCtx, http.MethodGet, url, nil)
 				if err != nil {
 					alive <- fmt.Errorf("unable to create request: %w", err)
 				}
@@ -770,9 +783,9 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 	}()
 
 	select {
-	case <-ctx.Done():
+	case <-ingressCtx.Done():
 		pterm.Error.Println("Timed out waiting for ingress")
-		return fmt.Errorf("browser liveness check failed: %w", ctx.Err())
+		return fmt.Errorf("browser liveness check failed: %w", ingressCtx.Err())
 	case err := <-alive:
 		if err != nil {
 			pterm.Error.Println("Ingress verification failed")
@@ -780,7 +793,10 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 		}
 	}
 	// if we're here, then no errors occurred
+	return nil
+}
 
+func (c *Command) launch(url string) error {
 	c.spinner.UpdateText(fmt.Sprintf("Attempting to launch web-browser for %s", url))
 
 	if err := c.launcher(url); err != nil {
