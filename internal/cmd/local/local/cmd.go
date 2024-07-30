@@ -352,7 +352,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + telUser,
 		"global.jobs.resources.limits.cpu=3",
 		"global.jobs.resources.limits.memory=4Gi",
-		"global.auth.enabled=false",
+		"global.auth.enabled=true",
 	}
 
 	if opts.dockerAuth() {
