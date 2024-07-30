@@ -190,7 +190,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVar(&flagDockerPass, "docker-password", "", "docker password, can also be specified via "+envDockerPass)
 	cmd.Flags().StringVar(&flagDockerEmail, "docker-email", "", "docker email, can also be specified via "+envDockerEmail)
 
-	cmd.Flags().BoolVar(&flagNoBrowser, "no-browser", false, "disabling attempting to launch the web-browser")
+	cmd.Flags().BoolVar(&flagNoBrowser, "no-browser", false, "disable launching the web-browser post install")
 
 	cmd.MarkFlagsRequiredTogether("docker-username", "docker-password", "docker-email")
 
