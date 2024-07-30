@@ -69,8 +69,15 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 			telClient.Attr("docker_arch", dockerVersion.Arch)
 			telClient.Attr("docker_platform", dockerVersion.Platform)
 
+			if flagHost != "localhost" {
+				pterm.Warning.Println("The --host flag has been deprecated. Use --external-host instead.")
+				if flagExternalHost != flagHost {
+					flagExternalHost = flagHost
+				}
+			}
+
 			spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", flagPort))
-			if err := portAvailable(cmd.Context(), flagHost, flagPort); err != nil {
+			if err := portAvailable(cmd.Context(), flagExternalHost, flagPort); err != nil {
 				return fmt.Errorf("port %d is not available: %w", flagPort, err)
 			}
 			return nil
@@ -134,13 +141,6 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 				if err != nil {
 					pterm.Error.Printfln("Failed to initialize 'local' command")
 					return fmt.Errorf("unable to initialize local command: %w", err)
-				}
-
-				if flagHost != "localhost" {
-					pterm.Warning.Println("The --host flag has been deprecated. Use --external-host instead.")
-					if flagExternalHost != flagHost {
-						flagExternalHost = flagHost
-					}
 				}
 
 				opts := local.InstallOpts{
