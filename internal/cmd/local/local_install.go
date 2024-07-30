@@ -39,14 +39,17 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		flagChartVersion    string
 		flagMigrate         bool
 		flagPort            int
-		flagHost            string
 
 		flagDockerServer string
 		flagDockerUser   string
 		flagDockerPass   string
 		flagDockerEmail  string
 
-		flagNoBrowser bool
+		flagNoBrowser    bool
+		flagExternalHost string
+
+		// deprecated
+		flagHost string
 	)
 
 	cmd := &cobra.Command{
@@ -133,6 +136,13 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					return fmt.Errorf("unable to initialize local command: %w", err)
 				}
 
+				if flagHost != "localhost" {
+					pterm.Warning.Println("The --host flag has been deprecated. Use --external-host instead.")
+					if flagExternalHost != flagHost {
+						flagExternalHost = flagHost
+					}
+				}
+
 				opts := local.InstallOpts{
 					BasicAuthUser:    flagBasicAuthUser,
 					BasicAuthPass:    flagBasicAuthPass,
@@ -141,7 +151,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					Secrets:          flagChartSecrets,
 					Migrate:          flagMigrate,
 					Docker:           dockerClient,
-					Host:             flagHost,
+					Host:             flagExternalHost,
 
 					DockerServer: flagDockerServer,
 					DockerUser:   flagDockerUser,
@@ -178,6 +188,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVarP(&flagBasicAuthUser, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	cmd.Flags().StringVarP(&flagBasicAuthPass, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
+	cmd.Flags().StringVar(&flagExternalHost, "external-host", "localhost", "ingress http host")
+	// host has been deprecated
 	cmd.Flags().StringVar(&flagHost, "host", "localhost", "ingress http host")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
