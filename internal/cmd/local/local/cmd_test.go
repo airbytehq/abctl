@@ -52,11 +52,15 @@ func TestCommand_Install(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         30 * time.Minute,
-				ValuesOptions: values.Options{Values: []string{
-					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
-					"global.jobs.resources.limits.cpu=3",
-					"global.jobs.resources.limits.memory=4Gi",
-				}},
+				ValuesYaml: `global:
+    env_vars:
+        AIRBYTE_INSTALLATION_ID: ` + userID.String() + `
+    jobs:
+        resources:
+            limits:
+                cpu: "3"
+                memory: 4Gi
+`,
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
@@ -205,12 +209,16 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         30 * time.Minute,
-				ValuesOptions: values.Options{Values: []string{
-					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
-					"global.jobs.resources.limits.cpu=3",
-					"global.jobs.resources.limits.memory=4Gi",
-				}},
-				ValuesYaml: "global:\n  edition: \"test\"\n",
+				ValuesYaml: `global:
+    edition: test
+    env_vars:
+        AIRBYTE_INSTALLATION_ID: ` + userID.String() + `
+    jobs:
+        resources:
+            limits:
+                cpu: "3"
+                memory: 4Gi
+`,
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
@@ -356,7 +364,7 @@ func TestCommand_Install_InvalidValuesFile(t *testing.T) {
 	if err == nil {
 		t.Fatal("expecting an error, received none")
 	}
-	if !strings.Contains(err.Error(), fmt.Sprintf("unable to read values file '%s'", valuesFile)) {
+	if !strings.Contains(err.Error(), fmt.Sprintf("unable to read values from yaml file '%s'", valuesFile)) {
 		t.Error("unexpected error:", err)
 	}
 
@@ -560,6 +568,9 @@ func (m *mockTelemetryClient) Attr(key, val string) {
 }
 
 func (m *mockTelemetryClient) User() uuid.UUID {
+	if m.user == nil {
+		return uuid.Nil
+	}
 	return m.user()
 }
 
