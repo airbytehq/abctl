@@ -14,16 +14,18 @@ func FromSlice(slice []string) map[string]any {
 	m := map[string]any{}
 
 	for _, s := range slice {
-		// s is going to be in the format of
+		// s has the format of:
 		// a.b.c=xyz
 		parts := strings.SplitN(s, "=", 2)
-		// a.b.c
+		// a.b.c becomes [a, b, c]
 		keys := strings.Split(parts[0], ".")
 		// xyz
 		value := parts[1]
 
-		// pointer to the root of the final map,
-		// will be updated to point to nested maps within the for loop
+		// pointer to the root of the map,
+		// as this map will contain nested maps, this pointer will be
+		// updated to point to the root of the nested maps as it iterates
+		// through the for loop
 		p := m
 		for i, k := range keys {
 			// last key, put the value into the map
@@ -35,7 +37,8 @@ func FromSlice(slice []string) map[string]any {
 			if _, ok := p[k]; !ok {
 				p[k] = map[string]any{}
 			}
-			// cat the key to a map[string]any
+			// cast the key to a map[string]any
+			// and update the pointer to point to it
 			p = p[k].(map[string]any)
 		}
 	}
