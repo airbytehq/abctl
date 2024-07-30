@@ -27,7 +27,6 @@ import (
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
-	"golang.org/x/crypto/bcrypt"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 	eventsv1 "k8s.io/api/events/v1"
@@ -355,6 +354,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + telUser,
 		"global.jobs.resources.limits.cpu=3",
 		"global.jobs.resources.limits.memory=4Gi",
+		"global.auth.enabled=true",
 	}
 
 	if opts.dockerAuth() {
@@ -437,12 +437,6 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 			}
 		}
 		return fmt.Errorf("unable to install nginx chart: %w", err)
-	}
-
-	c.spinner.UpdateText("Configuring Basic-Auth")
-	// basic auth
-	if err := c.handleBasicAuthSecret(ctx, opts.BasicAuthUser, opts.BasicAuthPass); err != nil {
-		return fmt.Errorf("unable to create or update basic-auth secret: %w", err)
 	}
 
 	if err := c.handleIngress(ctx, opts.Host); err != nil {
@@ -567,36 +561,6 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	default:
 		pterm.Debug.Printfln("Received an unsupported event type: %s", e.Type)
 	}
-}
-
-// handleBasicAuthSecret creates or updates the appropriate basic auth credentials for ingress.
-func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) error {
-	hashedPass, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
-	if err != nil {
-		pterm.Error.Println("Basic Auth secret could not be hashed.\n" +
-			"This may indicate an issue with the username or password provided.\n" +
-			"Please provider different credentials and try again.")
-
-		return fmt.Errorf("unable to hash basic auth password: %w", err)
-	}
-
-	secret := corev1.Secret{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: airbyteNamespace,
-			Name:      "basic-auth",
-		},
-		Data:       map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))},
-		StringData: nil,
-		Type:       corev1.SecretTypeOpaque,
-	}
-
-	if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
-		pterm.Error.Println("Unable to create Basic-Auth secret")
-		return fmt.Errorf("unable to create Basic-Auth secret: %w", err)
-	}
-	pterm.Success.Println("Basic-Auth secret created")
-	return nil
 }
 
 func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
