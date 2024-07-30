@@ -27,6 +27,9 @@ const (
 	envDockerEmail = "ABCTL_LOCAL_INSTALL_DOCKER_EMAIL"
 )
 
+// defaultHost is the default hostname where the installed Airbyte instance will be accessible.
+const defaultHost = "localhost"
+
 func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
@@ -69,9 +72,9 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 			telClient.Attr("docker_arch", dockerVersion.Arch)
 			telClient.Attr("docker_platform", dockerVersion.Platform)
 
-			if flagHost != "localhost" {
+			if flagHost != defaultHost {
 				pterm.Warning.Println("The --host flag has been deprecated. Use --external-host instead.")
-				if flagExternalHost != flagHost {
+				if flagExternalHost == defaultHost {
 					flagExternalHost = flagHost
 				}
 			}
@@ -188,9 +191,9 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVarP(&flagBasicAuthUser, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	cmd.Flags().StringVarP(&flagBasicAuthPass, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
-	cmd.Flags().StringVar(&flagExternalHost, "external-host", "localhost", "ingress http host")
+	cmd.Flags().StringVar(&flagExternalHost, "external-host", defaultHost, "ingress http host")
 	// host has been deprecated
-	cmd.Flags().StringVar(&flagHost, "host", "localhost", "deprecated, use --external-host instead")
+	cmd.Flags().StringVar(&flagHost, "host", defaultHost, "deprecated, use --external-host instead")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
