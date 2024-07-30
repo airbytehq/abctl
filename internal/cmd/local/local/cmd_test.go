@@ -52,16 +52,23 @@ func TestCommand_Install(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         30 * time.Minute,
-				ValuesOptions: values.Options{Values: []string{
-					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
-					"global.jobs.resources.limits.cpu=3",
-					"global.jobs.resources.limits.memory=4Gi",
-					"global.jobs.resources.requests.cpu=0.1",
-					"global.jobs.resources.requests.memory=100Mi",
-					"worker.env_vars.SIDECAR_KUBE_CPU_REQUEST=0.1",
-					"worker.env_vars.SIDECAR_KUBE_MEM_REQUEST=100Mi",
-					"worker.env_vars.SOCAT_KUBE_CPU_REQUEST=0.1",
-				}},
+				ValuesYaml: `global:
+    env_vars:
+        AIRBYTE_INSTALLATION_ID: ` + userID.String() + `
+    jobs:
+        resources:
+            limits:
+                cpu: "3"
+                memory: 4Gi
+            requests:
+                cpu: "0.1"
+                memory: 100Mi
+worker:
+    env_vars:
+        SIDECAR_KUBE_CPU_REQUEST: "0.1"
+        SIDECAR_KUBE_MEM_REQUEST: 100Mi
+        SOCAT_KUBE_CPU_REQUEST: "0.1"
+`,
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
@@ -111,6 +118,19 @@ func TestCommand_Install(t *testing.T) {
 			default:
 				t.Error("unsupported chart name", name)
 				return nil, "", errors.New("unexpected chart name")
+			}
+		},
+
+		getRelease: func(name string) (*release.Release, error) {
+			switch {
+			case name == airbyteChartRelease:
+				t.Error("should not have been called", name)
+				return nil, errors.New("should not have been called")
+			case name == nginxChartRelease:
+				return nil, errors.New("not found")
+			default:
+				t.Error("unsupported chart name", name)
+				return nil, errors.New("unexpected chart name")
 			}
 		},
 
@@ -197,17 +217,24 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         30 * time.Minute,
-				ValuesOptions: values.Options{Values: []string{
-					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
-					"global.jobs.resources.limits.cpu=3",
-					"global.jobs.resources.limits.memory=4Gi",
-					"global.jobs.resources.requests.cpu=0.1",
-					"global.jobs.resources.requests.memory=100Mi",
-					"worker.env_vars.SIDECAR_KUBE_CPU_REQUEST=0.1",
-					"worker.env_vars.SIDECAR_KUBE_MEM_REQUEST=100Mi",
-					"worker.env_vars.SOCAT_KUBE_CPU_REQUEST=0.1",
-				}},
-				ValuesYaml: "global:\n  edition: \"test\"\n",
+				ValuesYaml: `global:
+    edition: test
+    env_vars:
+        AIRBYTE_INSTALLATION_ID: ` + userID.String() + `
+    jobs:
+        resources:
+            limits:
+                cpu: "3"
+                memory: 4Gi
+            requests:
+                cpu: "0.1"
+                memory: 100Mi
+worker:
+    env_vars:
+        SIDECAR_KUBE_CPU_REQUEST: "0.1"
+        SIDECAR_KUBE_MEM_REQUEST: 100Mi
+        SOCAT_KUBE_CPU_REQUEST: "0.1"
+`,
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
@@ -257,6 +284,19 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 			default:
 				t.Error("unsupported chart name", name)
 				return nil, "", errors.New("unexpected chart name")
+			}
+		},
+
+		getRelease: func(name string) (*release.Release, error) {
+			switch {
+			case name == airbyteChartRelease:
+				t.Error("should not have been called", name)
+				return nil, errors.New("should not have been called")
+			case name == nginxChartRelease:
+				return nil, errors.New("not found")
+			default:
+				t.Error("unsupported chart name", name)
+				return nil, errors.New("unexpected chart name")
 			}
 		},
 
@@ -340,7 +380,7 @@ func TestCommand_Install_InvalidValuesFile(t *testing.T) {
 	if err == nil {
 		t.Fatal("expecting an error, received none")
 	}
-	if !strings.Contains(err.Error(), fmt.Sprintf("unable to read values file '%s'", valuesFile)) {
+	if !strings.Contains(err.Error(), fmt.Sprintf("unable to read values from yaml file '%s'", valuesFile)) {
 		t.Error("unexpected error:", err)
 	}
 
@@ -544,6 +584,9 @@ func (m *mockTelemetryClient) Attr(key, val string) {
 }
 
 func (m *mockTelemetryClient) User() uuid.UUID {
+	if m.user == nil {
+		return uuid.Nil
+	}
 	return m.user()
 }
 
