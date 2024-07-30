@@ -190,7 +190,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
 	cmd.Flags().StringVar(&flagExternalHost, "external-host", "localhost", "ingress http host")
 	// host has been deprecated
-	cmd.Flags().StringVar(&flagHost, "host", "localhost", "ingress http host")
+	cmd.Flags().StringVar(&flagHost, "host", "localhost", "deprecated, use --external-host instead")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
