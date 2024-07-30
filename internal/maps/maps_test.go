@@ -67,6 +67,17 @@ func TestFromSlice(t *testing.T) {
 				"z": "26",
 			},
 		},
+		{
+			name:  "value contains equals",
+			input: []string{"a.b.c=1=2=3"},
+			want: map[string]any{
+				"a": map[string]any{
+					"b": map[string]any{
+						"c": "1=2=3",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
