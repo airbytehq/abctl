@@ -52,11 +52,15 @@ func TestCommand_Install(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         30 * time.Minute,
-				ValuesOptions: values.Options{Values: []string{
-					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
-					"global.jobs.resources.limits.cpu=3",
-					"global.jobs.resources.limits.memory=4Gi",
-				}},
+				ValuesYaml: `global:
+    env_vars:
+        AIRBYTE_INSTALLATION_ID: ` + userID.String() + `
+    jobs:
+        resources:
+            limits:
+                cpu: "3"
+                memory: 4Gi
+`,
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
@@ -109,6 +113,19 @@ func TestCommand_Install(t *testing.T) {
 			}
 		},
 
+		getRelease: func(name string) (*release.Release, error) {
+			switch {
+			case name == airbyteChartRelease:
+				t.Error("should not have been called", name)
+				return nil, errors.New("should not have been called")
+			case name == nginxChartRelease:
+				return nil, errors.New("not found")
+			default:
+				t.Error("unsupported chart name", name)
+				return nil, errors.New("unexpected chart name")
+			}
+		},
+
 		installOrUpgradeChart: func(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error) {
 			if d := cmp.Diff(&expChart[expChartCnt].chart, spec); d != "" {
 				t.Error("chart mismatch", d)
@@ -124,7 +141,7 @@ func TestCommand_Install(t *testing.T) {
 		serverVersionGet: func() (string, error) {
 			return "test", nil
 		},
-		secretCreateOrUpdate: func(ctx context.Context, secretType coreV1.SecretType, namespace, name string, data map[string][]byte) error {
+		secretCreateOrUpdate: func(ctx context.Context, secret coreV1.Secret) error {
 			return nil
 		},
 		ingressExists: func(ctx context.Context, namespace string, ingress string) bool {
@@ -192,12 +209,16 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         30 * time.Minute,
-				ValuesOptions: values.Options{Values: []string{
-					"global.env_vars.AIRBYTE_INSTALLATION_ID=" + userID.String(),
-					"global.jobs.resources.limits.cpu=3",
-					"global.jobs.resources.limits.memory=4Gi",
-				}},
-				ValuesYaml: "global:\n  edition: \"test\"\n",
+				ValuesYaml: `global:
+    edition: test
+    env_vars:
+        AIRBYTE_INSTALLATION_ID: ` + userID.String() + `
+    jobs:
+        resources:
+            limits:
+                cpu: "3"
+                memory: 4Gi
+`,
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
@@ -250,6 +271,19 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 			}
 		},
 
+		getRelease: func(name string) (*release.Release, error) {
+			switch {
+			case name == airbyteChartRelease:
+				t.Error("should not have been called", name)
+				return nil, errors.New("should not have been called")
+			case name == nginxChartRelease:
+				return nil, errors.New("not found")
+			default:
+				t.Error("unsupported chart name", name)
+				return nil, errors.New("unexpected chart name")
+			}
+		},
+
 		installOrUpgradeChart: func(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error) {
 			if d := cmp.Diff(&expChart[expChartCnt].chart, spec); d != "" {
 				t.Error("chart mismatch", d)
@@ -265,7 +299,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		serverVersionGet: func() (string, error) {
 			return "test", nil
 		},
-		secretCreateOrUpdate: func(ctx context.Context, secretType coreV1.SecretType, namespace, name string, data map[string][]byte) error {
+		secretCreateOrUpdate: func(ctx context.Context, secret coreV1.Secret) error {
 			return nil
 		},
 		ingressExists: func(ctx context.Context, namespace string, ingress string) bool {
@@ -330,7 +364,7 @@ func TestCommand_Install_InvalidValuesFile(t *testing.T) {
 	if err == nil {
 		t.Fatal("expecting an error, received none")
 	}
-	if !strings.Contains(err.Error(), fmt.Sprintf("unable to read values file '%s'", valuesFile)) {
+	if !strings.Contains(err.Error(), fmt.Sprintf("unable to read values from yaml file '%s'", valuesFile)) {
 		t.Error("unexpected error:", err)
 	}
 
@@ -384,7 +418,7 @@ type mockK8sClient struct {
 	persistentVolumeClaimCreate func(ctx context.Context, namespace, name, volumeName string) error
 	persistentVolumeClaimExists func(ctx context.Context, namespace, name, volumeName string) bool
 	persistentVolumeClaimDelete func(ctx context.Context, namespace, name, volumeName string) error
-	secretCreateOrUpdate        func(ctx context.Context, secretType coreV1.SecretType, namespace, name string, data map[string][]byte) error
+	secretCreateOrUpdate        func(ctx context.Context, secret coreV1.Secret) error
 	serviceGet                  func(ctx context.Context, namespace, name string) (*coreV1.Service, error)
 	serverVersionGet            func() (string, error)
 	eventsWatch                 func(ctx context.Context, namespace string) (watch.Interface, error)
@@ -471,9 +505,9 @@ func (m *mockK8sClient) PersistentVolumeClaimDelete(ctx context.Context, namespa
 	return nil
 }
 
-func (m *mockK8sClient) SecretCreateOrUpdate(ctx context.Context, secretType coreV1.SecretType, namespace, name string, data map[string][]byte) error {
+func (m *mockK8sClient) SecretCreateOrUpdate(ctx context.Context, secret coreV1.Secret) error {
 	if m.secretCreateOrUpdate != nil {
-		return m.secretCreateOrUpdate(ctx, secretType, namespace, name, data)
+		return m.secretCreateOrUpdate(ctx, secret)
 	}
 
 	return nil
@@ -534,6 +568,9 @@ func (m *mockTelemetryClient) Attr(key, val string) {
 }
 
 func (m *mockTelemetryClient) User() uuid.UUID {
+	if m.user == nil {
+		return uuid.Nil
+	}
 	return m.user()
 }
 

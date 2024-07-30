@@ -7,7 +7,11 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/migrate"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/maps"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -185,7 +189,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	{
 		k8sVersion, err := c.k8s.ServerVersionGet()
 		if err != nil {
-			return nil, fmt.Errorf("%w: could not fetch kubernetes server version: %w", localerr.ErrKubernetes, err)
+			return nil, fmt.Errorf("%w: unable to fetch kubernetes server version: %w", localerr.ErrKubernetes, err)
 		}
 		c.tel.Attr("k8s_version", k8sVersion)
 	}
@@ -202,6 +206,7 @@ type InstallOpts struct {
 
 	HelmChartVersion string
 	ValuesFile       string
+	Secrets          []string
 	Migrate          bool
 	Host             string
 
@@ -250,12 +255,12 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 
 		pterm.Debug.Println(fmt.Sprintf("Creating directory '%s'", path))
 		if err := os.MkdirAll(path, 0766); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Could not create directory '%s'", name))
+			pterm.Error.Println(fmt.Sprintf("Unable to create directory '%s'", name))
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
 
 		if err := c.k8s.PersistentVolumeCreate(ctx, namespace, name); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume '%s'", name))
+			pterm.Error.Println(fmt.Sprintf("Unable to create persistent volume '%s'", name))
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
 
@@ -272,7 +277,7 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 		// access to the persisted volume directory.
 		pterm.Debug.Println(fmt.Sprintf("Updating permissions for '%s'", path))
 		if err := os.Chmod(path, 0777); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Could not set permissions for '%s'", path))
+			pterm.Error.Println(fmt.Sprintf("Unable to set permissions for '%s'", path))
 			return fmt.Errorf("unable to set permissions for '%s': %w", path, err)
 		}
 
@@ -288,7 +293,7 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 	if !c.k8s.PersistentVolumeClaimExists(ctx, namespace, name, volumeName) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume claim '%s'", name))
 		if err := c.k8s.PersistentVolumeClaimCreate(ctx, namespace, name, volumeName); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Could not create persistent volume claim '%s'", name))
+			pterm.Error.Println(fmt.Sprintf("Unable to create persistent volume claim '%s'", name))
 			return fmt.Errorf("unable to create persistent volume claim '%s': %w", name, err)
 		}
 		pterm.Info.Println(fmt.Sprintf("Persistent volume claim '%s' created", name))
@@ -301,21 +306,12 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
-	var values string
-	if opts.ValuesFile != "" {
-		raw, err := os.ReadFile(opts.ValuesFile)
-		if err != nil {
-			return fmt.Errorf("unable to read values file '%s': %w", opts.ValuesFile, err)
-		}
-		values = string(raw)
-	}
-
 	go c.watchEvents(ctx)
 
 	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", airbyteNamespace))
 		if err := c.k8s.NamespaceCreate(ctx, airbyteNamespace); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Could not create namespace '%s'", airbyteNamespace))
+			pterm.Error.Println(fmt.Sprintf("Unable to create namespace '%s'", airbyteNamespace))
 			return fmt.Errorf("unable to create airbyte namespace: %w", err)
 		}
 		pterm.Info.Println(fmt.Sprintf("Namespace '%s' created", airbyteNamespace))
@@ -353,20 +349,54 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	airbyteValues := []string{
+<<<<<<< HEAD
 		fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser),
 		fmt.Sprintf("global.jobs.resources.limits.cpu=3"),
 		fmt.Sprintf("global.jobs.resources.limits.memory=4Gi"),
 		"global.auth.enabled=false",
+=======
+		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + telUser,
+		"global.jobs.resources.limits.cpu=3",
+		"global.jobs.resources.limits.memory=4Gi",
+>>>>>>> origin/cole/prioritized-values.yml
 	}
 
 	if opts.dockerAuth() {
 		pterm.Debug.Println(fmt.Sprintf("Creating '%s' secret", dockerAuthSecretName))
 		if err := c.handleDockerSecret(ctx, opts.DockerServer, opts.DockerUser, opts.DockerPass, opts.DockerEmail); err != nil {
-			pterm.Debug.Println(fmt.Sprintf("Could not create '%s' secret", dockerAuthSecretName))
+			pterm.Debug.Println(fmt.Sprintf("Unable to create '%s' secret", dockerAuthSecretName))
 			return fmt.Errorf("unable to create '%s' secret: %w", dockerAuthSecretName, err)
 		}
 		pterm.Debug.Println(fmt.Sprintf("Created '%s' secret", dockerAuthSecretName))
 		airbyteValues = append(airbyteValues, fmt.Sprintf("global.imagePullSecrets[0].name=%s", dockerAuthSecretName))
+	}
+
+	for _, secretFile := range opts.Secrets {
+		c.spinner.UpdateText(fmt.Sprintf("Creating secret from '%s'", secretFile))
+		raw, err := os.ReadFile(secretFile)
+		if err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to read secret file '%s': %s", secretFile, err))
+			return fmt.Errorf("unable to read secret file '%s': %w", secretFile, err)
+		}
+
+		var secret corev1.Secret
+		if err := yaml.Unmarshal(raw, &secret); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to unmarshal secret file '%s': %s", secretFile, err))
+			return fmt.Errorf("unable to unmarshal secret file '%s': %w", secretFile, err)
+		}
+		secret.ObjectMeta.Namespace = airbyteNamespace
+
+		if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to create secret from file '%s'", secretFile))
+			return fmt.Errorf("unable to create secret from file '%s': %w", secretFile, err)
+		}
+
+		pterm.Success.Println(fmt.Sprintf("Secret from '%s' created or updated", secretFile))
+	}
+
+	valuesYAML, err := mergeValuesWithValuesYAML(airbyteValues, opts.ValuesFile)
+	if err != nil {
+		return fmt.Errorf("unable to merge values with values file '%s': %w", opts.ValuesFile, err)
 	}
 
 	if err := c.handleChart(ctx, chartRequest{
@@ -377,20 +407,20 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		chartRelease: airbyteChartRelease,
 		chartVersion: opts.HelmChartVersion,
 		namespace:    airbyteNamespace,
-		values:       airbyteValues,
-		valuesYAML:   values,
+		valuesYAML:   valuesYAML,
 	}); err != nil {
 		return fmt.Errorf("unable to install airbyte chart: %w", err)
 	}
 
 	if err := c.handleChart(ctx, chartRequest{
-		name:         "nginx",
-		repoName:     nginxRepoName,
-		repoURL:      nginxRepoURL,
-		chartName:    nginxChartName,
-		chartRelease: nginxChartRelease,
-		namespace:    nginxNamespace,
-		values:       append(c.provider.HelmNginx, fmt.Sprintf("controller.service.ports.http=%d", c.portHTTP)),
+		name:               "nginx",
+		checkShouldInstall: true,
+		repoName:           nginxRepoName,
+		repoURL:            nginxRepoURL,
+		chartName:          nginxChartName,
+		chartRelease:       nginxChartRelease,
+		namespace:          nginxNamespace,
+		values:             append(c.provider.HelmNginx, fmt.Sprintf("controller.service.ports.http=%d", c.portHTTP)),
 	}); err != nil {
 		// If we timed out, there is a good chance it's due to an unavailable port, check if this is the case.
 		// As the kubernetes client doesn't return usable error types, have to check for a specific string value.
@@ -528,17 +558,58 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+// handleBasicAuthSecret creates or updates the appropriate basic auth credentials for ingress.
+func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) error {
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	if err != nil {
+		pterm.Error.Println("Basic Auth secret could not be hashed.\n" +
+			"This may indicate an issue with the username or password provided.\n" +
+			"Please provider different credentials and try again.")
+
+		return fmt.Errorf("unable to hash basic auth password: %w", err)
+	}
+
+	secret := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: airbyteNamespace,
+			Name:      "basic-auth",
+		},
+		Data:       map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))},
+		StringData: nil,
+		Type:       corev1.SecretTypeOpaque,
+	}
+
+	if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
+		pterm.Error.Println("Unable to create Basic-Auth secret")
+		return fmt.Errorf("unable to create Basic-Auth secret: %w", err)
+	}
+	pterm.Success.Println("Basic-Auth secret created")
+	return nil
+}
+
+>>>>>>> origin/cole/prioritized-values.yml
 func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
-	data := map[string][]byte{}
-	secret, err := docker.Secret(server, user, pass, email)
+	secretBody, err := docker.Secret(server, user, pass, email)
 	if err != nil {
 		pterm.Error.Println("Unable to create docker secret")
 		return fmt.Errorf("unable to create docker secret: %w", err)
 	}
-	data[corev1.DockerConfigJsonKey] = secret
 
-	if err := c.k8s.SecretCreateOrUpdate(ctx, corev1.SecretTypeDockerConfigJson, airbyteNamespace, dockerAuthSecretName, data); err != nil {
-		pterm.Error.Println("Could not create Docker-auth secret")
+	secret := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: airbyteNamespace,
+			Name:      dockerAuthSecretName,
+		},
+		Data: map[string][]byte{corev1.DockerConfigJsonKey: secretBody},
+		Type: corev1.SecretTypeDockerConfigJson,
+	}
+
+	if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
+		pterm.Error.Println("Unable to create Docker-auth secret")
 		return fmt.Errorf("unable to create docker-auth secret: %w", err)
 	}
 	pterm.Success.Println("Docker-Auth secret created")
@@ -572,8 +643,8 @@ func (c *Command) Status(_ context.Context) error {
 
 		rel, err := c.helm.GetRelease(name)
 		if err != nil {
-			pterm.Warning.Println("Could not get airbyte release")
-			pterm.Debug.Printfln("unable to get airbyte release: %s", err)
+			pterm.Warning.Println("Unable to fetch airbyte release")
+			pterm.Debug.Printfln("unable to fetch airbyte release: %s", err)
 			continue
 		}
 
@@ -590,15 +661,16 @@ func (c *Command) Status(_ context.Context) error {
 
 // chartRequest exists to make all the parameters to handleChart somewhat manageable
 type chartRequest struct {
-	name         string
-	repoName     string
-	repoURL      string
-	chartName    string
-	chartRelease string
-	chartVersion string
-	namespace    string
-	values       []string
-	valuesYAML   string
+	name               string
+	repoName           string
+	repoURL            string
+	chartName          string
+	chartRelease       string
+	chartVersion       string
+	namespace          string
+	values             []string
+	valuesYAML         string
+	checkShouldInstall bool
 }
 
 // handleChart will handle the installation of a chart
@@ -625,7 +697,22 @@ func (c *Command) handleChart(
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
 
-	c.spinner.UpdateText(fmt.Sprintf("Installing '%s' (version: %s) Helm Chart (this may take several minutes)", req.chartName, helmChart.Metadata.Version))
+	if req.checkShouldInstall && !checkHelmReleaseShouldInstall(c.helm, helmChart, req.chartRelease) {
+		pterm.Success.Println(fmt.Sprintf(
+			"Found matching existing Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  AppVersion: %s",
+			req.chartName, req.chartName, req.namespace, helmChart.Metadata.Version, helmChart.Metadata.AppVersion,
+		))
+		return nil
+	}
+
+	pterm.Info.Println(fmt.Sprintf(
+		"Starting Helm Chart installation of '%s' (version: %s)",
+		req.chartName, helmChart.Metadata.Version,
+	))
+	c.spinner.UpdateText(fmt.Sprintf(
+		"Installing '%s' (version: %s) Helm Chart (this may take several minutes)",
+		req.chartName, helmChart.Metadata.Version,
+	))
 	helmRelease, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
 		ReleaseName:     req.chartRelease,
 		ChartName:       req.chartName,
@@ -646,9 +733,10 @@ func (c *Command) handleChart(
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 
-	pterm.Success.Printfln(
-		"Installed Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  Release: %d",
-		req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Chart.Metadata.Version, helmRelease.Version)
+	pterm.Success.Println(fmt.Sprintf(
+		"Installed Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  AppVersion: %s\n  Release: %d",
+		req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Chart.Metadata.Version, helmRelease.Chart.Metadata.AppVersion, helmRelease.Version,
+	))
 	return nil
 }
 
@@ -735,4 +823,73 @@ func k8sClientConfig(kubecfg, kubectx string) (clientcmd.ClientConfig, error) {
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
 		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
 	), nil
+}
+
+// checkHelmReleaseShouldInstall returns true if the provided release needs to be installed,
+// false otherwise.
+func checkHelmReleaseShouldInstall(helm helm.Client, chart *chart.Chart, releaseName string) bool {
+	// look for an existing release, see if it matches the existing chart
+	rel, err := helm.GetRelease(releaseName)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			// chart hasn't been installed previously
+			pterm.Debug.Println(fmt.Sprintf("Unable to find %s Helm Release", releaseName))
+		} else {
+			// chart may or may not exist, log error and ignore
+			pterm.Debug.Println(fmt.Sprintf("Unable to fetch %s Helm Release: %s", releaseName, err))
+		}
+		return true
+	}
+
+	if rel.Info.Status != release.StatusDeployed {
+		pterm.Debug.Println(fmt.Sprintf("Chart has the status of %s", rel.Info.Status))
+		return true
+	}
+
+	if rel.Chart.Metadata.Version != chart.Metadata.Version {
+		pterm.Debug.Println(fmt.Sprintf(
+			"Chart version (%s) does not match Helm Release (%s)",
+			chart.Metadata.Version, rel.Chart.Metadata.Version,
+		))
+		return true
+	}
+
+	if rel.Chart.Metadata.AppVersion != chart.Metadata.AppVersion {
+		pterm.Debug.Println(fmt.Sprintf(
+			"Chart app-version (%s) does not match Helm Release (%s)",
+			chart.Metadata.AppVersion, rel.Chart.Metadata.AppVersion,
+		))
+		return true
+	}
+
+	pterm.Debug.Println(fmt.Sprintf(
+		"Chart matched Helm Release\n  Version: %s - %s\n  AppVersion: %s - %s",
+		chart.Metadata.Version, rel.Chart.Metadata.Version,
+		chart.Metadata.AppVersion, rel.Chart.Metadata.AppVersion,
+	))
+
+	return false
+}
+
+// mergeValuesWithValuesYAML ensures that the values defined within this code have a lower
+// priority than any values defined in a values.yaml file.
+// By default, the helm-client we're using reversed this priority, putting the values
+// defined in this code at a higher priority than the values defined in the values.yaml file.
+// This function returns a string representation of the value.yaml file after all
+// values provided were potentially overridden by the valuesYML file.
+func mergeValuesWithValuesYAML(values []string, valuesYAML string) (string, error) {
+	a := maps.FromSlice(values)
+	b, err := maps.FromYAMLFile(valuesYAML)
+	if err != nil {
+		return "", fmt.Errorf("unable to read values from yaml file '%s': %w", valuesYAML, err)
+	}
+	maps.Merge(a, b)
+
+	res, err := maps.ToYAML(a)
+	if err != nil {
+		return "", fmt.Errorf("unable to merge values from yaml file '%s': %w", valuesYAML, err)
+	}
+
+	return res, nil
+
 }

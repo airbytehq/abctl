@@ -14,6 +14,10 @@ import (
 
 // Help messages to display for specific error situations.
 const (
+	// helpAirbyteDir is display if ErrAirbyteDir is ever returned
+	helpAirbyteDir = `The ~/.airbyte directory is inaccessible.
+You may need to remove this directory before trying your command again.`
+
 	// helpDocker is displayed if ErrDocker is ever returned
 	helpDocker = `An error occurred while communicating with the Docker daemon.
 Ensure that Docker is running and is accessible.  You may need to upgrade to a newer version of Docker.
@@ -41,16 +45,20 @@ func Execute(ctx context.Context, cmd *cobra.Command) {
 	if err := cmd.ExecuteContext(ctx); err != nil {
 		pterm.Error.Println(err)
 
-		if errors.Is(err, localerr.ErrDocker) {
+		switch {
+		case errors.Is(err, localerr.ErrAirbyteDir):
+			pterm.Println()
+			pterm.Info.Println(helpAirbyteDir)
+		case errors.Is(err, localerr.ErrDocker):
 			pterm.Println()
 			pterm.Info.Println(helpDocker)
-		} else if errors.Is(err, localerr.ErrKubernetes) {
+		case errors.Is(err, localerr.ErrKubernetes):
 			pterm.Println()
 			pterm.Info.Println(helpKubernetes)
-		} else if errors.Is(err, localerr.ErrIngress) {
+		case errors.Is(err, localerr.ErrIngress):
 			pterm.Println()
 			pterm.Info.Println(helpIngress)
-		} else if errors.Is(err, localerr.ErrPort) {
+		case errors.Is(err, localerr.ErrPort):
 			pterm.Println()
 			pterm.Info.Printfln(helpPort)
 		}
