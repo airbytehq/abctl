@@ -349,16 +349,10 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	airbyteValues := []string{
-<<<<<<< HEAD
-		fmt.Sprintf("global.env_vars.AIRBYTE_INSTALLATION_ID=%s", telUser),
-		fmt.Sprintf("global.jobs.resources.limits.cpu=3"),
-		fmt.Sprintf("global.jobs.resources.limits.memory=4Gi"),
-		"global.auth.enabled=false",
-=======
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + telUser,
 		"global.jobs.resources.limits.cpu=3",
 		"global.jobs.resources.limits.memory=4Gi",
->>>>>>> origin/cole/prioritized-values.yml
+		"global.auth.enabled=false",
 	}
 
 	if opts.dockerAuth() {
@@ -558,39 +552,6 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	}
 }
 
-<<<<<<< HEAD
-=======
-// handleBasicAuthSecret creates or updates the appropriate basic auth credentials for ingress.
-func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) error {
-	hashedPass, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
-	if err != nil {
-		pterm.Error.Println("Basic Auth secret could not be hashed.\n" +
-			"This may indicate an issue with the username or password provided.\n" +
-			"Please provider different credentials and try again.")
-
-		return fmt.Errorf("unable to hash basic auth password: %w", err)
-	}
-
-	secret := corev1.Secret{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: airbyteNamespace,
-			Name:      "basic-auth",
-		},
-		Data:       map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))},
-		StringData: nil,
-		Type:       corev1.SecretTypeOpaque,
-	}
-
-	if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
-		pterm.Error.Println("Unable to create Basic-Auth secret")
-		return fmt.Errorf("unable to create Basic-Auth secret: %w", err)
-	}
-	pterm.Success.Println("Basic-Auth secret created")
-	return nil
-}
-
->>>>>>> origin/cole/prioritized-values.yml
 func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
 	secretBody, err := docker.Secret(server, user, pass, email)
 	if err != nil {
