@@ -17,20 +17,15 @@ const (
 )
 
 func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
-	//spinner := &pterm.DefaultSpinner
-
 	cmd := &cobra.Command{
 		Use:   "credentials",
 		Short: "Get Airbyte user credentials",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return telClient.Wrap(cmd.Context(), telemetry.Install, func() error {
 
 				client, err := defaultK8s(provider.Kubeconfig, provider.Context)
 				if err != nil {
-					pterm.Error.Printfln("No existing cluster found")
+					pterm.Error.Println("No existing cluster found")
 					return nil
 				}
 				secret, err := client.SecretGet(cmd.Context(), airbyteNamespace, airbyteAuthSecretName)
@@ -38,8 +33,8 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 					return err
 				}
 
-				pterm.Success.Printfln(fmt.Sprintf("Getting your credentials: %s", secret.Name))
-				pterm.Info.Printfln(fmt.Sprintf("{\n  \"password\": \"%s\",\n  \"client-id\": \"%s\",\n  \"client-secret\": \"%s\"\n}", secret.Data["instance-admin-password"], secret.Data["instance-admin-client-id"], secret.Data["instance-admin-client-secret"]))
+				pterm.Success.Println(fmt.Sprintf("Getting your credentials: %s", secret.Name))
+				pterm.Info.Println(fmt.Sprintf("{\n  \"password\": \"%s\",\n  \"client-id\": \"%s\",\n  \"client-secret\": \"%s\"\n}", secret.Data["instance-admin-password"], secret.Data["instance-admin-client-id"], secret.Data["instance-admin-client-secret"]))
 				return nil
 			})
 		},

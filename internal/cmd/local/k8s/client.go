@@ -203,7 +203,7 @@ func (d *DefaultK8sClient) SecretCreateOrUpdate(ctx context.Context, secret core
 func (d *DefaultK8sClient) SecretGet(ctx context.Context, namespace, name string) (*corev1.Secret, error) {
 	secret, err := d.ClientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("unable to update the secret %s: %w", name, err)
+		return nil, fmt.Errorf("unable to get the secret %s: %w", name, err)
 	}
 	return secret, nil
 }
