@@ -43,7 +43,7 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 		Short: "Manages local Airbyte installations",
 	}
 
-	cmd.AddCommand(NewCmdInstall(provider), NewCmdUninstall(provider), NewCmdStatus(provider))
+	cmd.AddCommand(NewCmdInstall(provider), NewCmdUninstall(provider), NewCmdStatus(provider), NewCmdCredentials(provider))
 
 	return cmd
 }

@@ -27,7 +27,6 @@ import (
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
-	"golang.org/x/crypto/bcrypt"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 	eventsv1 "k8s.io/api/events/v1"
@@ -217,6 +216,8 @@ type InstallOpts struct {
 	DockerUser   string
 	DockerPass   string
 	DockerEmail  string
+
+	NoBrowser bool
 }
 
 func (i *InstallOpts) dockerAuth() bool {
@@ -359,6 +360,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		"worker.env_vars.SIDECAR_KUBE_CPU_REQUEST=0.1",
 		"worker.env_vars.SIDECAR_KUBE_MEM_REQUEST=100Mi",
 		"worker.env_vars.SOCAT_KUBE_CPU_REQUEST=0.1",
+		"global.auth.enabled=true",
 	}
 
 	if opts.dockerAuth() {
@@ -443,19 +445,22 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		return fmt.Errorf("unable to install nginx chart: %w", err)
 	}
 
-	c.spinner.UpdateText("Configuring Basic-Auth")
-	// basic auth
-	if err := c.handleBasicAuthSecret(ctx, opts.BasicAuthUser, opts.BasicAuthPass); err != nil {
-		return fmt.Errorf("unable to create or update basic-auth secret: %w", err)
-	}
-
 	if err := c.handleIngress(ctx, opts.Host); err != nil {
 		return err
 	}
 
-	c.spinner.UpdateText("Verifying ingress")
-	if err := c.openBrowser(ctx, fmt.Sprintf("http://%s:%d", opts.Host, c.portHTTP)); err != nil {
+	url := fmt.Sprintf("http://%s:%d", opts.Host, c.portHTTP)
+	if err := c.verifyIngress(ctx, url); err != nil {
 		return err
+	}
+
+	if opts.NoBrowser {
+		pterm.Success.Println(fmt.Sprintf(
+			"Launching web-browser disabled. Airbyte should be accessible at\n  %s",
+			url,
+		))
+	} else {
+		c.launch(url)
 	}
 
 	return nil
@@ -562,36 +567,6 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	default:
 		pterm.Debug.Printfln("Received an unsupported event type: %s", e.Type)
 	}
-}
-
-// handleBasicAuthSecret creates or updates the appropriate basic auth credentials for ingress.
-func (c *Command) handleBasicAuthSecret(ctx context.Context, user, pass string) error {
-	hashedPass, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
-	if err != nil {
-		pterm.Error.Println("Basic Auth secret could not be hashed.\n" +
-			"This may indicate an issue with the username or password provided.\n" +
-			"Please provider different credentials and try again.")
-
-		return fmt.Errorf("unable to hash basic auth password: %w", err)
-	}
-
-	secret := corev1.Secret{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: airbyteNamespace,
-			Name:      "basic-auth",
-		},
-		Data:       map[string][]byte{"auth": []byte(fmt.Sprintf("%s:%s", user, hashedPass))},
-		StringData: nil,
-		Type:       corev1.SecretTypeOpaque,
-	}
-
-	if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
-		pterm.Error.Println("Unable to create Basic-Auth secret")
-		return fmt.Errorf("unable to create Basic-Auth secret: %w", err)
-	}
-	pterm.Success.Println("Basic-Auth secret created")
-	return nil
 }
 
 func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
@@ -743,10 +718,12 @@ func (c *Command) handleChart(
 	return nil
 }
 
-// openBrowser will open the url in the user's browser but only if the url returns a 200 response code first
+// verifyIngress will open the url in the user's browser but only if the url returns a 200 response code first
 // TODO: clean up this method, make it testable
-func (c *Command) openBrowser(ctx context.Context, url string) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+func (c *Command) verifyIngress(ctx context.Context, url string) error {
+	c.spinner.UpdateText("Verifying ingress")
+
+	ingressCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
 	alive := make(chan error)
@@ -755,10 +732,10 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 		tick := time.Tick(1 * time.Second)
 		for {
 			select {
-			case <-ctx.Done():
-				alive <- fmt.Errorf("liveness check failed: %w", ctx.Err())
+			case <-ingressCtx.Done():
+				alive <- fmt.Errorf("liveness check failed: %w", ingressCtx.Err())
 			case <-tick:
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+				req, err := http.NewRequestWithContext(ingressCtx, http.MethodGet, url, nil)
 				if err != nil {
 					alive <- fmt.Errorf("unable to create request: %w", err)
 				}
@@ -776,9 +753,9 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 	}()
 
 	select {
-	case <-ctx.Done():
+	case <-ingressCtx.Done():
 		pterm.Error.Println("Timed out waiting for ingress")
-		return fmt.Errorf("browser liveness check failed: %w", ctx.Err())
+		return fmt.Errorf("browser liveness check failed: %w", ingressCtx.Err())
 	case err := <-alive:
 		if err != nil {
 			pterm.Error.Println("Ingress verification failed")
@@ -786,19 +763,23 @@ func (c *Command) openBrowser(ctx context.Context, url string) error {
 		}
 	}
 	// if we're here, then no errors occurred
+	return nil
+}
 
+func (c *Command) launch(url string) {
 	c.spinner.UpdateText(fmt.Sprintf("Attempting to launch web-browser for %s", url))
 
 	if err := c.launcher(url); err != nil {
-		pterm.Warning.Printfln("Failed to launch web-browser.\n"+
-			"Please launch your web-browser to access %s", url)
-		pterm.Debug.Printfln("failed to launch web-browser: %s", err.Error())
+		pterm.Warning.Println(fmt.Sprintf(
+			"Failed to launch web-browser.\nPlease launch your web-browser to access %s",
+			url,
+		))
+		pterm.Debug.Println(fmt.Sprintf("failed to launch web-browser: %s", err.Error()))
 		// don't consider a failed web-browser to be a failed installation
+		return
 	}
 
 	pterm.Success.Println(fmt.Sprintf("Launched web-browser successfully for %s", url))
-
-	return nil
 }
 
 // defaultK8s returns the default k8s client

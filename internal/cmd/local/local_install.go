@@ -45,6 +45,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		flagDockerUser   string
 		flagDockerPass   string
 		flagDockerEmail  string
+
+		flagNoBrowser bool
 	)
 
 	cmd := &cobra.Command{
@@ -65,7 +67,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 			telClient.Attr("docker_platform", dockerVersion.Platform)
 
 			spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", flagPort))
-			if err := portAvailable(cmd.Context(), flagPort); err != nil {
+			if err := portAvailable(cmd.Context(), flagHost, flagPort); err != nil {
 				return fmt.Errorf("port %d is not available: %w", flagPort, err)
 			}
 			return nil
@@ -145,6 +147,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					DockerUser:   flagDockerUser,
 					DockerPass:   flagDockerPass,
 					DockerEmail:  flagDockerEmail,
+
+					NoBrowser: flagNoBrowser,
 				}
 
 				if opts.HelmChartVersion == "latest" {
@@ -163,7 +167,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					return err
 				}
 
-				spinner.Success("Airbyte installation complete")
+				spinner.Success("Airbyte installation complete.\nRun: " + pterm.LightBlue("abctl local credentials") + " to retrieve your credentials")
 				return nil
 			})
 		},
@@ -185,6 +189,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVar(&flagDockerUser, "docker-username", "", "docker username, can also be specified via "+envDockerEmail)
 	cmd.Flags().StringVar(&flagDockerPass, "docker-password", "", "docker password, can also be specified via "+envDockerPass)
 	cmd.Flags().StringVar(&flagDockerEmail, "docker-email", "", "docker email, can also be specified via "+envDockerEmail)
+
+	cmd.Flags().BoolVar(&flagNoBrowser, "no-browser", false, "disable launching the web-browser post install")
 
 	cmd.MarkFlagsRequiredTogether("docker-username", "docker-password", "docker-email")
 

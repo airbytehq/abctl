@@ -51,6 +51,7 @@ type Client interface {
 
 	// SecretCreateOrUpdate will update or create the secret name with the payload of data in the specified namespace
 	SecretCreateOrUpdate(ctx context.Context, secret corev1.Secret) error
+	SecretGet(ctx context.Context, namespace, name string) (*corev1.Secret, error)
 
 	// ServiceGet returns a the service for the given namespace and name
 	ServiceGet(ctx context.Context, namespace, name string) (*corev1.Service, error)
@@ -197,6 +198,14 @@ func (d *DefaultK8sClient) SecretCreateOrUpdate(ctx context.Context, secret core
 	}
 
 	return fmt.Errorf("unexpected error while handling the secret %s: %w", name, err)
+}
+
+func (d *DefaultK8sClient) SecretGet(ctx context.Context, namespace, name string) (*corev1.Secret, error) {
+	secret, err := d.ClientSet.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to get the secret %s: %w", name, err)
+	}
+	return secret, nil
 }
 
 func (d *DefaultK8sClient) ServerVersionGet() (string, error) {

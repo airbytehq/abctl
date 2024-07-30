@@ -53,6 +53,8 @@ func TestCommand_Install(t *testing.T) {
 				Wait:            true,
 				Timeout:         30 * time.Minute,
 				ValuesYaml: `global:
+    auth:
+        enabled: "true"
     env_vars:
         AIRBYTE_INSTALLATION_ID: ` + userID.String() + `
     jobs:
@@ -218,6 +220,8 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 				Wait:            true,
 				Timeout:         30 * time.Minute,
 				ValuesYaml: `global:
+    auth:
+        enabled: "true"
     edition: test
     env_vars:
         AIRBYTE_INSTALLATION_ID: ` + userID.String() + `
@@ -435,6 +439,7 @@ type mockK8sClient struct {
 	persistentVolumeClaimExists func(ctx context.Context, namespace, name, volumeName string) bool
 	persistentVolumeClaimDelete func(ctx context.Context, namespace, name, volumeName string) error
 	secretCreateOrUpdate        func(ctx context.Context, secret coreV1.Secret) error
+	secretGet                   func(ctx context.Context, namespace, name string) (*coreV1.Secret, error)
 	serviceGet                  func(ctx context.Context, namespace, name string) (*coreV1.Service, error)
 	serverVersionGet            func() (string, error)
 	eventsWatch                 func(ctx context.Context, namespace string) (watch.Interface, error)
@@ -527,6 +532,14 @@ func (m *mockK8sClient) SecretCreateOrUpdate(ctx context.Context, secret coreV1.
 	}
 
 	return nil
+}
+
+func (m *mockK8sClient) SecretGet(ctx context.Context, namespace, name string) (*coreV1.Secret, error) {
+	if m.secretGet != nil {
+		return m.secretGet(ctx, namespace, name)
+	}
+
+	return nil, nil
 }
 
 func (m *mockK8sClient) ServiceGet(ctx context.Context, namespace, name string) (*coreV1.Service, error) {
