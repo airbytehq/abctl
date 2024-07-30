@@ -459,8 +459,8 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 			"Launching web-browser disabled. Airbyte should be accessible at\n  %s",
 			url,
 		))
-	} else if err := c.launch(url); err != nil {
-		return err
+	} else {
+		c.launch(url)
 	}
 
 	return nil
@@ -796,19 +796,20 @@ func (c *Command) verifyIngress(ctx context.Context, url string) error {
 	return nil
 }
 
-func (c *Command) launch(url string) error {
+func (c *Command) launch(url string) {
 	c.spinner.UpdateText(fmt.Sprintf("Attempting to launch web-browser for %s", url))
 
 	if err := c.launcher(url); err != nil {
-		pterm.Warning.Printfln("Failed to launch web-browser.\n"+
-			"Please launch your web-browser to access %s", url)
-		pterm.Debug.Printfln("failed to launch web-browser: %s", err.Error())
+		pterm.Warning.Println(fmt.Sprintf(
+			"Failed to launch web-browser.\nPlease launch your web-browser to access %s",
+			url,
+		))
+		pterm.Debug.Println(fmt.Sprintf("failed to launch web-browser: %s", err.Error()))
 		// don't consider a failed web-browser to be a failed installation
+		return
 	}
 
 	pterm.Success.Println(fmt.Sprintf("Launched web-browser successfully for %s", url))
-
-	return nil
 }
 
 // defaultK8s returns the default k8s client
