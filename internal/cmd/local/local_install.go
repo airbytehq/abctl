@@ -160,7 +160,11 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					return err
 				}
 
-				spinner.Success("Airbyte installation complete.\nRun: " + pterm.LightBlue("abctl local credentials") + " to retrieve your credentials")
+				spinner.Success(
+					"Airbyte installation complete.\n" +
+						"  A password may be required to login. The password can by found by running\n" +
+						"  the command " + pterm.LightBlue("abctl local credentials"),
+				)
 				return nil
 			})
 		},
