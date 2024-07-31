@@ -201,9 +201,6 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 }
 
 type InstallOpts struct {
-	BasicAuthUser string
-	BasicAuthPass string
-
 	HelmChartVersion string
 	ValuesFile       string
 	Secrets          []string
