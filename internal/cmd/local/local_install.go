@@ -79,7 +79,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 			}
 
 			if flagExternalScheme != "http" && flagExternalScheme != "https" {
-				pterm.Error.Println(fmt.Sprintf("Supported --external-host value '%s', must be http or https", flagExternalScheme))
+				pterm.Error.Println(fmt.Sprintf("Unsupported --external-host value '%s', must be http or https", flagExternalScheme))
 				return errors.New("unsupported scheme for --external-host")
 			}
 
