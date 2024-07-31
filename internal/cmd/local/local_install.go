@@ -176,6 +176,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	// if they were set in order to issue the deprecated warning.
 	cmd.Flags().StringP("username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
 	cmd.Flags().StringP("password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
+	_ = cmd.Flags().MarkHidden("username")
+	_ = cmd.Flags().MarkHidden("password")
 
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
 	cmd.Flags().StringVar(&flagHost, "host", "localhost", "ingress http host")
