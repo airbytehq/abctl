@@ -1,6 +1,7 @@
 package local
 
 import (
+	"errors"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
@@ -45,8 +46,9 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		flagDockerPass   string
 		flagDockerEmail  string
 
-		flagNoBrowser    bool
-		flagExternalHost string
+		flagNoBrowser      bool
+		flagExternalHost   string
+		flagExternalScheme string
 
 		// deprecated
 		flagHost string
@@ -76,8 +78,13 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 				}
 			}
 
+			if flagExternalScheme != "http" && flagExternalScheme != "https" {
+				pterm.Error.Println(fmt.Sprintf("Supported --external-host value '%s', must be http or https", flagExternalScheme))
+				return errors.New("unsupported scheme for --external-host")
+			}
+
 			spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", flagPort))
-			if err := portAvailable(cmd.Context(), flagExternalHost, flagPort); err != nil {
+			if err := portAvailable(cmd.Context(), flagExternalScheme, flagExternalHost, flagPort); err != nil {
 				return fmt.Errorf("port %d is not available: %w", flagPort, err)
 			}
 			return nil
@@ -156,7 +163,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					DockerPass:   flagDockerPass,
 					DockerEmail:  flagDockerEmail,
 
-					NoBrowser: flagNoBrowser,
+					NoBrowser:      flagNoBrowser,
+					ExternalScheme: flagExternalScheme,
 				}
 
 				if opts.HelmChartVersion == "latest" {
@@ -194,6 +202,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
 	cmd.Flags().StringVar(&flagExternalHost, "external-host", defaultHost, "ingress http host")
+	cmd.Flags().StringVar(&flagExternalScheme, "external-scheme", "http", "URI scheme for accessing the ingress; http or https")
 	// host has been deprecated
 	cmd.Flags().StringVar(&flagHost, "host", defaultHost, "deprecated, use --external-host instead")
 

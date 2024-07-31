@@ -214,7 +214,15 @@ type InstallOpts struct {
 	DockerPass   string
 	DockerEmail  string
 
-	NoBrowser bool
+	NoBrowser      bool
+	ExternalScheme string
+}
+
+// defaults will set the default value for any required field which is missing a value
+func (i *InstallOpts) defaults() {
+	if i.ExternalScheme == "" {
+		i.ExternalScheme = "http"
+	}
 }
 
 func (i *InstallOpts) dockerAuth() bool {
@@ -305,6 +313,8 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
+	opts.defaults()
+
 	go c.watchEvents(ctx)
 
 	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
@@ -440,7 +450,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		return err
 	}
 
-	url := fmt.Sprintf("http://%s:%d", opts.Host, c.portHTTP)
+	url := fmt.Sprintf("%s://%s:%d", opts.ExternalScheme, opts.Host, c.portHTTP)
 	if err := c.verifyIngress(ctx, url); err != nil {
 		return err
 	}
@@ -745,7 +755,7 @@ func (c *Command) verifyIngress(ctx context.Context, url string) error {
 
 	select {
 	case <-ingressCtx.Done():
-		pterm.Error.Println("Timed out waiting for ingress")
+		pterm.Error.Println("Timed out waiting for ingress, ensure --external-scheme is correct")
 		return fmt.Errorf("browser liveness check failed: %w", ingressCtx.Err())
 	case err := <-alive:
 		if err != nil {

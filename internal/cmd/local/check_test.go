@@ -79,7 +79,7 @@ func TestPortAvailable_Available(t *testing.T) {
 		t.Fatal("unable to close listener", err)
 	}
 
-	err = portAvailable(context.Background(), "localhost", p)
+	err = portAvailable(context.Background(), "http", "localhost", p)
 	if err != nil {
 		t.Error("portAvailable returned unexpected error", err)
 	}
@@ -94,7 +94,7 @@ func TestPortAvailable_Unavailable(t *testing.T) {
 	defer listener.Close()
 	p := port(listener.Addr().String())
 
-	err = portAvailable(context.Background(), "localhost", p)
+	err = portAvailable(context.Background(), "http", "localhost", p)
 	// expecting an error
 	if err == nil {
 		t.Error("portAvailable should have returned an error")
