@@ -24,17 +24,17 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 				return fmt.Errorf("%w: %w", localerr.ErrAirbyteDir, err)
 			}
 
-			// telemetry client configuration
-			{
-				var telOpts []telemetry.GetOption
-				// This is deprecated as the telemetry.Client now checks itself if the DO_NOT_TRACK env-var is defined.
-				// Currently leaving this here to output the message about the --dnt flag no longer being supported.
-				dntFlag, _ := cmd.Flags().GetBool("dnt")
-				if dntFlag {
-					pterm.Warning.Println("The --dnt flag has been deprecated. Use DO_NOT_TRACK environment-variable instead.")
-				}
+			telClient = telemetry.Get()
 
-				telClient = telemetry.Get(telOpts...)
+			{
+				// show the deprecation warning for username and password
+				userFlag, _ := cmd.Flags().GetString("username")
+				passFlag, _ := cmd.Flags().GetString("password")
+				if (userFlag != "" && userFlag != "airbyte") || (passFlag != "" && passFlag != "password") {
+					pterm.Warning.Println("The --username and --password flags have been deprecated.\n" +
+						"  Credentials now are randomly generated and can be retrieved by running\n" +
+						pterm.LightBlue("  abctl local credentials"))
+				}
 			}
 			printProviderDetails(provider)
 

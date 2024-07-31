@@ -180,7 +180,7 @@ func TestCommand_Install(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := c.Install(context.Background(), InstallOpts{BasicAuthUser: "user", BasicAuthPass: "pass"}); err != nil {
+	if err := c.Install(context.Background(), InstallOpts{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -340,7 +340,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := c.Install(context.Background(), InstallOpts{BasicAuthUser: "user", BasicAuthPass: "pass", ValuesFile: "testdata/values.yml"}); err != nil {
+	if err := c.Install(context.Background(), InstallOpts{ValuesFile: "testdata/values.yml"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -364,7 +364,7 @@ func TestCommand_Install_InvalidValuesFile(t *testing.T) {
 
 	valuesFile := "testdata/dne.yml"
 
-	err = c.Install(context.Background(), InstallOpts{BasicAuthUser: "user", BasicAuthPass: "pass", ValuesFile: valuesFile})
+	err = c.Install(context.Background(), InstallOpts{ValuesFile: valuesFile})
 	if err == nil {
 		t.Fatal("expecting an error, received none")
 	}

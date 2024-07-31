@@ -31,9 +31,6 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
 	var (
-		flagBasicAuthUser string
-		flagBasicAuthPass string
-
 		flagChartValuesFile string
 		flagChartSecrets    []string
 		flagChartVersion    string
@@ -134,8 +131,6 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 				}
 
 				opts := local.InstallOpts{
-					BasicAuthUser:    flagBasicAuthUser,
-					BasicAuthPass:    flagBasicAuthPass,
 					HelmChartVersion: flagChartVersion,
 					ValuesFile:       flagChartValuesFile,
 					Secrets:          flagChartSecrets,
@@ -155,8 +150,6 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					opts.HelmChartVersion = ""
 				}
 
-				envOverride(&opts.BasicAuthUser, envBasicAuthUser)
-				envOverride(&opts.BasicAuthPass, envBasicAuthPass)
 				envOverride(&opts.DockerServer, envDockerServer)
 				envOverride(&opts.DockerUser, envDockerUser)
 				envOverride(&opts.DockerPass, envDockerPass)
@@ -175,8 +168,11 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 	cmd.FParseErrWhitelist.UnknownFlags = true
 
-	cmd.Flags().StringVarP(&flagBasicAuthUser, "username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
-	cmd.Flags().StringVarP(&flagBasicAuthPass, "password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
+	// The username and password flags are deprecated, but must still be defined so we can check
+	// if they were set in order to issue the deprecated warning.
+	cmd.Flags().StringP("username", "u", "airbyte", "basic auth username, can also be specified via "+envBasicAuthUser)
+	cmd.Flags().StringP("password", "p", "password", "basic auth password, can also be specified via "+envBasicAuthPass)
+
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
 	cmd.Flags().StringVar(&flagHost, "host", "localhost", "ingress http host")
 
