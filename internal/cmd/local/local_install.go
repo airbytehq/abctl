@@ -27,6 +27,9 @@ const (
 	envDockerEmail = "ABCTL_LOCAL_INSTALL_DOCKER_EMAIL"
 )
 
+// defaultHost is the default hostname where the installed Airbyte instance will be accessible.
+const defaultHost = "localhost"
+
 func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
@@ -36,14 +39,17 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		flagChartVersion    string
 		flagMigrate         bool
 		flagPort            int
-		flagHost            string
 
 		flagDockerServer string
 		flagDockerUser   string
 		flagDockerPass   string
 		flagDockerEmail  string
 
-		flagNoBrowser bool
+		flagNoBrowser    bool
+		flagExternalHost string
+
+		// deprecated
+		flagHost string
 	)
 
 	cmd := &cobra.Command{
@@ -63,8 +69,15 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 			telClient.Attr("docker_arch", dockerVersion.Arch)
 			telClient.Attr("docker_platform", dockerVersion.Platform)
 
+			if flagHost != defaultHost {
+				pterm.Warning.Println("The --host flag has been deprecated. Use --external-host instead.")
+				if flagExternalHost == defaultHost {
+					flagExternalHost = flagHost
+				}
+			}
+
 			spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", flagPort))
-			if err := portAvailable(cmd.Context(), flagHost, flagPort); err != nil {
+			if err := portAvailable(cmd.Context(), flagExternalHost, flagPort); err != nil {
 				return fmt.Errorf("port %d is not available: %w", flagPort, err)
 			}
 			return nil
@@ -136,7 +149,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					Secrets:          flagChartSecrets,
 					Migrate:          flagMigrate,
 					Docker:           dockerClient,
-					Host:             flagHost,
+					Host:             flagExternalHost,
 
 					DockerServer: flagDockerServer,
 					DockerUser:   flagDockerUser,
@@ -180,7 +193,9 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	_ = cmd.Flags().MarkHidden("password")
 
 	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
-	cmd.Flags().StringVar(&flagHost, "host", "localhost", "ingress http host")
+	cmd.Flags().StringVar(&flagExternalHost, "external-host", defaultHost, "ingress http host")
+	// host has been deprecated
+	cmd.Flags().StringVar(&flagHost, "host", defaultHost, "deprecated, use --external-host instead")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
