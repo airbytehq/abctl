@@ -123,7 +123,9 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 
 // createAndPing attempts to create a docker client and ping it to ensure we can communicate
 func createAndPing(ctx context.Context, newPing newPing, host string, opts []client.Opt) (Client, error) {
-	cli, err := newPing(append(opts, client.WithHost(host))...)
+	// Pass client.WithHost first to ensure it runs prior to the client.FromEnv call.
+	// We want the DOCKER_HOST to be used if it has been specified, overriding our host.
+	cli, err := newPing(append([]client.Opt{client.WithHost(host)}, opts...)...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create docker client: %w", err)
 	}
@@ -147,7 +149,6 @@ func (d *Docker) Version(ctx context.Context) (Version, error) {
 		Arch:     ver.Arch,
 		Platform: ver.Platform.Name,
 	}, nil
-
 }
 
 // Port returns the host-port the underlying docker process is currently bound to, for the given container.
