@@ -51,8 +51,8 @@ var httpClient doer = &http.Client{Timeout: 3 * time.Second}
 //
 // This function works by attempting to establish a tcp listener on a port.
 // If we can establish a tcp listener on the port, an additional check is made to see if Airbyte may already be
-// bound to that port. If something behinds Airbyte is using it, then treat this as a inaccessible port.
-func portAvailable(ctx context.Context, host string, port int) error {
+// bound to that port. If something besides Airbyte is using it, then treat this as a inaccessible port.
+func portAvailable(ctx context.Context, port int) error {
 	if port < 1024 {
 		pterm.Warning.Printfln(
 			"Availability of port %d cannot be determined, as this is a privileged port (less than 1024).\n"+
@@ -63,12 +63,12 @@ func portAvailable(ctx context.Context, host string, port int) error {
 
 	// net.Listen doesn't support providing a context
 	lc := &net.ListenConfig{}
-	listener, err := lc.Listen(ctx, "tcp", fmt.Sprintf("%s:%d", host, port))
+	listener, err := lc.Listen(ctx, "tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
 		pterm.Debug.Println(fmt.Sprintf("Unable to listen on port '%d': %s", port, err))
 
 		// check if an existing airbyte installation is already listening on this port
-		req, errInner := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://%s:%d/api/v1/instance_configuration", host, port), nil)
+		req, errInner := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d/api/v1/instance_configuration", port), nil)
 		if errInner != nil {
 			pterm.Error.Printfln("Port %d request could not be created", port)
 			return fmt.Errorf("%w: unable to create request: %w", localerr.ErrPort, err)

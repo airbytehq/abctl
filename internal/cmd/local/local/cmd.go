@@ -440,7 +440,8 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		return err
 	}
 
-	url := fmt.Sprintf("http://%s:%d", opts.Host, c.portHTTP)
+	// verify ingress using localhost
+	url := fmt.Sprintf("http://localhost:%d", c.portHTTP)
 	if err := c.verifyIngress(ctx, url); err != nil {
 		return err
 	}
