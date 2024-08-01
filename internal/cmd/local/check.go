@@ -51,7 +51,7 @@ var httpClient doer = &http.Client{Timeout: 3 * time.Second}
 //
 // This function works by attempting to establish a tcp listener on a port.
 // If we can establish a tcp listener on the port, an additional check is made to see if Airbyte may already be
-// bound to that port. If something besides Airbyte is using it, then treat this as a inaccessible port.
+// bound to that port. If something besides Airbyte is using it, treat this as an inaccessible port.
 func portAvailable(ctx context.Context, port int) error {
 	if port < 1024 {
 		pterm.Warning.Printfln(
