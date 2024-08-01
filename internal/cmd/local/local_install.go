@@ -64,7 +64,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 			telClient.Attr("docker_platform", dockerVersion.Platform)
 
 			spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", flagPort))
-			if err := portAvailable(cmd.Context(), flagHost, flagPort); err != nil {
+			if err := portAvailable(cmd.Context(), flagPort); err != nil {
 				return fmt.Errorf("port %d is not available: %w", flagPort, err)
 			}
 			return nil
