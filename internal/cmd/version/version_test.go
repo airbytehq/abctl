@@ -2,7 +2,6 @@ package version
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pterm/pterm"
@@ -14,7 +13,6 @@ func TestCmd_Output(t *testing.T) {
 	b := bytes.NewBufferString("")
 	pterm.SetDefaultOutput(b)
 	t.Cleanup(func() {
-		fmt.Println("outer cleanup")
 		pterm.SetDefaultOutput(os.Stdout)
 	})
 
