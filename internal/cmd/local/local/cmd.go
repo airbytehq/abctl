@@ -12,6 +12,7 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/rest"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -776,6 +777,7 @@ func (c *Command) launch(url string) {
 
 // defaultK8s returns the default k8s client
 func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
+	rest.SetDefaultWarningHandler(k8s.Logger{})
 	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
