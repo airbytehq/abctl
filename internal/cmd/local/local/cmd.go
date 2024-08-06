@@ -3,6 +3,13 @@ package local
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/migrate"
@@ -13,12 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
@@ -202,11 +203,12 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 }
 
 type InstallOpts struct {
-	HelmChartVersion string
-	ValuesFile       string
-	Secrets          []string
-	Migrate          bool
-	Host             string
+	HelmChartVersion  string
+	ValuesFile        string
+	Secrets           []string
+	ExtraVolumeMounts []string
+	Migrate           bool
+	Host              string
 
 	Docker *docker.Docker
 
