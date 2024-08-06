@@ -9,7 +9,7 @@ type Config struct {
 }
 
 type Node struct {
-	Role   NodeRole          `yaml:"role"`
+	Role   string            `yaml:"role"`
 	Image  string            `yaml:"image"`
 	Labels map[string]string `yaml:"labels"`
 
@@ -24,25 +24,19 @@ type Node struct {
 }
 
 type Mount struct {
-	ContainerPath  string           `yaml:"containerPath"`
-	HostPath       string           `yaml:"hostPath"`
-	ReadOnly       bool             `yaml:"readOnly"`
-	SelinuxRelabel bool             `yaml:"selinuxRelabel"`
-	Propagation    MountPropagation `yaml:"propagation"`
+	ContainerPath  string `yaml:"containerPath"`
+	HostPath       string `yaml:"hostPath"`
+	ReadOnly       bool   `yaml:"readOnly"`
+	SelinuxRelabel bool   `yaml:"selinuxRelabel"`
+	Propagation    string `yaml:"propagation"`
 }
-
-type MountPropagation string
-
-type NodeRole string
 
 type PortMapping struct {
-	ContainerPort int32               `yaml:"containerPort"`
-	HostPort      int32               `yaml:"hostPort"`
-	ListenAddress string              `yaml:"listenAddress"`
-	Protocol      PortMappingProtocol `yaml:"protocol"`
+	ContainerPort int32  `yaml:"containerPort"`
+	HostPort      int32  `yaml:"hostPort"`
+	ListenAddress string `yaml:"listenAddress"`
+	Protocol      string `yaml:"protocol"`
 }
-
-type PortMappingProtocol string
 
 func DefaultConfig() *Config {
 	kubeadmConfigPatch := `kind: InitConfiguration
@@ -60,7 +54,7 @@ nodeRegistration:
 				ExtraMounts: []Mount{
 					{
 						HostPath:      paths.Data,
-						ContainerPath: "/var/local-path-provider",
+						ContainerPath: "/var/local-path-provisioner",
 					},
 				},
 				ExtraPortMappings: []PortMapping{
