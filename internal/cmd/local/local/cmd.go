@@ -203,12 +203,11 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 }
 
 type InstallOpts struct {
-	HelmChartVersion  string
-	ValuesFile        string
-	Secrets           []string
-	ExtraVolumeMounts []string
-	Migrate           bool
-	Host              string
+	HelmChartVersion string
+	ValuesFile       string
+	Secrets          []string
+	Migrate          bool
+	Host             string
 
 	Docker *docker.Docker
 
