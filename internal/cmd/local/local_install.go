@@ -199,7 +199,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
 	cmd.Flags().StringSliceVar(&flagChartSecrets, "secret", []string{}, "an Airbyte helm chart secret file")
-	cmd.Flags().StringSliceVar(&flagExtraVolumeMounts, "volume", []string{}, "additional volume mounts (format: <host_path>:<guest_path>)")
+	cmd.Flags().StringSliceVar(&flagExtraVolumeMounts, "volume", []string{}, "additional volume mounts (format: <HOST_PATH>:<GUEST_PATH>)")
 	cmd.Flags().BoolVar(&flagMigrate, "migrate", false, "migrate data from docker compose installation")
 
 	cmd.Flags().StringVar(&flagDockerServer, "docker-server", "https://index.docker.io/v1/", "docker registry, can also be specified via "+envDockerServer)
