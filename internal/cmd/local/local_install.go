@@ -225,10 +225,6 @@ func envOverride(original *string, env string) {
 }
 
 func parseVolumeMounts(specs []string) ([]k8s.ExtraVolumeMount, error) {
-	if len(specs) == 0 {
-		return nil, nil
-	}
-
 	mounts := make([]k8s.ExtraVolumeMount, len(specs))
 
 	for i, spec := range specs {
