@@ -7,6 +7,7 @@ import (
 
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
@@ -193,7 +194,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	_ = cmd.Flags().MarkHidden("username")
 	_ = cmd.Flags().MarkHidden("password")
 
-	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
+	cmd.Flags().IntVar(&flagPort, "port", kind.IngressPort, "ingress http port")
 	cmd.Flags().StringVar(&flagHost, "host", "localhost", "ingress http host")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")

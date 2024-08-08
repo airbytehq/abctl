@@ -12,6 +12,7 @@ import (
 
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/migrate"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/maps"
@@ -50,9 +51,6 @@ const (
 	nginxRepoName       = "nginx"
 	nginxRepoURL        = "https://kubernetes.github.io/ingress-nginx"
 )
-
-// Port is the default port that Airbyte will deploy to.
-const Port = 8000
 
 // dockerAuthSecretName is the name of the secret which holds the docker authentication information.
 const dockerAuthSecretName = "docker-auth"
@@ -153,7 +151,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	}
 
 	if c.portHTTP == 0 {
-		c.portHTTP = Port
+		c.portHTTP = kind.IngressPort
 	}
 
 	// set k8s client, if not defined

@@ -1,6 +1,11 @@
 package kind
 
-import "github.com/airbytehq/abctl/internal/cmd/local/paths"
+import (
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+)
+
+// IngressPort is the default port that Airbyte will deploy to.
+const IngressPort = 8000
 
 type Config struct {
 	Kind       string `yaml:"kind"`
@@ -60,7 +65,7 @@ nodeRegistration:
 				ExtraPortMappings: []PortMapping{
 					{
 						ContainerPort: 80,
-						HostPort:      8000,
+						HostPort:      IngressPort,
 					},
 				},
 			},
