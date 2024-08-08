@@ -6,6 +6,10 @@ import (
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/airbytehq/abctl/internal/cmd"
 	"github.com/airbytehq/abctl/internal/update"
+	"github.com/airbytehq/abctl/internal/ux"
+	"github.com/airbytehq/abctl/internal/ux/event"
+	"github.com/airbytehq/abctl/internal/ux/status"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/pterm/pterm"
 	"net/http"
 	"os"
@@ -15,6 +19,46 @@ import (
 )
 
 func main() {
+	m := ux.New()
+	p := tea.NewProgram(m)
+	go func() {
+		time.Sleep(1 * time.Second)
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message"})
+		time.Sleep(1 * time.Second)
+		p.Send(status.Msg{Type: status.SUCCESS, Msg: "Success message"})
+		time.Sleep(1 * time.Second)
+		p.Send(status.Msg{Type: status.FAILURE, Msg: "Failure message"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 0"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 1"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 2"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 3"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 4"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 5"})
+		p.Send(event.Msg{Type: event.INFO, Msg: "An event occurred"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 6"})
+		time.Sleep(1 * time.Second)
+
+		p.Send(event.Msg{Type: event.INFO, Msg: "An event occurred 2"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 6"})
+		p.Send(event.Msg{Type: event.WARN, Msg: "An event occurred 3"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 6"})
+		p.Send(event.Msg{Type: event.INFO, Msg: "An event occurred 4"})
+
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 7"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 8"})
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 900"})
+		p.Send(status.Msg{Type: status.SUCCESS, Msg: "Success again message"})
+		time.Sleep(1 * time.Second)
+		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message"})
+	}()
+	if _, err := p.Run(); err != nil {
+		panic(err)
+	}
+
+	if true {
+		return
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
