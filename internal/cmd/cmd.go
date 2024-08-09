@@ -72,9 +72,6 @@ func NewCmd() *cobra.Command {
 	cobra.EnableTraverseRunHooks = true
 
 	var (
-		// Deprecated. Use DO_NOT_TRACK environment-variable instead.
-		// Will be removed soon.
-		flagDNT     bool
 		flagVerbose bool
 	)
 
@@ -99,7 +96,6 @@ func NewCmd() *cobra.Command {
 	cmd.CompletionOptions.DisableDefaultCmd = true
 	cmd.FParseErrWhitelist.UnknownFlags = true
 
-	cmd.PersistentFlags().BoolVar(&flagDNT, "dnt", false, "opt out of telemetry data collection")
 	cmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "enable verbose output")
 
 	cmd.AddCommand(version.NewCmdVersion())
