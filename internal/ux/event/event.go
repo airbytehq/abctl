@@ -15,6 +15,22 @@ const (
 	ERROR
 )
 
+func Debug(msg string) Msg {
+	return Msg{Type: DEBUG, Msg: msg}
+}
+
+func Info(msg string) Msg {
+	return Msg{Type: INFO, Msg: msg}
+}
+
+func Warn(msg string) Msg {
+	return Msg{Type: WARN, Msg: msg}
+}
+
+func Error(msg string) Msg {
+	return Msg{Type: ERROR, Msg: msg}
+}
+
 type Msg struct {
 	Type MsgType
 	Msg  string
@@ -63,13 +79,13 @@ func handleLogMsg(msg Msg) tea.Cmd {
 	var prefix string
 	switch msg.Type {
 	case DEBUG:
-		prefix = fmtDebug.Render(" ")
+		prefix = fmtDebug.Render("")
 	case INFO:
 		prefix = "" //fmtInfo.String()
 	case WARN:
-		prefix = fmtWarn.Render(" ")
+		prefix = fmtWarn.Render("")
 	case ERROR:
-		prefix = fmtErr.Render(" ")
+		prefix = fmtErr.Render("")
 	}
 
 	return tea.Println(prefix + msg.Msg)
