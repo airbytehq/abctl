@@ -2,13 +2,16 @@ package local
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 const (
@@ -27,16 +30,22 @@ const (
 	envDockerEmail = "ABCTL_LOCAL_INSTALL_DOCKER_EMAIL"
 )
 
+type VolumeMount struct {
+	Path     string
+	HostPath string
+}
+
 func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	spinner := &pterm.DefaultSpinner
 
 	var (
-		flagChartValuesFile string
-		flagChartSecrets    []string
-		flagChartVersion    string
-		flagMigrate         bool
-		flagPort            int
-		flagHost            string
+		flagChartValuesFile   string
+		flagChartSecrets      []string
+		flagChartVersion      string
+		flagMigrate           bool
+		flagPort              int
+		flagHost              string
+		flagExtraVolumeMounts []string
 
 		flagDockerServer string
 		flagDockerUser   string
@@ -113,7 +122,13 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					// no existing cluster, need to create one
 					pterm.Info.Println(fmt.Sprintf("No existing cluster found, cluster '%s' will be created", provider.ClusterName))
 					spinner.UpdateText(fmt.Sprintf("Creating cluster '%s'", provider.ClusterName))
-					if err := cluster.Create(flagPort); err != nil {
+
+					extraVolumeMounts, err := parseVolumeMounts(flagExtraVolumeMounts)
+					if err != nil {
+						return err
+					}
+
+					if err := cluster.Create(flagPort, extraVolumeMounts); err != nil {
 						pterm.Error.Printfln("Cluster '%s' could not be created", provider.ClusterName)
 						return err
 					}
@@ -179,12 +194,13 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	_ = cmd.Flags().MarkHidden("username")
 	_ = cmd.Flags().MarkHidden("password")
 
-	cmd.Flags().IntVar(&flagPort, "port", local.Port, "ingress http port")
+	cmd.Flags().IntVar(&flagPort, "port", kind.IngressPort, "ingress http port")
 	cmd.Flags().StringVar(&flagHost, "host", "localhost", "ingress http host")
 
 	cmd.Flags().StringVar(&flagChartVersion, "chart-version", "latest", "specify the Airbyte helm chart version to install")
 	cmd.Flags().StringVar(&flagChartValuesFile, "values", "", "the Airbyte helm chart values file to load")
 	cmd.Flags().StringSliceVar(&flagChartSecrets, "secret", []string{}, "an Airbyte helm chart secret file")
+	cmd.Flags().StringSliceVar(&flagExtraVolumeMounts, "volume", []string{}, "additional volume mounts (format: <HOST_PATH>:<GUEST_PATH>)")
 	cmd.Flags().BoolVar(&flagMigrate, "migrate", false, "migrate data from docker compose installation")
 
 	cmd.Flags().StringVar(&flagDockerServer, "docker-server", "https://index.docker.io/v1/", "docker registry, can also be specified via "+envDockerServer)
@@ -206,4 +222,21 @@ func envOverride(original *string, env string) {
 	if v := os.Getenv(env); v != "" {
 		*original = v
 	}
+}
+
+func parseVolumeMounts(specs []string) ([]k8s.ExtraVolumeMount, error) {
+	mounts := make([]k8s.ExtraVolumeMount, len(specs))
+
+	for i, spec := range specs {
+		parts := strings.Split(spec, ":")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("volume %s is not a valid volume spec, must be <HOST_PATH>:<GUEST_PATH>", spec)
+		}
+		mounts[i] = k8s.ExtraVolumeMount{
+			HostPath:      parts[0],
+			ContainerPath: parts[1],
+		}
+	}
+
+	return mounts, nil
 }

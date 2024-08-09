@@ -2,17 +2,26 @@ package k8s
 
 import (
 	"fmt"
+	"os"
+	"time"
+
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/pterm/pterm"
-	"os"
+	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/kind/pkg/cluster"
-	"time"
 )
+
+// ExtraVolumeMount defines a host volume mount for the Kind cluster
+type ExtraVolumeMount struct {
+	HostPath      string
+	ContainerPath string
+}
 
 // Cluster is an interface representing all the actions taken at the cluster level.
 type Cluster interface {
 	// Create a cluster with the provided name.
-	Create(portHTTP int) error
+	Create(portHTTP int, extraMounts []ExtraVolumeMount) error
 	// Delete a cluster with the provided name.
 	Delete() error
 	// Exists returns true if the cluster exists, false otherwise.
@@ -36,7 +45,7 @@ type kindCluster struct {
 // that we're currently using (e.g. https://github.com/kubernetes-sigs/kind/releases/tag/v0.23.0)
 const k8sVersion = "v1.29.4@sha256:3abb816a5b1061fb15c6e9e60856ec40d56b7b52bcea5f5f1350bc6e2320b6f8"
 
-func (k *kindCluster) Create(port int) error {
+func (k *kindCluster) Create(port int, extraMounts []ExtraVolumeMount) error {
 	// Create the data directory before the cluster does to ensure that it's owned by the correct user.
 	// If the cluster creates it and docker is running as root, it's possible that root will own this directory
 	// which will cause minio and postgres to break.
@@ -47,31 +56,21 @@ func (k *kindCluster) Create(port int) error {
 	}
 
 	// see https://kind.sigs.k8s.io/docs/user/ingress/#create-cluster
-	rawCfg := fmt.Sprintf(`kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-  - role: control-plane
-    kubeadmConfigPatches:
-    - |
-      kind: InitConfiguration
-      nodeRegistration:
-        kubeletExtraArgs:
-          node-labels: "ingress-ready=true"
-    extraMounts:
-      - hostPath: %s
-        containerPath: /var/local-path-provisioner
-    extraPortMappings:
-      - containerPort: 80
-        hostPort: %d
-        protocol: TCP`,
-		paths.Data,
-		port)
+	config := kind.DefaultConfig().WithHostPort(port)
+	for _, mount := range extraMounts {
+		config = config.WithVolumeMount(mount.HostPath, mount.ContainerPath)
+	}
+
+	rawCfg, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("unable to marshal Kind cluster config: %w", err)
+	}
 
 	opts := []cluster.CreateOption{
 		cluster.CreateWithWaitForReady(5 * time.Minute),
 		cluster.CreateWithKubeconfigPath(k.kubeconfig),
 		cluster.CreateWithNodeImage("kindest/node:" + k8sVersion),
-		cluster.CreateWithRawConfig([]byte(rawCfg)),
+		cluster.CreateWithRawConfig(rawCfg),
 	}
 
 	if err := k.p.Create(k.clusterName, opts...); err != nil {
