@@ -43,6 +43,7 @@ func main() {
 		p.Send(event.Msg{Type: event.WARN, Msg: "An event occurred 3"})
 		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 6"})
 		p.Send(event.Msg{Type: event.INFO, Msg: "An event occurred 4"})
+		p.Send(event.Msg{Type: event.ERROR, Msg: "An event occurred 5"})
 
 		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 7"})
 		p.Send(status.Msg{Type: status.UPDATE, Msg: "Update message 8"})

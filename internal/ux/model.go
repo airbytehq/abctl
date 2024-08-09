@@ -5,6 +5,7 @@ import (
 	"github.com/airbytehq/abctl/internal/ux/status"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"time"
 )
 
 type Model struct {
@@ -17,11 +18,11 @@ type Model struct {
 var _ tea.Model = (*Model)(nil)
 
 func New() Model {
-	s := status.New("Starting message")
+	s := status.New("Starting message", time.Now())
 
 	return Model{
 		status:  s,
-		event:   event.Model{},
+		event:   event.New(),
 		running: true,
 	}
 }

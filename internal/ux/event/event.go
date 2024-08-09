@@ -4,7 +4,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"strings"
-	"sync"
 )
 
 type MsgType int8
@@ -23,7 +22,13 @@ type Msg struct {
 
 var _ tea.Model = (*Model)(nil)
 
-type Model struct{}
+type Model struct {
+	err error
+}
+
+func New() Model {
+	return Model{}
+}
 
 func (m Model) Init() tea.Cmd {
 	return nil
@@ -38,6 +43,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case Msg:
 		return m, handleLogMsg(msg)
+	case error:
+		m.err = msg
+		return m, nil
 	}
 
 	return m, nil
@@ -48,7 +56,6 @@ func (m Model) View() string {
 }
 
 var leftPad = strings.Repeat(" ", 5)
-var mutex sync.Mutex
 
 func handleLogMsg(msg Msg) tea.Cmd {
 	msg.Msg = strings.ReplaceAll(msg.Msg, "\n", "\n"+leftPad)
@@ -56,30 +63,26 @@ func handleLogMsg(msg Msg) tea.Cmd {
 	var prefix string
 	switch msg.Type {
 	case DEBUG:
-		prefix = fmtDebug.String()
-		//s = fmt.Sprintf("%s %s", fmtDebug, msg.Msg)
+		prefix = fmtDebug.Render(" ")
 	case INFO:
-		prefix = fmtInfo.String()
-		//s = fmt.Sprintf("%s %s", fmtInfo, msg.Msg)
+		prefix = "" //fmtInfo.String()
 	case WARN:
-		prefix = fmtWarn.String()
-		//s = fmt.Sprintf("%s %s", fmtWarn, msg.Msg)
+		prefix = fmtWarn.Render(" ")
 	case ERROR:
-		prefix = fmtErr.String()
-		//s = fmt.Sprintf("%s %s", fmtErr, msg.Msg)
+		prefix = fmtErr.Render(" ")
 	}
 
-	return tea.Println(prefix + " " + msg.Msg)
+	return tea.Println(prefix + msg.Msg)
 }
 
 var (
-	fmtDebug = logStyle("debug", "63")
-	fmtWarn  = logStyle("warning", "192")
-	fmtInfo  = logStyle("info", "86")
-	fmtErr   = logStyle("error", "204")
+	fmtDebug = logStyle("debug", "63", "63")
+	fmtInfo  = logStyle("info", "39", "86") // 79
+	fmtWarn  = logStyle("warning", "208", "192")
+	fmtErr   = logStyle("error", "203", "204")
 )
 
-func logStyle(prefix, color string) lipgloss.Style {
+func logStyle(prefix, colorLight, colorDark string) lipgloss.Style {
 	switch {
 	case len(prefix) < 4:
 		prefix += strings.Repeat(" ", 4-len(prefix))
@@ -87,7 +90,6 @@ func logStyle(prefix, color string) lipgloss.Style {
 		prefix = prefix[:4]
 	}
 	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color(color)).
+		Foreground(lipgloss.AdaptiveColor{Light: colorLight, Dark: colorDark}).
 		SetString(strings.ToUpper(prefix))
-	//Bold(true)
 }

@@ -30,14 +30,17 @@ type Model struct {
 	running bool
 }
 
-func New(msg string) Model {
+func New(msg string, start time.Time) Model {
 	s := spinner.New()
-	//s.Model = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	//s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
+		Light: "55",
+		Dark:  "104",
+	})
 
 	return Model{
 		spinner: s,
-		start:   time.Now(),
+		start:   start,
 		msg:     msg,
 		running: true,
 	}
@@ -64,7 +67,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	return fmt.Sprintf("%s %s (%s)", m.spinner.View(), m.msg, formatTime(m.start))
+	return fmt.Sprintf(
+		"%s %s %s",
+		m.spinner.View(),
+		m.msg,
+		fmtTimer.Render("("+formatTime(m.start)+")"),
+	)
 }
 
 func handleMsg(s *Model, msg Msg) tea.Cmd {
@@ -87,6 +95,10 @@ func formatTime(start time.Time) string {
 var (
 	fmtSuccess = spinnerMsgStyle("✓", "70")
 	fmtFailure = spinnerMsgStyle("x", "204")
+	fmtTimer   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{
+		Light: "8",
+		Dark:  "188",
+	})
 )
 
 func spinnerMsgStyle(prefix, color string) lipgloss.Style {

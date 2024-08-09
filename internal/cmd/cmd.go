@@ -7,6 +7,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/version"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"os"
@@ -80,7 +81,7 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "abctl",
-		Short: pterm.LightBlue("Airbyte") + "'s command line tool",
+		Short: lipgloss.NewStyle().Foreground(lipgloss.Color("94")).Render("Airbyte") + "'s command line tool",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if flagVerbose {
 				pterm.EnableDebugMessages()
