@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/status"
 	helmclient "github.com/mittwald/go-helm-client"
-	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
@@ -59,10 +59,10 @@ type helmLogger struct {
 }
 
 func (d helmLogger) Write(p []byte) (int, error) {
-	pterm.Debug.Println(fmt.Sprintf("helm: %s", string(p)))
+	status.Debug(fmt.Sprintf("helm: %s", string(p)))
 	return len(p), nil
 }
 
 func (d helmLogger) Debug(format string, v ...interface{}) {
-	pterm.Debug.Println(fmt.Sprintf("helm - DEBUG: "+format, v...))
+	status.Debug(fmt.Sprintf("helm - DEBUG: "+format, v...))
 }

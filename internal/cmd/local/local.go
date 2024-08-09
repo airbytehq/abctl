@@ -6,14 +6,17 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/airbytehq/abctl/internal/telemetry"
-	"github.com/pterm/pterm"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"io/fs"
 	"os"
 )
 
 var telClient telemetry.Client
+
+var blue = lipgloss.NewStyle().Foreground(lipgloss.Color("94"))
 
 // NewCmdLocal represents the local command.
 func NewCmdLocal(provider k8s.Provider) *cobra.Command {
@@ -31,9 +34,9 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 				userFlag, _ := cmd.Flags().GetString("username")
 				passFlag, _ := cmd.Flags().GetString("password")
 				if (userFlag != "" && userFlag != "airbyte") || (passFlag != "" && passFlag != "password") {
-					pterm.Warning.Println("The --username and --password flags have been deprecated.\n" +
+					status.Warn("The --username and --password flags have been deprecated.\n" +
 						"  Credentials now are randomly generated and can be retrieved by running\n" +
-						pterm.LightBlue("  abctl local credentials"))
+						blue.Render("  abctl local credentials"))
 				}
 			}
 			printProviderDetails(provider)
@@ -49,7 +52,7 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 }
 
 func printProviderDetails(p k8s.Provider) {
-	pterm.Info.Println(fmt.Sprintf(
+	status.Info(fmt.Sprintf(
 		"Using Kubernetes provider:\n  Provider: %s\n  Kubeconfig: %s\n  Context: %s",
 		p.Name, p.Kubeconfig, p.Context,
 	))

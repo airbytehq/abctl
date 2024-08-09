@@ -2,12 +2,12 @@ package k8s
 
 import (
 	"fmt"
+	"github.com/airbytehq/abctl/internal/status"
 	"os"
 	"time"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
-	"github.com/pterm/pterm"
 	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/kind/pkg/cluster"
 )
@@ -49,9 +49,9 @@ func (k *kindCluster) Create(port int, extraMounts []ExtraVolumeMount) error {
 	// Create the data directory before the cluster does to ensure that it's owned by the correct user.
 	// If the cluster creates it and docker is running as root, it's possible that root will own this directory
 	// which will cause minio and postgres to break.
-	pterm.Debug.Println(fmt.Sprintf("Creating data directory '%s'", paths.Data))
+	status.Debug(fmt.Sprintf("Creating data directory '%s'", paths.Data))
 	if err := os.MkdirAll(paths.Data, 0766); err != nil {
-		pterm.Error.Println(fmt.Sprintf("Error creating data directory '%s'", paths.Data))
+		status.Error(fmt.Sprintf("Error creating data directory '%s'", paths.Data))
 		return fmt.Errorf("unable to create directory '%s': %w", paths.Data, err)
 	}
 

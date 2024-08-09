@@ -3,7 +3,7 @@ package version
 import (
 	"fmt"
 	"github.com/airbytehq/abctl/internal/build"
-	"github.com/pterm/pterm"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/spf13/cobra"
 	"strings"
 )
@@ -25,7 +25,7 @@ func NewCmdVersion() *cobra.Command {
 			if build.Modified {
 				parts = append(parts, fmt.Sprintf("modified: %t", build.Modified))
 			}
-			pterm.Println(strings.Join(parts, "\n"))
+			status.Info(strings.Join(parts, "\n"))
 		},
 	}
 }

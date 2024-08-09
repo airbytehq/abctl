@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/google/uuid"
-	"github.com/pterm/pterm"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -115,7 +115,7 @@ func Get(opts ...GetOption) Client {
 			if err := writeConfigToFile(configPath, analyticsCfg); err != nil {
 				return analyticsCfg, fmt.Errorf("unable to write file to %s: %w", configPath, err)
 			}
-			pterm.Info.Println(Welcome)
+			status.Info(Welcome)
 		} else if err != nil {
 			return Config{}, fmt.Errorf("unable to load config from %s: %w", configPath, err)
 		}
@@ -133,7 +133,7 @@ func Get(opts ...GetOption) Client {
 
 	cfg, err := getOrCreateConfigFile(getCfg)
 	if err != nil {
-		pterm.Warning.Printfln("unable to create telemetry config file: %s", err.Error())
+		status.Warn(fmt.Sprintf("unable to create telemetry config file: %s", err.Error()))
 		instance = NoopClient{}
 	} else {
 		instance = NewSegmentClient(cfg)

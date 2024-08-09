@@ -7,7 +7,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/version"
-	"github.com/pterm/pterm"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -43,24 +43,24 @@ The ingress port can be changed by passing the flag --port.`
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(ctx context.Context, cmd *cobra.Command) {
 	if err := cmd.ExecuteContext(ctx); err != nil {
-		pterm.Error.Println(err)
+		status.Error(err)
 
 		switch {
 		case errors.Is(err, localerr.ErrAirbyteDir):
-			pterm.Println()
-			pterm.Info.Println(helpAirbyteDir)
+			status.Empty()
+			status.Info(helpIngress)
 		case errors.Is(err, localerr.ErrDocker):
-			pterm.Println()
-			pterm.Info.Println(helpDocker)
+			status.Empty()
+			status.Info(helpDocker)
 		case errors.Is(err, localerr.ErrKubernetes):
-			pterm.Println()
-			pterm.Info.Println(helpKubernetes)
+			status.Empty()
+			status.Info(helpKubernetes)
 		case errors.Is(err, localerr.ErrIngress):
-			pterm.Println()
-			pterm.Info.Println(helpIngress)
+			status.Empty()
+			status.Info(helpIngress)
 		case errors.Is(err, localerr.ErrPort):
-			pterm.Println()
-			pterm.Info.Printfln(helpPort)
+			status.Empty()
+			status.Info(helpPort)
 		}
 
 		os.Exit(1)
@@ -80,14 +80,14 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "abctl",
-		Short: pterm.LightBlue("Airbyte") + "'s command line tool",
+		Short: "Airbyte's command line tool",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if flagVerbose {
-				pterm.EnableDebugMessages()
+				status.SetDebug(true)
 			}
 
 			if _, envVarDNT := os.LookupEnv("DO_NOT_TRACK"); envVarDNT {
-				pterm.Info.Println("Telemetry collection disabled (DO_NOT_TRACK)")
+				status.Debug("Telemetry collection disabled (DO_NOT_TRACK)")
 			}
 
 			return nil

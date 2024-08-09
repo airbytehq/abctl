@@ -3,17 +3,16 @@ package version
 import (
 	"bytes"
 	"github.com/airbytehq/abctl/internal/build"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pterm/pterm"
-	"os"
 	"testing"
 )
 
 func TestCmd_Output(t *testing.T) {
 	b := bytes.NewBufferString("")
-	pterm.SetDefaultOutput(b)
+	origWriter := status.SetWriter(b)
 	t.Cleanup(func() {
-		pterm.SetDefaultOutput(os.Stdout)
+		status.SetWriter(origWriter)
 	})
 
 	tests := []struct {

@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/airbytehq/abctl/internal/cmd"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/airbytehq/abctl/internal/update"
-	"github.com/pterm/pterm"
 	"net/http"
 	"os"
 	"os/signal"
@@ -39,7 +40,7 @@ func main() {
 	}()
 
 	// ensure the pterm info width matches the other printers
-	pterm.Info.Prefix.Text = " INFO  "
+	//pterm.Info.Prefix.Text = " INFO  "
 
 	root := cmd.NewCmd()
 	cmd.Execute(ctx, root)
@@ -47,11 +48,11 @@ func main() {
 	newRelease := <-updateChan
 	if newRelease.err != nil {
 		if errors.Is(newRelease.err, update.ErrDevVersion) {
-			pterm.DefaultLogger.Debug("Release checking is disabled for dev builds")
+			status.Debug("Release checking is disabled for dev builds")
 		}
 	} else if newRelease.version != "" {
-		pterm.Println()
-		pterm.Info.Printfln("A new release of abctl is available: %s -> %s\nUpdating to the latest version is highly recommended", build.Version, newRelease.version)
+		status.Empty()
+		status.Info(fmt.Sprintf("A new release of abctl is available: %s -> %s\nUpdating to the latest version is highly recommended", build.Version, newRelease.version))
 	}
 }
 

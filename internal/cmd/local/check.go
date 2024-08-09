@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
-	"github.com/pterm/pterm"
+	"github.com/airbytehq/abctl/internal/status"
 	"io"
 	"net"
 	"net/http"
@@ -24,17 +24,17 @@ func dockerInstalled(ctx context.Context) (docker.Version, error) {
 	var err error
 	if dockerClient == nil {
 		if dockerClient, err = docker.New(ctx); err != nil {
-			pterm.Error.Println("Unable to create Docker client")
+			status.Error("Unable to create Docker client")
 			return docker.Version{}, fmt.Errorf("%w: unable to create client: %w", localerr.ErrDocker, err)
 		}
 	}
 
 	version, err := dockerClient.Version(ctx)
 	if err != nil {
-		pterm.Error.Println("Unable to communicate with the Docker daemon")
+		status.Error("Unable to communicate with the Docker daemon")
 		return docker.Version{}, fmt.Errorf("%w: %w", localerr.ErrDocker, err)
 	}
-	pterm.Success.Println(fmt.Sprintf("Found Docker installation: version %s", version.Version))
+	status.Success(fmt.Sprintf("Found Docker installation: version %s", version.Version))
 	return version, nil
 
 }
@@ -54,10 +54,10 @@ var httpClient doer = &http.Client{Timeout: 3 * time.Second}
 // bound to that port. If something besides Airbyte is using it, treat this as an inaccessible port.
 func portAvailable(ctx context.Context, port int) error {
 	if port < 1024 {
-		pterm.Warning.Printfln(
+		status.Warn(fmt.Sprintf(
 			"Availability of port %d cannot be determined, as this is a privileged port (less than 1024).\n"+
 				"Installation may not complete successfully",
-			port)
+			port))
 		return nil
 	}
 
@@ -65,37 +65,37 @@ func portAvailable(ctx context.Context, port int) error {
 	lc := &net.ListenConfig{}
 	listener, err := lc.Listen(ctx, "tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
-		pterm.Debug.Println(fmt.Sprintf("Unable to listen on port '%d': %s", port, err))
+		status.Debug(fmt.Sprintf("Unable to listen on port '%d': %s", port, err))
 
 		// check if an existing airbyte installation is already listening on this port
 		req, errInner := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d/api/v1/instance_configuration", port), nil)
 		if errInner != nil {
-			pterm.Error.Printfln("Port %d request could not be created", port)
+			status.Error(fmt.Sprintf("Port %d request could not be created", port))
 			return fmt.Errorf("%w: unable to create request: %w", localerr.ErrPort, err)
 		}
 
 		res, errInner := httpClient.Do(req)
 		if errInner != nil {
-			pterm.Error.Printfln("Port %d appears to already be in use", port)
+			status.Error(fmt.Sprintf("Port %d appears to already be in use", port))
 			return fmt.Errorf("%w: unable to send request: %w", localerr.ErrPort, err)
 		}
 
 		if res.StatusCode == http.StatusOK {
-			pterm.Success.Printfln("Port %d appears to be running a previous Airbyte installation", port)
+			status.Success(fmt.Sprintf("Port %d appears to be running a previous Airbyte installation", port))
 			return nil
 		}
 
 		// if we're here, we haven't been able to determine why this port may or may not be available
 		body, errInner := io.ReadAll(res.Body)
 		if errInner != nil {
-			pterm.Debug.Println(fmt.Sprintf("Unable to read response body: %s", errInner))
+			status.Debug(fmt.Sprintf("Unable to read response body: %s", errInner))
 		}
-		pterm.Debug.Println(fmt.Sprintf(
+		status.Debug(fmt.Sprintf(
 			"Unable to determine if port '%d' is in use:\n  StatusCode: %d\n  Body: %s",
 			port, res.StatusCode, body,
 		))
 
-		pterm.Error.Println(fmt.Sprintf(
+		status.Error(fmt.Sprintf(
 			"Unable to determine if port '%d' is available, consider specifying a different port",
 			port,
 		))
@@ -106,6 +106,6 @@ func portAvailable(ctx context.Context, port int) error {
 		_ = listener.Close()
 	}()
 
-	pterm.Success.Printfln("Port %d appears to be available", port)
+	status.Success(fmt.Sprintf("Port %d appears to be available", port))
 	return nil
 }

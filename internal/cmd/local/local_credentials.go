@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/airbytehq/abctl/internal/telemetry"
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -25,7 +25,7 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 
 				client, err := defaultK8s(provider.Kubeconfig, provider.Context)
 				if err != nil {
-					pterm.Error.Println("No existing cluster found")
+					status.Error("No existing cluster found")
 					return nil
 				}
 				secret, err := client.SecretGet(cmd.Context(), airbyteNamespace, airbyteAuthSecretName)
@@ -33,8 +33,13 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 					return err
 				}
 
-				pterm.Success.Println(fmt.Sprintf("Getting your credentials: %s", secret.Name))
-				pterm.Info.Println(fmt.Sprintf("{\n  \"password\": \"%s\",\n  \"client-id\": \"%s\",\n  \"client-secret\": \"%s\"\n}", secret.Data["instance-admin-password"], secret.Data["instance-admin-client-id"], secret.Data["instance-admin-client-secret"]))
+				//status.Success(fmt.Sprintf("Getting your credentials: %s", secret.Name))
+				status.Info(fmt.Sprintf(
+					"{\n  \"password\"      : \"%s\",\n  \"client-id\"     : \"%s\",\n  \"client-secret\" : \"%s\"\n}",
+					secret.Data["instance-admin-password"],
+					secret.Data["instance-admin-client-id"],
+					secret.Data["instance-admin-client-secret"],
+				))
 				return nil
 			})
 		},

@@ -2,7 +2,7 @@ package k8s
 
 import (
 	"fmt"
-	"github.com/pterm/pterm"
+	"github.com/airbytehq/abctl/internal/status"
 	"k8s.io/client-go/rest"
 )
 
@@ -18,5 +18,5 @@ func (x Logger) HandleWarningHeader(code int, _ string, msg string) {
 	if code != 299 || len(msg) == 0 {
 		return
 	}
-	pterm.Debug.Println(fmt.Sprintf("k8s - WARN: %s", msg))
+	status.Debug(fmt.Sprintf("k8s - WARN: %s", msg))
 }

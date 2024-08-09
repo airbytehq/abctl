@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/pkg/archive"
-	"github.com/pterm/pterm"
 	"io"
 	"os"
 	"path/filepath"
@@ -59,7 +59,7 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 	if err != nil {
 		return fmt.Errorf("unable to create initial docker migration container: %w", err)
 	}
-	pterm.Debug.Println(fmt.Sprintf("Created initial migration container '%s'", conCopy.ID))
+	status.Debug(fmt.Sprintf("Created initial migration container '%s'", conCopy.ID))
 
 	// docker cp [conCopy.ID]]:/$migratePGDATA/. ~/.airbyte/abctl/data/airbyte-volume-db/pgdata
 	dst := filepath.Join(paths.Data, "airbyte-volume-db", "pgdata")
@@ -76,7 +76,7 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 	if err := copyFromContainer(ctx, dockerCli, conCopy.ID, migratePGDATA+"/.", dst); err != nil {
 		return fmt.Errorf("unable to copy airbyte db data from container %s: %w", conCopy.ID, err)
 	}
-	pterm.Debug.Println(fmt.Sprintf("Copied airbyte db data from container '%s' to '%s'", conCopy.ID, dst))
+	status.Debug(fmt.Sprintf("Copied airbyte db data from container '%s' to '%s'", conCopy.ID, dst))
 
 	stopAndRemoveContainer(ctx, dockerCli, conCopy.ID)
 
@@ -110,8 +110,8 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 	if err != nil {
 		return fmt.Errorf("unable to create docker container: %w", err)
 	}
-	pterm.Debug.Println(fmt.Sprintf("Created secondary migration container '%s'", conTransform.ID))
-	pterm.Debug.Println(fmt.Sprintf("Container was created with the following warnings: %s", conTransform.Warnings))
+	status.Debug(fmt.Sprintf("Created secondary migration container '%s'", conTransform.ID))
+	status.Debug(fmt.Sprintf("Container was created with the following warnings: %s", conTransform.Warnings))
 	if err := dockerCli.ContainerStart(ctx, conTransform.ID, container.StartOptions{}); err != nil {
 		return fmt.Errorf("unable to start container %s: %w", conTransform.ID, err)
 	}
@@ -129,21 +129,21 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 	)
 	// add a new database user to match the default helm user
 	now := time.Now()
-	pterm.Debug.Println("Adding Airbyte postgres user")
+	status.Debug("Adding Airbyte postgres user")
 	if err := exec(ctx, dockerCli, conTransform.ID, cmdPsqlUser); err != nil {
-		pterm.Debug.Println("Failed to add postgres user")
+		status.Debug("Failed to add postgres user")
 		return fmt.Errorf("unable to update postgres user: %w", err)
 	}
-	pterm.Debug.Println(fmt.Sprintf("Adding Airbyte postgres user completed in %s", time.Since(now)))
+	status.Debug(fmt.Sprintf("Adding Airbyte postgres user completed in %s", time.Since(now)))
 
 	// rename the database to match the default helm database name
-	pterm.Debug.Println("Renaming database")
+	status.Debug("Renaming database")
 	now = time.Now()
 	if err := exec(ctx, dockerCli, conTransform.ID, cmdPsqlRename); err != nil {
-		pterm.Debug.Println("Failed to rename database")
+		status.Debug("Failed to rename database")
 		return fmt.Errorf("unable to rename postgres database: %w", err)
 	}
-	pterm.Debug.Println(fmt.Sprintf("Renaming database completed in %s", time.Since(now)))
+	status.Debug(fmt.Sprintf("Renaming database completed in %s", time.Since(now)))
 
 	return nil
 }
@@ -151,7 +151,7 @@ func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume strin
 // volumeExists returns the MountPoint of the volumeID (if the volume exists), an empty string otherwise.
 func volumeExists(ctx context.Context, d docker.Client, volumeID string) string {
 	if v, err := d.VolumeInspect(ctx, volumeID); err != nil {
-		pterm.Debug.Println(fmt.Sprintf("Volume %s cannot be accessed: %s", volumeID, err))
+		status.Debug(fmt.Sprintf("Volume %s cannot be accessed: %s", volumeID, err))
 		return ""
 	} else {
 		return v.Mountpoint
@@ -160,29 +160,29 @@ func volumeExists(ctx context.Context, d docker.Client, volumeID string) string 
 
 func ensureImage(ctx context.Context, d docker.Client, img string) error {
 	// check if an image already exists on the host
-	pterm.Debug.Println(fmt.Sprintf("Checking if the image '%s' already exists", img))
+	status.Debug(fmt.Sprintf("Checking if the image '%s' already exists", img))
 	filter := filters.NewArgs()
 	filter.Add("reference", img)
 	imgs, err := d.ImageList(ctx, image.ListOptions{Filters: filter})
 	if err != nil {
-		pterm.Error.Println(fmt.Sprintf("unable to list docker images when checking for '%s'", img))
+		status.Error(fmt.Sprintf("unable to list docker images when checking for '%s'", img))
 		return fmt.Errorf("unable to list image '%s': %w", img, err)
 	}
 
 	// if it does exist, there is nothing else to do
 	if len(imgs) > 0 {
-		pterm.Debug.Println(fmt.Sprintf("Image '%s' already exists", img))
+		status.Debug(fmt.Sprintf("Image '%s' already exists", img))
 		return nil
 	}
 
-	pterm.Debug.Println(fmt.Sprintf("Image '%s' not found, pulling it", img))
+	status.Debug(fmt.Sprintf("Image '%s' not found, pulling it", img))
 	// if we're here, then we need to pull the image
 	reader, err := d.ImagePull(ctx, img, image.PullOptions{})
 	if err != nil {
-		pterm.Error.Println(fmt.Sprintf("unable to pull the docker image '%s'", img))
+		status.Error(fmt.Sprintf("unable to pull the docker image '%s'", img))
 		return fmt.Errorf("unable to pull image '%s': %w", img, err)
 	}
-	pterm.Debug.Println(fmt.Sprintf("Successfully pulled the docker image '%s'", img))
+	status.Debug(fmt.Sprintf("Successfully pulled the docker image '%s'", img))
 	defer reader.Close()
 	if _, err := io.Copy(io.Discard, reader); err != nil {
 		return fmt.Errorf("error fetching output: %w", err)
@@ -215,13 +215,13 @@ func copyFromContainer(ctx context.Context, d docker.Client, container, src, dst
 
 // stopAndRemoveContainer will stop and ultimately remove the containerID
 func stopAndRemoveContainer(ctx context.Context, d docker.Client, containerID string) {
-	pterm.Debug.Println(fmt.Sprintf("Stopping container '%s'", containerID))
+	status.Debug(fmt.Sprintf("Stopping container '%s'", containerID))
 	if err := d.ContainerStop(ctx, containerID, container.StopOptions{}); err != nil {
-		pterm.Debug.Println(fmt.Sprintf("Unable to stop docker container %s: %s", containerID, err))
+		status.Debug(fmt.Sprintf("Unable to stop docker container %s: %s", containerID, err))
 	}
-	pterm.Debug.Println(fmt.Sprintf("Removing container '%s'", containerID))
+	status.Debug(fmt.Sprintf("Removing container '%s'", containerID))
 	if err := d.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true}); err != nil {
-		pterm.Debug.Println(fmt.Sprintf("Unable to remove docker container %s: %s", containerID, err))
+		status.Debug(fmt.Sprintf("Unable to remove docker container %s: %s", containerID, err))
 	}
 }
 

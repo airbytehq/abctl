@@ -2,6 +2,7 @@ package local
 
 import (
 	"fmt"
+	"github.com/airbytehq/abctl/internal/status"
 	"os"
 	"strings"
 
@@ -64,7 +65,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 			dockerVersion, err := dockerInstalled(cmd.Context())
 			if err != nil {
-				pterm.Error.Println("Unable to determine if Docker is installed")
+				status.Error("Unable to determine if Docker is installed")
 				return fmt.Errorf("unable to determine docker installation status: %w", err)
 			}
 
@@ -84,13 +85,13 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 				cluster, err := provider.Cluster()
 				if err != nil {
-					pterm.Error.Printfln("Unable to determine status of any existing '%s' cluster", provider.ClusterName)
+					status.Error(fmt.Sprintf("Unable to determine status of any existing '%s' cluster", provider.ClusterName))
 					return err
 				}
 
 				if cluster.Exists() {
 					// existing cluster, validate it
-					pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
+					status.Success(fmt.Sprintf("Existing cluster '%s' found", provider.ClusterName))
 					spinner.UpdateText(fmt.Sprintf("Validating existing cluster '%s'", provider.ClusterName))
 
 					// only for kind do we need to check the existing port
@@ -98,7 +99,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 						if dockerClient == nil {
 							dockerClient, err = docker.New(cmd.Context())
 							if err != nil {
-								pterm.Error.Printfln("Unable to connect to Docker daemon")
+								status.Error("Unable to connect to Docker daemon")
 								return fmt.Errorf("unable to connect to docker: %w", err)
 							}
 						}
@@ -106,21 +107,23 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 						providedPort := flagPort
 						flagPort, err = dockerClient.Port(cmd.Context(), fmt.Sprintf("%s-control-plane", provider.ClusterName))
 						if err != nil {
-							pterm.Warning.Printfln("Unable to determine which port the existing cluster was configured to use.\n" +
+							status.Warn("Unable to determine which port the existing cluster was configured to use.\n" +
 								"Installation will continue but may ultimately fail, in which case it will be necessarily to uninstall first.")
 							// since we can't verify the port is correct, push forward with the provided port
 							flagPort = providedPort
 						}
 						if providedPort != flagPort {
-							pterm.Warning.Printfln("The existing cluster was found to be using port %d, which differs from the provided port %d.\n"+
-								"The existing port will be used, as changing ports currently requires the existing installation to be uninstalled first.", flagPort, providedPort)
+							status.Warn(fmt.Sprintf("The existing cluster was found to be using port %d, which differs from the provided port %d.\n"+
+								"The existing port will be used, as changing ports currently requires the existing installation to be uninstalled first.",
+								flagPort, providedPort,
+							))
 						}
 					}
 
-					pterm.Success.Printfln("Cluster '%s' validation complete", provider.ClusterName)
+					status.Success(fmt.Sprintf("Cluster '%s' validation complete", provider.ClusterName))
 				} else {
 					// no existing cluster, need to create one
-					pterm.Info.Println(fmt.Sprintf("No existing cluster found, cluster '%s' will be created", provider.ClusterName))
+					status.Info(fmt.Sprintf("No existing cluster found, cluster '%s' will be created", provider.ClusterName))
 					spinner.UpdateText(fmt.Sprintf("Creating cluster '%s'", provider.ClusterName))
 
 					extraVolumeMounts, err := parseVolumeMounts(flagExtraVolumeMounts)
@@ -129,10 +132,10 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					}
 
 					if err := cluster.Create(flagPort, extraVolumeMounts); err != nil {
-						pterm.Error.Printfln("Cluster '%s' could not be created", provider.ClusterName)
+						status.Error(fmt.Sprintf("Cluster '%s' could not be created", provider.ClusterName))
 						return err
 					}
-					pterm.Success.Printfln("Cluster '%s' created", provider.ClusterName)
+					status.Success(fmt.Sprintf("Cluster '%s' created", provider.ClusterName))
 				}
 
 				lc, err := local.New(provider,
@@ -141,7 +144,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					local.WithSpinner(spinner),
 				)
 				if err != nil {
-					pterm.Error.Printfln("Failed to initialize 'local' command")
+					status.Error("Failed to initialize 'local' command")
 					return fmt.Errorf("unable to initialize local command: %w", err)
 				}
 
@@ -178,7 +181,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 				spinner.Success(
 					"Airbyte installation complete.\n" +
 						"  A password may be required to login. The password can by found by running\n" +
-						"  the command " + pterm.LightBlue("abctl local credentials"),
+						"  the command " + blue.Render("abctl local credentials"),
 				)
 				return nil
 			})

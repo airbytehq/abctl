@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/airbytehq/abctl/internal/build"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/google/uuid"
 	"github.com/pbnjay/memory"
-	"github.com/pterm/pterm"
 	"k8s.io/apimachinery/pkg/util/json"
 	"maps"
 	"net/http"
@@ -89,14 +89,14 @@ func (s *SegmentClient) Wrap(ctx context.Context, et EventType, f func() error) 
 	attemptSuccessFailure := true
 
 	if err := s.Start(ctx, et); err != nil {
-		pterm.Debug.Printfln("Unable to send telemetry start data: %s", err)
+		status.Debug(fmt.Sprintf("Unable to send telemetry start data: %s", err))
 		attemptSuccessFailure = false
 	}
 
 	if err := f(); err != nil {
 		if attemptSuccessFailure {
 			if errTel := s.Failure(ctx, et, err); errTel != nil {
-				pterm.Debug.Printfln("Unable to send telemetry failure data: %s", errTel)
+				status.Debug(fmt.Sprintf("Unable to send telemetry failure data: %s", errTel))
 			}
 		}
 
@@ -105,7 +105,7 @@ func (s *SegmentClient) Wrap(ctx context.Context, et EventType, f func() error) 
 
 	if attemptSuccessFailure {
 		if err := s.Success(ctx, et); err != nil {
-			pterm.Debug.Printfln("Unable to send telemetry success data: %s", err)
+			status.Debug(fmt.Sprintf("Unable to send telemetry success data: %s", err))
 		}
 	}
 

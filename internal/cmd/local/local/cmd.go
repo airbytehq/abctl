@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"fmt"
+	"github.com/airbytehq/abctl/internal/status"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -252,14 +253,14 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 		// user that is running this code and not the user that is running the docker daemon.
 		path := filepath.Join(paths.Data, name)
 
-		pterm.Debug.Println(fmt.Sprintf("Creating directory '%s'", path))
+		status.Debug(fmt.Sprintf("Creating directory '%s'", path))
 		if err := os.MkdirAll(path, 0766); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to create directory '%s'", name))
+			status.Error(fmt.Sprintf("Unable to create directory '%s'", name))
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
 
 		if err := c.k8s.PersistentVolumeCreate(ctx, namespace, name); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to create persistent volume '%s'", name))
+			status.Error(fmt.Sprintf("Unable to create persistent volume '%s'", name))
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
 
@@ -274,15 +275,15 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 		// Because it is likely that the host has a umask defined that would override this 0777 to 0775 or 0755.
 		// Due to the postgres uid/gid issue mentioned above, 0775 or 0755 would not allow the postgres image
 		// access to the persisted volume directory.
-		pterm.Debug.Println(fmt.Sprintf("Updating permissions for '%s'", path))
+		status.Debug(fmt.Sprintf("Updating permissions for '%s'", path))
 		if err := os.Chmod(path, 0777); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to set permissions for '%s'", path))
+			status.Error(fmt.Sprintf("Unable to set permissions for '%s'", path))
 			return fmt.Errorf("unable to set permissions for '%s': %w", path, err)
 		}
 
-		pterm.Info.Println(fmt.Sprintf("Persistent volume '%s' created", name))
+		status.Info(fmt.Sprintf("Persistent volume '%s' created", name))
 	} else {
-		pterm.Info.Printfln("Persistent volume '%s' already exists", name)
+		status.Info(fmt.Sprintf("Persistent volume '%s' already exists", name))
 	}
 
 	return nil
@@ -292,12 +293,12 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 	if !c.k8s.PersistentVolumeClaimExists(ctx, namespace, name, volumeName) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume claim '%s'", name))
 		if err := c.k8s.PersistentVolumeClaimCreate(ctx, namespace, name, volumeName); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to create persistent volume claim '%s'", name))
+			status.Error(fmt.Sprintf("Unable to create persistent volume claim '%s'", name))
 			return fmt.Errorf("unable to create persistent volume claim '%s': %w", name, err)
 		}
-		pterm.Info.Println(fmt.Sprintf("Persistent volume claim '%s' created", name))
+		status.Info(fmt.Sprintf("Persistent volume claim '%s' created", name))
 	} else {
-		pterm.Info.Printfln("Persistent volume claim '%s' already exists", name)
+		status.Info(fmt.Sprintf("Persistent volume claim '%s' already exists", name))
 	}
 
 	return nil
@@ -310,12 +311,12 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", airbyteNamespace))
 		if err := c.k8s.NamespaceCreate(ctx, airbyteNamespace); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to create namespace '%s'", airbyteNamespace))
+			status.Error(fmt.Sprintf("Unable to create namespace '%s'", airbyteNamespace))
 			return fmt.Errorf("unable to create airbyte namespace: %w", err)
 		}
-		pterm.Info.Println(fmt.Sprintf("Namespace '%s' created", airbyteNamespace))
+		status.Info(fmt.Sprintf("Namespace '%s' created", airbyteNamespace))
 	} else {
-		pterm.Info.Printfln("Namespace '%s' already exists", airbyteNamespace)
+		status.Info(fmt.Sprintf("Namespace '%s' already exists", airbyteNamespace))
 	}
 
 	if err := c.persistentVolume(ctx, airbyteNamespace, pvMinio); err != nil {
@@ -329,7 +330,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		c.spinner.UpdateText("Migrating airbyte data")
 		//if err := c.tel.Wrap(ctx, telemetry.Migrate, func() error { return opts.Docker.MigrateComposeDB(ctx, "airbyte_db") }); err != nil {
 		if err := c.tel.Wrap(ctx, telemetry.Migrate, func() error { return migrate.FromDockerVolume(ctx, opts.Docker.Client, "airbyte_db") }); err != nil {
-			pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
+			status.Error("Failed to migrate data from previous Airbyte installation")
 			return fmt.Errorf("unable to migrate data from previous airbyte installation: %w", err)
 		}
 	}
@@ -355,12 +356,12 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	if opts.dockerAuth() {
-		pterm.Debug.Println(fmt.Sprintf("Creating '%s' secret", dockerAuthSecretName))
+		status.Debug(fmt.Sprintf("Creating '%s' secret", dockerAuthSecretName))
 		if err := c.handleDockerSecret(ctx, opts.DockerServer, opts.DockerUser, opts.DockerPass, opts.DockerEmail); err != nil {
-			pterm.Debug.Println(fmt.Sprintf("Unable to create '%s' secret", dockerAuthSecretName))
+			status.Debug(fmt.Sprintf("Unable to create '%s' secret", dockerAuthSecretName))
 			return fmt.Errorf("unable to create '%s' secret: %w", dockerAuthSecretName, err)
 		}
-		pterm.Debug.Println(fmt.Sprintf("Created '%s' secret", dockerAuthSecretName))
+		status.Debug(fmt.Sprintf("Created '%s' secret", dockerAuthSecretName))
 		airbyteValues = append(airbyteValues, fmt.Sprintf("global.imagePullSecrets[0].name=%s", dockerAuthSecretName))
 	}
 
@@ -368,23 +369,23 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		c.spinner.UpdateText(fmt.Sprintf("Creating secret from '%s'", secretFile))
 		raw, err := os.ReadFile(secretFile)
 		if err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to read secret file '%s': %s", secretFile, err))
+			status.Error(fmt.Sprintf("Unable to read secret file '%s': %s", secretFile, err))
 			return fmt.Errorf("unable to read secret file '%s': %w", secretFile, err)
 		}
 
 		var secret corev1.Secret
 		if err := yaml.Unmarshal(raw, &secret); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to unmarshal secret file '%s': %s", secretFile, err))
+			status.Error(fmt.Sprintf("Unable to unmarshal secret file '%s': %s", secretFile, err))
 			return fmt.Errorf("unable to unmarshal secret file '%s': %w", secretFile, err)
 		}
 		secret.ObjectMeta.Namespace = airbyteNamespace
 
 		if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to create secret from file '%s'", secretFile))
+			status.Error(fmt.Sprintf("Unable to create secret from file '%s'", secretFile))
 			return fmt.Errorf("unable to create secret from file '%s': %w", secretFile, err)
 		}
 
-		pterm.Success.Println(fmt.Sprintf("Secret from '%s' created or updated", secretFile))
+		status.Success(fmt.Sprintf("Secret from '%s' created or updated", secretFile))
 	}
 
 	valuesYAML, err := mergeValuesWithValuesYAML(airbyteValues, opts.ValuesFile)
@@ -418,9 +419,9 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		// If we timed out, there is a good chance it's due to an unavailable port, check if this is the case.
 		// As the kubernetes client doesn't return usable error types, have to check for a specific string value.
 		if strings.Contains(err.Error(), "client rate limiter Wait returned an error") {
-			pterm.Warning.Printfln("Encountered an error while installing the %s Helm Chart.\n"+
+			status.Warn(fmt.Sprintf("Encountered an error while installing the %s Helm Chart.\n"+
 				"This could be an indication that port %d is not available.\n"+
-				"If installation fails, please try again with a different port.", nginxChartName, c.portHTTP)
+				"If installation fails, please try again with a different port.", nginxChartName, c.portHTTP))
 
 			srv, err := c.k8s.ServiceGet(ctx, nginxNamespace, "ingress-nginx-controller")
 			// If there is an error, we can ignore it as we only are checking for a missing ingress entry,
@@ -447,7 +448,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	if opts.NoBrowser {
-		pterm.Success.Println(fmt.Sprintf(
+		status.Success(fmt.Sprintf(
 			"Launching web-browser disabled. Airbyte should be accessible at\n  %s",
 			url,
 		))
@@ -462,28 +463,28 @@ func (c *Command) handleIngress(ctx context.Context, host string) error {
 	c.spinner.UpdateText("Checking for existing Ingress")
 
 	if c.k8s.IngressExists(ctx, airbyteNamespace, airbyteIngress) {
-		pterm.Success.Println("Found existing Ingress")
+		status.Success("Found existing Ingress")
 		if err := c.k8s.IngressUpdate(ctx, airbyteNamespace, ingress(host)); err != nil {
-			pterm.Error.Printfln("Unable to update existing Ingress")
+			status.Error("Unable to update existing Ingress")
 			return fmt.Errorf("unable to update existing ingress: %w", err)
 		}
-		pterm.Success.Println("Updated existing Ingress")
+		status.Success("Updated existing Ingress")
 		return nil
 	}
 
-	pterm.Info.Println("No existing Ingress found, creating one")
+	status.Info("No existing Ingress found, creating one")
 	if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress(host)); err != nil {
-		pterm.Error.Println("Unable to create ingress")
+		status.Error("Unable to create ingress")
 		return fmt.Errorf("unable to create ingress: %w", err)
 	}
-	pterm.Success.Println("Ingress created")
+	status.Success("Ingress created")
 	return nil
 }
 
 func (c *Command) watchEvents(ctx context.Context) {
 	watcher, err := c.k8s.EventsWatch(ctx, airbyteNamespace)
 	if err != nil {
-		pterm.Warning.Printfln("Unable to watch airbyte events\n  %s", err)
+		status.Warn(fmt.Sprintf("Unable to watch airbyte events\n  %s", err))
 		return
 	}
 	defer watcher.Stop()
@@ -492,16 +493,16 @@ func (c *Command) watchEvents(ctx context.Context) {
 		select {
 		case event, ok := <-watcher.ResultChan():
 			if !ok {
-				pterm.Debug.Println("Event watcher completed.")
+				status.Debug("Event watcher completed.")
 				return
 			}
 			if convertedEvent, ok := event.Object.(*eventsv1.Event); ok {
 				c.handleEvent(ctx, convertedEvent)
 			} else {
-				pterm.Debug.Printfln("Received unexpected event: %T", event.Object)
+				status.Debug(fmt.Sprintf("Received unexpected event: %T", event.Object))
 			}
 		case <-ctx.Done():
-			pterm.Debug.Printfln("Event watcher context completed:\n  %s", ctx.Err())
+			status.Debug(fmt.Sprintf("Event watcher context completed:\n  %s", ctx.Err()))
 			return
 		}
 	}
@@ -525,14 +526,14 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 
 	switch {
 	case strings.EqualFold(e.Type, "normal"):
-		pterm.Debug.Println(e.Note)
+		status.Debug(e.Note)
 	case strings.EqualFold(e.Type, "warning"):
 		var logs = ""
 		if strings.EqualFold(e.Reason, "backoff") {
 			var err error
 			logs, err = c.k8s.LogsGet(ctx, e.Regarding.Namespace, e.Regarding.Name)
 			if err != nil {
-				pterm.Debug.Printfln("Unable to retrieve logs for %s:%s\n  %s", e.Regarding.Namespace, e.Regarding.Name, err)
+				status.Debug(fmt.Sprintf("Unable to retrieve logs for %s:%s\n  %s", e.Regarding.Namespace, e.Regarding.Name, err))
 			}
 		}
 
@@ -541,30 +542,30 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 		if logs != "" {
 			msg := fmt.Sprintf("Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs: %s",
 				e.Name, e.Reason, e.Note, e.DeprecatedCount, strings.TrimSpace(logs))
-			pterm.Debug.Println(msg)
+			status.Debug(msg)
 			// only show the warning if the count is higher than 5
 			if e.DeprecatedCount > 5 {
-				pterm.Warning.Printfln(msg)
+				status.Warn(msg)
 			}
 		} else {
 			msg := fmt.Sprintf("Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d",
 				e.Name, e.Reason, e.Note, e.DeprecatedCount)
-			pterm.Debug.Printfln(msg)
+			status.Debug(msg)
 			// only show the warning if the count is higher than 5
 			if e.DeprecatedCount > 5 {
-				pterm.Warning.Printfln(msg)
+				status.Warn(msg)
 			}
 		}
 
 	default:
-		pterm.Debug.Printfln("Received an unsupported event type: %s", e.Type)
+		status.Debug(fmt.Sprintf("Received an unsupported event type: %s", e.Type))
 	}
 }
 
 func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
 	secretBody, err := docker.Secret(server, user, pass, email)
 	if err != nil {
-		pterm.Error.Println("Unable to create docker secret")
+		status.Error("Unable to create docker secret")
 		return fmt.Errorf("unable to create docker secret: %w", err)
 	}
 
@@ -579,10 +580,10 @@ func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, em
 	}
 
 	if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
-		pterm.Error.Println("Unable to create Docker-auth secret")
+		status.Error("Unable to create Docker-auth secret")
 		return fmt.Errorf("unable to create docker-auth secret: %w", err)
 	}
-	pterm.Success.Println("Docker-Auth secret created")
+	status.Success("Docker-Auth secret created")
 	return nil
 }
 
@@ -596,10 +597,10 @@ func (c *Command) Uninstall(_ context.Context, opts UninstallOpts) error {
 	if opts.Persisted {
 		c.spinner.UpdateText("Removing persisted data")
 		if err := os.RemoveAll(paths.Data); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to remove persisted data '%s'", paths.Data))
+			status.Error(fmt.Sprintf("Unable to remove persisted data '%s'", paths.Data))
 			return fmt.Errorf("unable to remove persisted data '%s': %w", paths.Data, err)
 		}
-		pterm.Success.Println("Removed persisted data")
+		status.Success("Removed persisted data")
 	}
 
 	return nil
@@ -613,18 +614,18 @@ func (c *Command) Status(_ context.Context) error {
 
 		rel, err := c.helm.GetRelease(name)
 		if err != nil {
-			pterm.Warning.Println("Unable to fetch airbyte release")
-			pterm.Debug.Printfln("unable to fetch airbyte release: %s", err)
+			status.Warn("Unable to fetch airbyte release")
+			status.Debug(fmt.Sprintf("unable to fetch airbyte release: %s", err))
 			continue
 		}
 
-		pterm.Info.Println(fmt.Sprintf(
+		status.Info(fmt.Sprintf(
 			"Found helm chart '%s'\n  Status: %s\n  Chart Version: %s\n  App Version: %s",
 			name, rel.Info.Status.String(), rel.Chart.Metadata.Version, rel.Chart.Metadata.AppVersion,
 		))
 	}
 
-	pterm.Info.Println(fmt.Sprintf("Airbyte should be accessible via http://localhost:%d", c.portHTTP))
+	status.Info(fmt.Sprintf("Airbyte should be accessible via http://localhost:%d", c.portHTTP))
 
 	return nil
 }
@@ -654,28 +655,28 @@ func (c *Command) handleChart(
 		Name: req.repoName,
 		URL:  req.repoURL,
 	}); err != nil {
-		pterm.Error.Printfln("Unable to configure %s Helm repository", req.repoName)
+		status.Error(fmt.Sprintf("Unable to configure %s Helm repository", req.repoName))
 		return fmt.Errorf("unable to add %s chart repo: %w", req.name, err)
 	}
 
 	c.spinner.UpdateText(fmt.Sprintf("Fetching %s Helm Chart", req.chartName))
 	helmChart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{Version: req.chartVersion})
 	if err != nil {
-		pterm.Error.Printfln("Unable to fetch %s Helm Chart", req.chartName)
+		status.Error(fmt.Sprintf("Unable to fetch %s Helm Chart", req.chartName))
 		return fmt.Errorf("unable to fetch chart %s: %w", req.chartName, err)
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
 
 	if req.checkShouldInstall && !checkHelmReleaseShouldInstall(c.helm, helmChart, req.chartRelease) {
-		pterm.Success.Println(fmt.Sprintf(
+		status.Success(fmt.Sprintf(
 			"Found matching existing Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  AppVersion: %s",
 			req.chartName, req.chartName, req.namespace, helmChart.Metadata.Version, helmChart.Metadata.AppVersion,
 		))
 		return nil
 	}
 
-	pterm.Info.Println(fmt.Sprintf(
+	status.Info(fmt.Sprintf(
 		"Starting Helm Chart installation of '%s' (version: %s)",
 		req.chartName, helmChart.Metadata.Version,
 	))
@@ -697,13 +698,13 @@ func (c *Command) handleChart(
 		&helmclient.GenericHelmOptions{},
 	)
 	if err != nil {
-		pterm.Error.Printfln("Failed to install %s Helm Chart", req.chartName)
+		status.Error(fmt.Sprintf("Failed to install %s Helm Chart", req.chartName))
 		return fmt.Errorf("unable to install helm: %w", err)
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 
-	pterm.Success.Println(fmt.Sprintf(
+	status.Success(fmt.Sprintf(
 		"Installed Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  AppVersion: %s\n  Release: %d",
 		req.chartName, helmRelease.Name, helmRelease.Namespace, helmRelease.Chart.Metadata.Version, helmRelease.Chart.Metadata.AppVersion, helmRelease.Version,
 	))
@@ -746,11 +747,11 @@ func (c *Command) verifyIngress(ctx context.Context, url string) error {
 
 	select {
 	case <-ingressCtx.Done():
-		pterm.Error.Println("Timed out waiting for ingress")
+		status.Error("Timed out waiting for ingress")
 		return fmt.Errorf("browser liveness check failed: %w", ingressCtx.Err())
 	case err := <-alive:
 		if err != nil {
-			pterm.Error.Println("Ingress verification failed")
+			status.Error("Ingress verification failed")
 			return fmt.Errorf("browser failed liveness check: %w", err)
 		}
 	}
@@ -762,16 +763,16 @@ func (c *Command) launch(url string) {
 	c.spinner.UpdateText(fmt.Sprintf("Attempting to launch web-browser for %s", url))
 
 	if err := c.launcher(url); err != nil {
-		pterm.Warning.Println(fmt.Sprintf(
+		status.Warn(fmt.Sprintf(
 			"Failed to launch web-browser.\nPlease launch your web-browser to access %s",
 			url,
 		))
-		pterm.Debug.Println(fmt.Sprintf("failed to launch web-browser: %s", err.Error()))
+		status.Debug(fmt.Sprintf("failed to launch web-browser: %s", err.Error()))
 		// don't consider a failed web-browser to be a failed installation
 		return
 	}
 
-	pterm.Success.Println(fmt.Sprintf("Launched web-browser successfully for %s", url))
+	status.Success(fmt.Sprintf("Launched web-browser successfully for %s", url))
 }
 
 // defaultK8s returns the default k8s client
@@ -810,21 +811,21 @@ func checkHelmReleaseShouldInstall(helm helm.Client, chart *chart.Chart, release
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			// chart hasn't been installed previously
-			pterm.Debug.Println(fmt.Sprintf("Unable to find %s Helm Release", releaseName))
+			status.Debug(fmt.Sprintf("Unable to find %s Helm Release", releaseName))
 		} else {
 			// chart may or may not exist, log error and ignore
-			pterm.Debug.Println(fmt.Sprintf("Unable to fetch %s Helm Release: %s", releaseName, err))
+			status.Debug(fmt.Sprintf("Unable to fetch %s Helm Release: %s", releaseName, err))
 		}
 		return true
 	}
 
 	if rel.Info.Status != release.StatusDeployed {
-		pterm.Debug.Println(fmt.Sprintf("Chart has the status of %s", rel.Info.Status))
+		status.Debug(fmt.Sprintf("Chart has the status of %s", rel.Info.Status))
 		return true
 	}
 
 	if rel.Chart.Metadata.Version != chart.Metadata.Version {
-		pterm.Debug.Println(fmt.Sprintf(
+		status.Debug(fmt.Sprintf(
 			"Chart version (%s) does not match Helm Release (%s)",
 			chart.Metadata.Version, rel.Chart.Metadata.Version,
 		))
@@ -832,14 +833,14 @@ func checkHelmReleaseShouldInstall(helm helm.Client, chart *chart.Chart, release
 	}
 
 	if rel.Chart.Metadata.AppVersion != chart.Metadata.AppVersion {
-		pterm.Debug.Println(fmt.Sprintf(
+		status.Debug(fmt.Sprintf(
 			"Chart app-version (%s) does not match Helm Release (%s)",
 			chart.Metadata.AppVersion, rel.Chart.Metadata.AppVersion,
 		))
 		return true
 	}
 
-	pterm.Debug.Println(fmt.Sprintf(
+	status.Debug(fmt.Sprintf(
 		"Chart matched Helm Release\n  Version: %s - %s\n  AppVersion: %s - %s",
 		chart.Metadata.Version, rel.Chart.Metadata.Version,
 		chart.Metadata.AppVersion, rel.Chart.Metadata.AppVersion,

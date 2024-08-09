@@ -2,22 +2,18 @@ package k8s
 
 import (
 	"bytes"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pterm/pterm"
-	"os"
 	"testing"
 )
 
 func TestLogger_HandleWarningHeader(t *testing.T) {
 	b := bytes.NewBufferString("")
-	pterm.SetDefaultOutput(b)
-	pterm.EnableDebugMessages()
-	// remove color codes from output
-	pterm.DisableColor()
+	origWriter := status.SetWriter(b)
+	origDebug := status.SetDebug(true)
 	t.Cleanup(func() {
-		pterm.SetDefaultOutput(os.Stdout)
-		pterm.DisableDebugMessages()
-		pterm.EnableColor()
+		status.SetWriter(origWriter)
+		status.SetDebug(origDebug)
 	})
 
 	tests := []struct {
@@ -39,7 +35,7 @@ func TestLogger_HandleWarningHeader(t *testing.T) {
 			name: "happy path",
 			code: 299,
 			msg:  "test msg",
-			want: "  DEBUG   k8s - WARN: test msg\n",
+			want: "DEBU k8s - WARN: test msg\n",
 		},
 	}
 

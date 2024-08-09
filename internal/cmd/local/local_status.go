@@ -5,6 +5,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
+	"github.com/airbytehq/abctl/internal/status"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -22,7 +23,7 @@ func NewCmdStatus(provider k8s.Provider) *cobra.Command {
 
 			dockerVersion, err := dockerInstalled(cmd.Context())
 			if err != nil {
-				pterm.Error.Println("Unable to determine if Docker is installed")
+				status.Error("Unable to determine if Docker is installed")
 				return fmt.Errorf("unable to determine docker installation status: %w", err)
 			}
 
@@ -38,17 +39,17 @@ func NewCmdStatus(provider k8s.Provider) *cobra.Command {
 
 				cluster, err := provider.Cluster()
 				if err != nil {
-					pterm.Error.Printfln("Unable to determine status of any existing '%s' cluster", provider.ClusterName)
+					status.Error(fmt.Sprintf("Unable to determine status of any existing '%s' cluster", provider.ClusterName))
 					return err
 				}
 
 				if !cluster.Exists() {
-					pterm.Warning.Println("Airbyte does not appear to be installed locally")
+					status.Warn("Airbyte does not appear to be installed locally")
 					return nil
 				}
 
 				var port int
-				pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
+				status.Success(fmt.Sprintf("Existing cluster '%s' found", provider.ClusterName))
 				spinner.UpdateText(fmt.Sprintf("Validating existing cluster '%s'", provider.ClusterName))
 
 				// only for kind do we need to check the existing port
@@ -56,14 +57,14 @@ func NewCmdStatus(provider k8s.Provider) *cobra.Command {
 					if dockerClient == nil {
 						dockerClient, err = docker.New(cmd.Context())
 						if err != nil {
-							pterm.Error.Printfln("Unable to connect to Docker daemon")
+							status.Error("Unable to connect to Docker daemon")
 							return fmt.Errorf("unable to connect to docker: %w", err)
 						}
 					}
 
 					port, err = dockerClient.Port(cmd.Context(), fmt.Sprintf("%s-control-plane", provider.ClusterName))
 					if err != nil {
-						pterm.Warning.Printfln("Unable to determine docker port for cluster '%s'", provider.ClusterName)
+						status.Warn(fmt.Sprintf("Unable to determine docker port for cluster '%s'", provider.ClusterName))
 						return nil
 					}
 				}
@@ -74,7 +75,7 @@ func NewCmdStatus(provider k8s.Provider) *cobra.Command {
 					local.WithSpinner(spinner),
 				)
 				if err != nil {
-					pterm.Error.Printfln("Failed to initialize 'local' command")
+					status.Error("Failed to initialize 'local' command")
 					return fmt.Errorf("unable to initialize local command: %w", err)
 				}
 
