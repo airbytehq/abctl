@@ -62,6 +62,14 @@ func TestCommand_Install(t *testing.T) {
             limits:
                 cpu: "3"
                 memory: 4Gi
+            requests:
+                cpu: "0.1"
+                memory: 100Mi
+worker:
+    env_vars:
+        SIDECAR_KUBE_CPU_REQUEST: "0.1"
+        SIDECAR_KUBE_MEM_REQUEST: 100Mi
+        SOCAT_KUBE_CPU_REQUEST: "0.1"
 `,
 			},
 			release: release.Release{
@@ -222,6 +230,14 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
             limits:
                 cpu: "3"
                 memory: 4Gi
+            requests:
+                cpu: "0.1"
+                memory: 100Mi
+worker:
+    env_vars:
+        SIDECAR_KUBE_CPU_REQUEST: "0.1"
+        SIDECAR_KUBE_MEM_REQUEST: 100Mi
+        SOCAT_KUBE_CPU_REQUEST: "0.1"
 `,
 			},
 			release: release.Release{
