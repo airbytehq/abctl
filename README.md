@@ -1,5 +1,5 @@
 <img alt="abctl logo" src="https://avatars.githubusercontent.com/u/59758427?size=64" height="100%" align="left" />
-abctl<br />
+*abctl*<br />
 Airbyte's command line tool for local Airbyte deployments.
 <br clear="left"/>
 
