@@ -17,6 +17,11 @@ Airbyte's command line tool for local Airbyte deployments.
 > [!TIP]
 > Additional documentation can be found in the [Airbyte Documentation](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
 
+> [!IMPORTANT]
+> Credentials are randomly generated as part of the installation process.
+>
+> After installation is complete, to find your credentials run `abctl local credentials`.
+
 1. Install `Docker`
    - [Linux](https://docs.docker.com/desktop/install/linux-install/)
    - [Mac](https://docs.docker.com/desktop/install/mac-install/)
@@ -33,15 +38,23 @@ Airbyte's command line tool for local Airbyte deployments.
      go install github.com/airbytehq/abctl@latest
      ```
    - Via [Github ](https://github.com/airbytehq/abctl/releases/latest)
-3. Install `Airbyte` 
-> [!NOTE]
-> Depending on internet speed, `abctl local install` could take in excess of 15 minutes.
+3. Install `Airbyte`
    ```
    abctl local install
    abctl local credentials
    ```
-
-    
+> [!NOTE]
+> Depending on internet speed, `abctl local install` could take in excess of 15 minutes.
+> 
+> By default `abctl local install` will only allow Airbyte to accessible on the host `localhost` and port `8000`.
+>
+> If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.<br />
+> If port `8000` is not available. or another port is preferred, `--port [PORT]` can be specified.
+4. Login to `Airbyte`
+   If `abctl local install` completed successfully, it should open a browser to http://localhost:8000
+   (or to the `--host` and `--port` overrides if specified).  If this is the first time Airbyte has been
+   installed you will be asked to provide your email and organization name.  To retrieve your password
+   to login, run `abctl local credentials`.
 
 ## Launch Airbyte
 > [!Note]
@@ -55,10 +68,7 @@ To install and launch Airbyte locally, with default settings, run
 abctl local install 
 ```
 
-> [!IMPORTANT]
-> Credentials are randomly generated as part of the installation process.
-> 
-> To find your credentials run `abctl local credentials`.
+
 
 If `abctl local install` completed successfully, it should have opened a browser to http://localhost:8000
 (or to the `--host` and `--port` overrides).  If this is the first time Airbyte has been installed
