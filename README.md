@@ -36,19 +36,24 @@ Pick one of the following:
 
 ### Launch Airbyte
 To launch Airbyte locally with the default settings, simply run
+
+> [!Note]
+> By default `abctl local install` will install Airbyte to `localhost` port `8000`.
+>
+> If port `8000` is not available or another port is preferred, `--port [PORT]` can be specified.
+> If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.
+
 ```shell
 abctl local install 
 ```
 
-> [!Note]
-> By default `abctl local install` will install Airbyte to `localhost` port `8000`.
-> 
-> If port `8000` is not available or another port is preferred, `--port [PORT]` can be specified.
-> If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.
+> [!IMPORTANT]
+> Credentials are randomly generated as part of the installation process.
+> To find your credentials run `abctl local credentials`.
 
-After the `local install` command completes successfully, your browser should have launched and 
-redirected you to http://localhost.  You will need to provide credentials in order to access 
-Airbyte locally, which default to the username `airbyte` and the password `password`.
+After the `local install` command successfully completes, your browser should have launched and 
+redirected you to http://localhost:8000 (what whatever `--host` and `--port` overrides were provided).  
+You will need to provide credentials in order to access Airbyte locally, which can be found by running `abctl local credentials`.
 
 These credentials can be changed either of the following 
 - passing the `--username` and `--password` flags to the `local install` command
