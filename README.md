@@ -55,35 +55,27 @@ Airbyte's command line tool for local Airbyte deployments.
 
    If `abctl local install` completed successfully, it should open a browser to http://localhost:8000
    (or to the `--host` and `--port` overrides if specified).  If this is the first time Airbyte has been
-   installed you will be asked to provide your email and organization name.  To retrieve your password
+   installed you will be asked to provide an email and organization name.  To retrieve your password
    to login, run `abctl local credentials`.
 
-## Launch Airbyte
-> [!Note]
-> By default `abctl local install` will only allow Airbyte to accessible on the host `localhost` and port `8000`.
->
-> If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.<br />
-> If port `8000` is not available. or another port is preferred, `--port [PORT]` can be specified.
-
-To install and launch Airbyte locally, with default settings, run
-```
-abctl local install 
-```
-
-
-
-If `abctl local install` completed successfully, it should have opened a browser to http://localhost:8000
-(or to the `--host` and `--port` overrides).  If this is the first time Airbyte has been installed
-you will be asked to provide your email and organization name.  To retrieve your password to login,
-run `abctl local credentials`.
 
 # Commands
 
-This tool supports the following commands
+This tool supports the following commands:
 
 ## local
 
-## version
+The `local` command supports the following sub-commands:
+
+### credentials
+
+### install
+
+### status
+
+## uninstall
+
+## abctl version
 
 ### Additional Options
 For additional options supported by `abctl`, pass the `--help` flag
