@@ -34,22 +34,20 @@ Pick from the following:
 - Download the latest version of `abctl` from the [releases page](https://github.com/airbytehq/abctl/releases)
 
 ## Launch Airbyte
-<p align="right">
 > [!Note]
 > By default `abctl local install` will only allow Airbyte to accessible on the host `localhost` and port `8000`.
 >
 > If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.
 > If port `8000` is not available or another port is preferred, `--port [PORT]` can be specified.
-</p>
 
 To install and launch Airbyte locally, with default settings, run
 ```shell
 abctl local install 
 ```
-<br clear="right" />
 
 > [!IMPORTANT]
 > Credentials are randomly generated as part of the installation process.
+> 
 > To find your credentials run `abctl local credentials`.
 
 After the `local install` command successfully completes, your browser should have launched and 
