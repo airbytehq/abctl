@@ -23,16 +23,16 @@ Airbyte's command line tool for local Airbyte deployments.
    - [Windows](https://docs.docker.com/desktop/install/windows-install/)
    
 2. Install `abctl`
-   - `brew`
+   - Via [brew](https://brew.sh/)
      ```
      brew tap airbytehq/tap
      brew install abctl
      ``` 
-   - `go install`
+   - Via [go install](https://go.dev/ref/mod#go-install)
      ```
      go install github.com/airbytehq/abctl@latest
      ```
-  - Download from the [releases page](https://github.com/airbytehq/abctl/releases/latest)
+  - Via [Github ](https://github.com/airbytehq/abctl/releases/latest)
 
 ## Launch Airbyte
 > [!Note]
