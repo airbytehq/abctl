@@ -33,6 +33,14 @@ Airbyte's command line tool for local Airbyte deployments.
      go install github.com/airbytehq/abctl@latest
      ```
    - Via [Github ](https://github.com/airbytehq/abctl/releases/latest)
+3. Install `Airbyte` 
+   ```
+   abctl local install
+   abctl local credentials
+   ```
+   > [!NOTE]
+   > Depending on internet speed, `abctl local install` could take in excess of 15 minutes.
+    
 
 ## Launch Airbyte
 > [!Note]
