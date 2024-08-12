@@ -1,7 +1,7 @@
 <p align="center">
     <img alt="abctl logo" src="https://avatars.githubusercontent.com/u/59758427?size=200" height="140" />
     <h3 align="center">abctl</h3>
-    <p align="center">Airbyte's command line tool for running Airbyte locally.</p>
+    <p align="center">Airbyte's command line tool for local Airbyte deployments.</p>
 </p>
 
 ---
@@ -16,13 +16,13 @@
 ## Getting Started
 
 ### Prerequisites
-1. `Docker` installed
+- `Docker` installed
     - [Mac instructions](https://docs.docker.com/desktop/install/mac-install/)
     - [Windows instructions](https://docs.docker.com/desktop/install/windows-install/)
     - [Linux instructions](https://docs.docker.com/desktop/install/linux-install/)
 
-### Installation
-Do one of the following:
+### Install abctl
+Pick one of the following:
 - Install using `brew`
    ```shell
    brew tap airbytehq/tap
@@ -34,11 +34,16 @@ Do one of the following:
    ```
 - Download the latest version of `abctl` from the [releases page](https://github.com/airbytehq/abctl/releases)
 
-### Launch
+### Launch Airbyte
 To launch Airbyte locally with the default settings, simply run
 ```shell
 abctl local install 
 ```
+
+> [!Note]
+> By default `abctl local install` will install Airbyte to `localhost` port `8000`.
+> If port `8000` is not available or another port is preferred, `--port [PORT]` can be specified.
+> If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.
 
 After the `local install` command completes successfully, your browser should have launched and 
 redirected you to http://localhost.  You will need to provide credentials in order to access 
