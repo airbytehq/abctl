@@ -14,14 +14,14 @@ Airbyte's command line tool for local Airbyte deployments.
 
 # Quickstart
 
-> [!NOTE]
+> [!TIP]
 > Additional documentation can be found in the [Airbyte Documentation](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
 
-- Install `Docker`
+1. Install `Docker`
   - [Mac instructions](https://docs.docker.com/desktop/install/mac-install/)
   - [Windows instructions](https://docs.docker.com/desktop/install/windows-install/)
   - [Linux instructions](https://docs.docker.com/desktop/install/linux-install/)
-- Install `abctl`
+2. Install `abctl`<br />
    Pick from the following:
   - Install using `brew`
      ```shell
