@@ -32,7 +32,7 @@ Airbyte's command line tool for local Airbyte deployments.
      ```
      go install github.com/airbytehq/abctl@latest
      ```
-  - Via [Github ](https://github.com/airbytehq/abctl/releases/latest)
+   - Via [Github ](https://github.com/airbytehq/abctl/releases/latest)
 
 ## Launch Airbyte
 > [!Note]
