@@ -35,7 +35,7 @@ Pick from the following:
 
 ## Launch Airbyte
 > [!Note]
-> By default `abctl local install` will only allow Airbyte to accessible<br />on the host `localhost` and port `8000`.
+> By default `abctl local install` will only allow Airbyte to accessible on the host `localhost` and port `8000`.
 >
 > If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.<br />
 > If port `8000` is not available. or another port is preferred, `--port [PORT]` can be specified.
