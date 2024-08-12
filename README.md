@@ -1,28 +1,27 @@
-<p align="center">
-    <img alt="abctl logo" src="https://avatars.githubusercontent.com/u/59758427?size=200" height="140" />
-    <h3 align="center">abctl</h3>
-    <p align="center">Airbyte's command line tool for local Airbyte deployments.</p>
-</p>
+<img alt="abctl logo" src="https://avatars.githubusercontent.com/u/59758427?size=200" height="64" align="left" />
 
+abctl
+
+Airbyte's command line tool for local Airbyte deployments.
+<br clear="left"/>
 ---
-
 - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
-    - [Installation](#installation)
-    - [Launch](#launch)
+    - [Install abctl](#install-abctl)
+    - [Launch Airbyte](#launch-airbyte)
     - [Additional Options](#additional-options)
 - [Contributing](#contributing) 
 
-## Getting Started
+# Getting Started
 
-### Prerequisites
+## Prerequisites
 - `Docker` installed
     - [Mac instructions](https://docs.docker.com/desktop/install/mac-install/)
     - [Windows instructions](https://docs.docker.com/desktop/install/windows-install/)
     - [Linux instructions](https://docs.docker.com/desktop/install/linux-install/)
 
-### Install abctl
-Pick one of the following:
+## Install abctl
+Pick from the following:
 - Install using `brew`
    ```shell
    brew tap airbytehq/tap
@@ -34,15 +33,14 @@ Pick one of the following:
    ```
 - Download the latest version of `abctl` from the [releases page](https://github.com/airbytehq/abctl/releases)
 
-### Launch Airbyte
-To launch Airbyte locally with the default settings, simply run
-
+## Launch Airbyte
 > [!Note]
-> By default `abctl local install` will install Airbyte to `localhost` port `8000`.
+> By default `abctl local install` will only allow Airbyte to accessible on the host `localhost` and port `8000`.
 >
-> If port `8000` is not available or another port is preferred, `--port [PORT]` can be specified.
 > If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.
+> If port `8000` is not available or another port is preferred, `--port [PORT]` can be specified.
 
+To install and launch Airbyte locally, with default settings, run
 ```shell
 abctl local install 
 ```
