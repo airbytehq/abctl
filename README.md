@@ -18,21 +18,21 @@ Airbyte's command line tool for local Airbyte deployments.
 > Additional documentation can be found in the [Airbyte Documentation](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
 
 1. Install `Docker`
-   - [Mac instructions](https://docs.docker.com/desktop/install/mac-install/)
-   - [Windows instructions](https://docs.docker.com/desktop/install/windows-install/)
-   - [Linux instructions](https://docs.docker.com/desktop/install/linux-install/)
-2. Install `abctl`<br />
-   Pick from the following:
-  - Install using `brew`
-     ```shell
+   - [Linux](https://docs.docker.com/desktop/install/linux-install/)
+   - [Mac](https://docs.docker.com/desktop/install/mac-install/)
+   - [Windows](https://docs.docker.com/desktop/install/windows-install/)
+   
+2. Install `abctl`
+   - `brew`
+     ```
      brew tap airbytehq/tap
      brew install abctl
+     ``` 
+   - `go install`
      ```
-  - Install using `go install`
-     ```shell
      go install github.com/airbytehq/abctl@latest
      ```
-  - Download the latest version from the [releases page](https://github.com/airbytehq/abctl/releases)
+  - Download from the [releases page](https://github.com/airbytehq/abctl/releases/latest)
 
 ## Launch Airbyte
 > [!Note]
