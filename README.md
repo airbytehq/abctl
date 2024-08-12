@@ -5,33 +5,34 @@ Airbyte's command line tool for local Airbyte deployments.
 
 ---
 
-- [Getting Started](#getting-started)
+- [Quickstart](#quickstart)
     - [Prerequisites](#prerequisites)
     - [Install abctl](#install-abctl)
     - [Launch Airbyte](#launch-airbyte)
     - [Additional Options](#additional-options)
 - [Contributing](#contributing) 
 
-# Getting Started
+# Quickstart
 
-## Prerequisites
-- `Docker` installed
-    - [Mac instructions](https://docs.docker.com/desktop/install/mac-install/)
-    - [Windows instructions](https://docs.docker.com/desktop/install/windows-install/)
-    - [Linux instructions](https://docs.docker.com/desktop/install/linux-install/)
+> [!NOTE]
+> Additional documentation can be found in the [Airbyte Documentation](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
 
-## Install abctl
-Pick from the following:
-- Install using `brew`
-   ```shell
-   brew tap airbytehq/tap
-   brew install abctl
-   ```
-- Install using `go install`
-   ```shell
-   go install github.com/airbytehq/abctl@latest
-   ```
-- Download the latest version of `abctl` from the [releases page](https://github.com/airbytehq/abctl/releases)
+- Install `Docker`
+  - [Mac instructions](https://docs.docker.com/desktop/install/mac-install/)
+  - [Windows instructions](https://docs.docker.com/desktop/install/windows-install/)
+  - [Linux instructions](https://docs.docker.com/desktop/install/linux-install/)
+- Install `abctl`
+   Pick from the following:
+  - Install using `brew`
+     ```shell
+     brew tap airbytehq/tap
+     brew install abctl
+     ```
+  - Install using `go install`
+     ```shell
+     go install github.com/airbytehq/abctl@latest
+     ```
+  - Download the latest version from the [releases page](https://github.com/airbytehq/abctl/releases)
 
 ## Launch Airbyte
 > [!Note]
@@ -50,22 +51,19 @@ abctl local install
 > 
 > To find your credentials run `abctl local credentials`.
 
-After the `local install` command successfully completes, your browser should have launched and 
-redirected you to http://localhost:8000 (what whatever `--host` and `--port` overrides were provided).  
-You will need to provide credentials in order to access Airbyte locally, which can be found by running `abctl local credentials`.
+If `abctl local install` completed successfully, it should have opened a browser to http://localhost:8000
+(or to the `--host` and `--port` overrides).  If this is the first time Airbyte has been installed
+you will be asked to provide your email and organization name.  To retrieve your password to login,
+run `abctl local credentials`.
 
-These credentials can be changed either of the following 
-- passing the `--username` and `--password` flags to the `local install` command
-   ```
-   abctl local install --username foo --password bar
-   ```
-- defining the environment variables `ABCTL_LOCAL_INSTALL_USERNAME` and `ABCTL_LOCAL_INSTALL_PASSWORD`
-   ```
-   ABCTL_LOCAL_INSTALL_USERNAME=foo
-   ABCTL_LOCAL_INSTALL_PASSWORD=bar
-   abctl local install
-   ```
-  
+# Commands
+
+This tool supports the following commands
+
+## local
+
+## version
+
 ### Additional Options
 For additional options supported by `abctl`, pass the `--help` flag
 ```
