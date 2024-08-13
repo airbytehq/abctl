@@ -126,24 +126,24 @@ Installs a local Airbyte instance or updates an existing installation that was i
 
 `install` supports the following optional flags:
 
-| name              | default value | description                                                                                                                                                        |
-|-------------------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| --chart-version   | latest        | Which Airbyte helm-chart version to install.                                                                                                                       | 
-| --docker-email    |               | Docker email address to authenticate against `--docker-server`.<br />Can also be specified by setting the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_EMAIL`. |
-| --docker-password |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
-|                   |               |                                                                                                                                                                    |
+| name              | description                                                                                                                                                        |
+|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| --chart-version   | Which Airbyte helm-chart version to install, defaults to "latest".                                                                                                 | 
+| --docker-email    | Docker email address to authenticate against `--docker-server`.<br />Can also be specified by setting the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_EMAIL`. |
+| --docker-password |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
+|                   |                                                                                                                                                                    |
 
 
 ### status
