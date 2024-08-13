@@ -168,7 +168,38 @@ Airbyte should be accessible via http://localhost:8000
 
 ### uninstall
 
+```abctl local uninstall```
+
+Uninstalls a local Airbyte instance.
+
+> [!NOTE]
+> The data associated with the installed Airbyte instance will not be removed.
+> 
+> This is done to allow Airbyte to be reinstalled at a later date with all the data preserved. 
+
+`uninstall` supports the following optional flags:
+
+> [!NOTE]
+> An `-` in the default column indicates no value can be provided.
+>
+> These flags behave as a switch, enabled if provided, disabled if not.
+
+| name        | default | description                                                                    |
+|-------------|---------|--------------------------------------------------------------------------------|
+| --persisted | -       | Will remove all data for the Airbyte installation.<br />This cannot be undone. |
+
+
 ## version
+
+```abctl version```
+
+Displays version information about the `abctl` tool.
+
+For example:
+```
+$ abctl version
+version: v0.12.0
+```
 
 # Contributing
 If you have found a problem with `abctl`, please open a [Github Issue](https://github.com/airbytehq/airbyte/issues/new/choose) and use the `🐛 [abctl] Report an issue with the abctl tool` template.
