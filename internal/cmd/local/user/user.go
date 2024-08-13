@@ -16,19 +16,9 @@ const (
 	pathUser  = "/api/public/v1/organizations"
 )
 
-type orgRequest struct{}
+var client httpClient = &http.Client{Timeout: 10 * time.Second}
 
-type orgResponse struct {
-	Data []struct {
-		OrgID   string `json:"organizationId"`
-		OrgName string `json:"organizationName"`
-		Email   string `json:"email"`
-	} `json:"data"`
-}
-
-var client doer = &http.Client{Timeout: 10 * time.Second}
-
-type doer interface {
+type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
