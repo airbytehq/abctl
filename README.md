@@ -6,10 +6,7 @@ Airbyte's command line tool for local Airbyte deployments.
 ---
 
 - [Quickstart](#quickstart)
-    - [Prerequisites](#prerequisites)
-    - [Install abctl](#install-abctl)
-    - [Launch Airbyte](#launch-airbyte)
-    - [Additional Options](#additional-options)
+- [Commands](#commands)
 - [Contributing](#contributing) 
 
 # Quickstart
