@@ -61,12 +61,18 @@ Airbyte's command line tool for local Airbyte deployments.
 
 # Commands
 
-All commands and sub-commands support the following global flags:
+All commands and sub-commands support the following optional global flags:
 
 | short | long      | description                                                                     |
 |-------|-----------|---------------------------------------------------------------------------------|
 | -h    | --help    | Displays the help information, description the available options.               |
 | -v    | --verbose | Enables verbose (debug) output.<br />Useful when debugging unexpected behavior. |
+
+All commands support the following environment variables:
+
+| name         | description                                     |
+|--------------|-------------------------------------------------|
+| DO_NOT_TRACK | Set to any value to disable telemetry tracking. |
 
 The following commands are supported:
 - [local](#local)
@@ -78,10 +84,10 @@ The following commands are supported:
 
 The local sub-commands are focused on managing the local Airbyte installation.
 The following sub-commands are supports:
-- credentials
-- install
-- status
-- uninstall
+- [credentials](#credentials)
+- [install](#install)
+- [status](#status)
+- [uninstall](#uninstall)
    
 ### credentials
 
@@ -106,56 +112,64 @@ $ abctl local credentials
   "client-secret": "[RANDOM CLIENT-SECRET]"
 }
 ```
-  
-
-## local
-
-The `local` command supports the following sub-commands:
-
-### credentials
 
 ### install
 
+```abctl local install```
+
+Installs a local Airbyte instance.
+
+> [!NOTE]
+> Depending on your internet speed, the `abctl local install` step may take in excess of 20 minutes.
+
+Installs a local Airbyte instance or updates an existing installation that was initially installed by this tool.
+
+`install` supports the following optional flags:
+
+| name              | default value | description                                                                                                                                                        |
+|-------------------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| --chart-version   | latest        | Which Airbyte helm-chart version to install.                                                                                                                       | 
+| --docker-email    |               | Docker email address to authenticate against `--docker-server`.<br />Can also be specified by setting the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_EMAIL`. |
+| --docker-password |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+|                   |               |                                                                                                                                                                    |
+
+
 ### status
 
-## uninstall
+```abctl local status```
+
+If an Airbyte installation exists, returns information regarding that installation.
+
+For example:
+```
+$ abctl local status
+Existing cluster 'airbyte-abctl' found
+Found helm chart 'airbyte-abctl'
+  Status: deployed
+  Chart Version: 0.422.2
+  App Version: 0.63.15
+Found helm chart 'ingress-nginx'
+  Status: deployed
+  Chart Version: 4.11.1
+  App Version: 1.11.1
+Airbyte should be accessible via http://localhost:8000
+```
+
+### uninstall
 
 ## version
 
-### Additional Options
-For additional options supported by `abctl`, pass the `--help` flag
-```
-abctl --help
-
-Usage:
-  abctl [command]
-
-Available Commands:
-  help        Help about any command
-  local       Manages local Airbyte installations
-  version     Print version information
-
-Flags:
-  -h, --help      help for abctl
-  -v, --verbose   enable verbose output
-```
-```
-abctl local install --help
-
-Usage:
-  abctl local install [flags]
-
-Flags:
-      --chart-version string   specify the specific Airbyte helm chart version to install (default "latest")
-  -h, --help                   help for install
-  -p, --password string        basic auth password, can also be specified via ABCTL_LOCAL_INSTALL_PASSWORD (default "password")
-      --port int               ingress http port (default 8000)
-  -u, --username string        basic auth username, can also be specified via ABCTL_LOCAL_INSTALL_USERNAME (default "airbyte")
-
-Global Flags:
-  -v, --verbose   enable verbose output
-
-```
-
-## Contributing
+# Contributing
 If you have found a problem with `abctl`, please open a [Github Issue](https://github.com/airbytehq/airbyte/issues/new/choose) and use the `🐛 [abctl] Report an issue with the abctl tool` template.
