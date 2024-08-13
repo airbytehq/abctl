@@ -87,14 +87,15 @@ The following sub-commands are supports:
 
 ```abctl local credentials```
 
-Displays the credentials required to login to the local Airbyte installation.  
+Displays the credentials required to login to the local Airbyte installation.
+
+> [!NOTE]
+> When `abctl local install` is first executed, random `password`, `client-id`, and `client-secret`
+> are generated.
 
 Returns ths `password`, `client-id`, and `client-secret` credentials.  The `password` is the password
 required to login to Airbyte. The `client-id` and `client-secret` are necessary to create an 
 [`Access Token` for interacting with the Airbyte API](https://reference.airbyte.com/reference/createaccesstoken).
-
-> [!NOTE]
-> When `abctl local install` is first executed, random password, client-id, and client-secret are all generated.
 
 For example:
 ```
