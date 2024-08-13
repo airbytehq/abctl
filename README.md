@@ -61,7 +61,19 @@ Airbyte's command line tool for local Airbyte deployments.
 
 # Commands
 
-This tool supports the following commands:
+`abctl` supports the following global flags:
+
+| short | long      | description                                                                     |
+|-------|-----------|---------------------------------------------------------------------------------|
+| -h    | --help    | Displays the help information, description the available options.               |
+| -v    | --verbose | Enables verbose (debug) output.<br />Useful when debugging unexpected behavior. |
+
+This tool supports the following commands and subcommand:
+- local
+  - install
+  - status
+  - uninstall
+- version
 
 ## local
 
