@@ -117,12 +117,10 @@ $ abctl local credentials
 
 ```abctl local install```
 
-Installs a local Airbyte instance.
+Installs a local Airbyte instance or updates an existing installation that was initially installed by `abctl`.
 
 > [!NOTE]
 > Depending on your internet speed, the `abctl local install` step may take in excess of 20 minutes.
-
-Installs a local Airbyte instance or updates an existing installation that was initially installed by this tool.
 
 `install` supports the following optional flags:
 
