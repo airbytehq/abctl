@@ -1,95 +1,202 @@
-<p align="center">
-    <img alt="abctl logo" src="https://avatars.githubusercontent.com/u/59758427?size=200" height="140" />
-    <h3 align="center">abctl</h3>
-    <p align="center">Airbyte's command line tool for running Airbyte locally.</p>
-</p>
+<img alt="abctl logo" src="https://avatars.githubusercontent.com/u/59758427?size=64" height="100%" align="left" />
+<h1 align="left">abctl</h1>
+Airbyte's command line tool for local Airbyte deployments.
+<br clear="left"/>
 
 ---
 
-- [Getting Started](#getting-started)
-    - [Prerequisites](#prerequisites)
-    - [Installation](#installation)
-    - [Launch](#launch)
-    - [Additional Options](#additional-options)
+- [Quickstart](#quickstart)
+- [Commands](#commands)
 - [Contributing](#contributing) 
 
-## Getting Started
+# Quickstart
 
-### Prerequisites
-1. `Docker` installed
-    - [Mac instructions](https://docs.docker.com/desktop/install/mac-install/)
-    - [Windows instructions](https://docs.docker.com/desktop/install/windows-install/)
-    - [Linux instructions](https://docs.docker.com/desktop/install/linux-install/)
+> [!TIP]
+> Additional documentation can be found in the [Airbyte Documentation](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
 
-### Installation
-Do one of the following:
-- Install using `brew`
-   ```shell
-   brew tap airbytehq/tap
-   brew install abctl
+> [!IMPORTANT]
+> Credentials are randomly generated as part of the installation process.
+>
+> After installation is complete, to find your credentials run `abctl local credentials`.
+
+1. Install `Docker`
+   - [Linux](https://docs.docker.com/desktop/install/linux-install/)
+   - [Mac](https://docs.docker.com/desktop/install/mac-install/)
+   - [Windows](https://docs.docker.com/desktop/install/windows-install/)
+   
+2. Install `abctl`
+   - Via [brew](https://brew.sh/)
+     ```
+     brew tap airbytehq/tap
+     brew install abctl
+     ``` 
+   - Via [go install](https://go.dev/ref/mod#go-install)
+     ```
+     go install github.com/airbytehq/abctl@latest
+     ```
+   - Via [Github ](https://github.com/airbytehq/abctl/releases/latest)
+3. Install `Airbyte`
    ```
-- Install using `go install`
-   ```shell
-   go install github.com/airbytehq/abctl@latest
-   ```
-- Download the latest version of `abctl` from the [releases page](https://github.com/airbytehq/abctl/releases)
-
-### Launch
-To launch Airbyte locally with the default settings, simply run
-```shell
-abctl local install 
-```
-
-After the `local install` command completes successfully, your browser should have launched and 
-redirected you to http://localhost.  You will need to provide credentials in order to access 
-Airbyte locally, which default to the username `airbyte` and the password `password`.
-
-These credentials can be changed either of the following 
-- passing the `--username` and `--password` flags to the `local install` command
-   ```shell
-   abctl local install --username foo --password bar
-   ```
-- defining the environment variables `ABCTL_LOCAL_INSTALL_USERNAME` and `ABCTL_LOCAL_INSTALL_PASSWORD`
-   ```shell
-   ABCTL_LOCAL_INSTALL_USERNAME=foo
-   ABCTL_LOCAL_INSTALL_PASSWORD=bar
    abctl local install
+   abctl local credentials
    ```
-  
-### Additional Options
-For additional options supported by `abctl`, pass the `--help` flag
+> [!NOTE]
+> Depending on internet speed, `abctl local install` could take in excess of 15 minutes.
+> 
+> By default `abctl local install` will only allow Airbyte to accessible on the host `localhost` and port `8000`.
+>
+> If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.<br />
+> If port `8000` is not available. or another port is preferred, `--port [PORT]` can be specified.
+
+4. Login to `Airbyte`
+
+   If `abctl local install` completed successfully, it should open a browser to http://localhost:8000
+   (or to the `--host` and `--port` overrides if specified).  If this is the first time Airbyte has been
+   installed you will be asked to provide an email and organization name.  To retrieve your password
+   to login, run `abctl local credentials`.
+
+
+# Commands
+
+All commands and sub-commands support the following optional global flags:
+
+| short | long      | description                                                                     |
+|-------|-----------|---------------------------------------------------------------------------------|
+| -h    | --help    | Displays the help information, description the available options.               |
+| -v    | --verbose | Enables verbose (debug) output.<br />Useful when debugging unexpected behavior. |
+
+All commands support the following environment variables:
+
+| name         | description                                     |
+|--------------|-------------------------------------------------|
+| DO_NOT_TRACK | Set to any value to disable telemetry tracking. |
+
+The following commands are supported:
+- [local](#local)
+- [version](#version)
+
+## local
+
+```abctl local --help```
+
+The local sub-commands are focused on managing the local Airbyte installation.
+The following sub-commands are supports:
+- [credentials](#credentials)
+- [install](#install)
+- [status](#status)
+- [uninstall](#uninstall)
+   
+### credentials
+
+```abctl local credentials```
+
+Displays the credentials required to login to the local Airbyte installation.
+
+> [!NOTE]
+> When `abctl local install` is first executed, random `password`, `client-id`, and `client-secret`
+> are generated.
+
+Returns ths `password`, `client-id`, and `client-secret` credentials.  The `password` is required to 
+login to Airbyte. The `client-id` and `client-secret` are necessary to create an 
+[`Access Token` for interacting with the Airbyte API](https://reference.airbyte.com/reference/createaccesstoken).
+
+For example:
 ```
-abctl --help
-
-Usage:
-  abctl [command]
-
-Available Commands:
-  help        Help about any command
-  local       Manages local Airbyte installations
-  version     Print version information
-
-Flags:
-  -h, --help      help for abctl
-  -v, --verbose   enable verbose output
-```
-```
-abctl local install --help
-
-Usage:
-  abctl local install [flags]
-
-Flags:
-      --chart-version string   specify the specific Airbyte helm chart version to install (default "latest")
-  -h, --help                   help for install
-  -p, --password string        basic auth password, can also be specified via ABCTL_LOCAL_INSTALL_PASSWORD (default "password")
-      --port int               ingress http port (default 8000)
-  -u, --username string        basic auth username, can also be specified via ABCTL_LOCAL_INSTALL_USERNAME (default "airbyte")
-
-Global Flags:
-  -v, --verbose   enable verbose output
-
+$ abctl local credentials
+{
+  "password": "[RANDOM PASSWORD]",
+  "client-id": "[RANDOM CLIENT-ID]",
+  "client-secret": "[RANDOM CLIENT-SECRET]"
+}
 ```
 
-## Contributing
+### install
+
+```abctl local install```
+
+Installs a local Airbyte instance or updates an existing installation which was initially installed by `abctl`.
+
+> [!NOTE]
+> Depending on your internet speed, `abctl local install` may take in excess of 20 minutes.
+
+`install` supports the following optional flags:
+
+> [!NOTE]
+> An `-` in the default column indicates no value can be provided.  
+> 
+> These flags behave as a switch, enabled if provided, disabled if not.
+
+| name              | default   | description                                                                                                                                                                                                                                            |
+|-------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| --chart-version   | latest    | Which Airbyte helm-chart version to install.                                                                                                                                                                                                           | 
+| --docker-email    | ""        | Docker email address to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_EMAIL`.                                                                                             |
+| --docker-password | ""        | Docker password to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_PASSWORD`.                                                                                               |
+| --docker-server   | ""        | Docker server to authenticate against.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_SERVER`.                                                                                                                     |
+| --docker-username | ""        | Docker username to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_USERNAME`.                                                                                               |
+| --host            | localhost | FQDN where the Airbyte installation will be accessed.<br />Set this if the Airbyte installation will be accessed outside of localhost.                                                                                                                 |
+| --migrate         | -         | Enables data-migration from an existing docker-compose backed Airbyte installation.<br />Copies, leaving the original data unmodified, the data from a docker-compose<br />backed Airbyte installation into this `abctl` managed Airbyte installation. |
+| --no-browser      | -         | Disables launching the browser when installation completes.<br />Useful to set in situations where no browser is available.                                                                                                                            |
+| --port            | 8000      | Port where the Airbyte installation will be accessed.<br />Set this if port 8000 is already in use or if a different port is preferred.                                                                                                                |
+| --secret          | ""        | **Can be set multiple times**.<br />Creates a kubernetes secret based on the contents of the file provided.<br />Useful when used in conjunction with `--values` for customizing installation.                                                         |
+| --values          | ""        | Helm values file to further customize the Airbyte installation.                                                                                                                                                                                        |
+| --volume          | ""        | **Can be set multiple times**.<br />Mounts additional volumes in the kubernetes cluster.<br />Must be in the format of `<HOST_PATH>:<GUEST_PATH>`.                                                                                                     |
+
+
+### status
+
+```abctl local status```
+
+If an Airbyte installation exists, returns information regarding that installation.
+
+For example:
+```
+$ abctl local status
+Existing cluster 'airbyte-abctl' found
+Found helm chart 'airbyte-abctl'
+  Status: deployed
+  Chart Version: 0.422.2
+  App Version: 0.63.15
+Found helm chart 'ingress-nginx'
+  Status: deployed
+  Chart Version: 4.11.1
+  App Version: 1.11.1
+Airbyte should be accessible via http://localhost:8000
+```
+
+### uninstall
+
+```abctl local uninstall```
+
+Uninstalls a local Airbyte instance.
+
+> [!NOTE]
+> The data associated with the installed Airbyte instance will not be removed.
+> 
+> This is done to allow Airbyte to be reinstalled at a later date with all the data preserved. 
+
+`uninstall` supports the following optional flags:
+
+> [!NOTE]
+> An `-` in the default column indicates no value can be provided.
+>
+> These flags behave as a switch, enabled if provided, disabled if not.
+
+| name        | default | description                                                                    |
+|-------------|---------|--------------------------------------------------------------------------------|
+| --persisted | -       | Will remove all data for the Airbyte installation.<br />This cannot be undone. |
+
+
+## version
+
+```abctl version```
+
+Displays version information about the `abctl` tool.
+
+For example:
+```
+$ abctl version
+version: v0.12.0
+```
+
+# Contributing
 If you have found a problem with `abctl`, please open a [Github Issue](https://github.com/airbytehq/airbyte/issues/new/choose) and use the `🐛 [abctl] Report an issue with the abctl tool` template.
