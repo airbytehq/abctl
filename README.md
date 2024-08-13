@@ -140,9 +140,9 @@ Installs a local Airbyte instance or updates an existing installation that was i
 | --migrate         | -         | Enables data-migration from an existing docker-compose backed Airbyte installation.<br />Copies, leaving the original data unmodified, the data from a docker-compose<br />backed Airbyte installation into this `abctl` managed Airbyte installation. |
 | --no-browser      | -         | Disables launching the browser when installation completes.<br />Useful to set in situations where no browser is available.                                                                                                                            |
 | --port            | 8000      | Port where the Airbyte installation will be accessed.<br />Set this if port 8000 is already in use or if a different port is preferred.                                                                                                                |
-| --secret          | ""        | **Can be passed multiple times**.<br />Creates a kubernetes secret based on the contents of the file provided.<br />Useful when used in conjunction with `--values` for customizing installation.                                                      |
+| --secret          | ""        | **Can be set multiple times**.<br />Creates a kubernetes secret based on the contents of the file provided.<br />Useful when used in conjunction with `--values` for customizing installation.                                                         |
 | --values          | ""        | Helm values file to further customize the Airbyte installation.                                                                                                                                                                                        |
-| --volume          | ""        | **Can be passed multiple times**.<br />Mounts additional volumes in the kubernetes cluster.<br />Must be in the format of `<HOST_PATH>:<GUEST_PATH>`.                                                                                                  |
+| --volume          | ""        | **Can be set multiple times**.<br />Mounts additional volumes in the kubernetes cluster.<br />Must be in the format of `<HOST_PATH>:<GUEST_PATH>`.                                                                                                     |
 
 
 ### status
