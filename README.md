@@ -61,19 +61,51 @@ Airbyte's command line tool for local Airbyte deployments.
 
 # Commands
 
-`abctl` supports the following global flags:
+All commands and sub-commands support the following global flags:
 
 | short | long      | description                                                                     |
 |-------|-----------|---------------------------------------------------------------------------------|
 | -h    | --help    | Displays the help information, description the available options.               |
 | -v    | --verbose | Enables verbose (debug) output.<br />Useful when debugging unexpected behavior. |
 
-This tool supports the following commands and subcommand:
-- local
-  - install
-  - status
-  - uninstall
-- version
+The following commands are supported:
+- [local](#local)
+- [version](#version)
+
+## local
+
+```abctl local --help```
+
+The local sub-commands are focused on managing the local Airbyte installation.
+The following sub-commands are supports:
+- credentials
+- install
+- status
+- uninstall
+   
+### credentials
+
+```abctl local credentials```
+
+Displays the credentials required to login to the local Airbyte installation.  
+
+Returns ths `password`, `client-id`, and `client-secret` credentials.  The `password` is the password
+required to login to Airbyte. The `client-id` and `client-secret` are necessary to create an 
+[`Access Token` for interacting with the Airbyte API](https://reference.airbyte.com/reference/createaccesstoken).
+
+> [!NOTE]
+> When `abctl local install` is first executed, random password, client-id, and client-secret are all generated.
+
+For example:
+```
+$ abctl local credentials
+{
+  "password": "[RANDOM PASSWORD]",
+  "client-id": "[RANDOM CLIENT-ID]",
+  "client-secret": "[RANDOM CLIENT-SECRET]"
+}
+```
+  
 
 ## local
 
@@ -87,7 +119,7 @@ The `local` command supports the following sub-commands:
 
 ## uninstall
 
-## abctl version
+## version
 
 ### Additional Options
 For additional options supported by `abctl`, pass the `--help` flag
