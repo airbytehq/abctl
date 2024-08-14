@@ -214,8 +214,8 @@ type InstallOpts struct {
 	DockerPass   string
 	DockerEmail  string
 
-	NoBrowser          bool
-	LowResourceProfile bool
+	NoBrowser       bool
+	LowResourceMode bool
 }
 
 func (i *InstallOpts) dockerAuth() bool {
@@ -353,7 +353,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		"global.auth.enabled=true",
 	}
 
-	if opts.LowResourceProfile {
+	if opts.LowResourceMode {
 		airbyteValues = append(airbyteValues,
 			"global.jobs.resources.requests.cpu=1m",
 			"global.jobs.resources.requests.memory=128m",

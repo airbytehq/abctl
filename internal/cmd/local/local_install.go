@@ -52,8 +52,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 		flagDockerPass   string
 		flagDockerEmail  string
 
-		flagNoBrowser          bool
-		flagLowResourceProfile bool
+		flagNoBrowser       bool
+		flagLowResourceMode bool
 	)
 
 	cmd := &cobra.Command{
@@ -159,8 +159,8 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					DockerPass:   flagDockerPass,
 					DockerEmail:  flagDockerEmail,
 
-					NoBrowser:          flagNoBrowser,
-					LowResourceProfile: flagLowResourceProfile,
+					NoBrowser:       flagNoBrowser,
+					LowResourceMode: flagLowResourceMode,
 				}
 
 				if opts.HelmChartVersion == "latest" {
@@ -211,7 +211,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVar(&flagDockerEmail, "docker-email", "", "docker email, can also be specified via "+envDockerEmail)
 
 	cmd.Flags().BoolVar(&flagNoBrowser, "no-browser", false, "disable launching the web-browser post install")
-	cmd.Flags().BoolVar(&flagLowResourceProfile, "low-resource-profile", false, "run Airbyte with a low resource profile")
+	cmd.Flags().BoolVar(&flagLowResourceMode, "low-resource-mode", false, "run Airbyte in low resource mode")
 
 	cmd.MarkFlagsRequiredTogether("docker-username", "docker-password", "docker-email")
 
