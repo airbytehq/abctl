@@ -140,6 +140,8 @@ Installs a local Airbyte instance or updates an existing installation which was 
 | --secret          | ""        | **Can be set multiple times**.<br />Creates a kubernetes secret based on the contents of the file provided.<br />Useful when used in conjunction with `--values` for customizing installation.                                                         |
 | --values          | ""        | Helm values file to further customize the Airbyte installation.                                                                                                                                                                                        |
 | --volume          | ""        | **Can be set multiple times**.<br />Mounts additional volumes in the kubernetes cluster.<br />Must be in the format of `<HOST_PATH>:<GUEST_PATH>`.                                                                                                     |
+| --low-resource-mode          | false        | Run Airbyte in low resource mode.              |
+
 
 
 ### status
