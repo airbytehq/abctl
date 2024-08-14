@@ -362,8 +362,6 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		airbyteValues = append(airbyteValues,
 			"global.jobs.resources.limits.cpu=3",
 			"global.jobs.resources.limits.memory=4Gi",
-			"global.jobs.resources.requests.cpu=1m",
-			"global.jobs.resources.requests.memory=128m",
 		)
 	}
 
