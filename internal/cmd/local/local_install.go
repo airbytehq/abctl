@@ -211,7 +211,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 	cmd.Flags().StringVar(&flagDockerEmail, "docker-email", "", "docker email, can also be specified via "+envDockerEmail)
 
 	cmd.Flags().BoolVar(&flagNoBrowser, "no-browser", false, "disable launching the web-browser post install")
-	cmd.Flags().BoolVar(&flagLowResourceProfile, "low-resource-profile", false, "run Airbyte with the minimal resource profile")
+	cmd.Flags().BoolVar(&flagLowResourceProfile, "low-resource-profile", false, "run Airbyte with a low resource profile")
 
 	cmd.MarkFlagsRequiredTogether("docker-username", "docker-password", "docker-email")
 
