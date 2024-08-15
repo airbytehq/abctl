@@ -216,6 +216,7 @@ type InstallOpts struct {
 
 	NoBrowser       bool
 	LowResourceMode bool
+	InsecureCookies bool
 }
 
 func (i *InstallOpts) dockerAuth() bool {
@@ -363,6 +364,11 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 			"global.jobs.resources.limits.cpu=3",
 			"global.jobs.resources.limits.memory=4Gi",
 		)
+	}
+	if opts.InsecureCookies {
+		airbyteValues = append(airbyteValues,
+			"global.auth.cookieSecureSetting=false",
+			"global.auth.cookieSameSiteSetting=None")
 	}
 
 	if opts.dockerAuth() {
