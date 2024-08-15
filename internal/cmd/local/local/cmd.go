@@ -214,7 +214,8 @@ type InstallOpts struct {
 	DockerPass   string
 	DockerEmail  string
 
-	NoBrowser bool
+	NoBrowser       bool
+	LowResourceMode bool
 }
 
 func (i *InstallOpts) dockerAuth() bool {
@@ -349,9 +350,19 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 
 	airbyteValues := []string{
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + telUser,
-		"global.jobs.resources.limits.cpu=3",
-		"global.jobs.resources.limits.memory=4Gi",
 		"global.auth.enabled=true",
+	}
+
+	if opts.LowResourceMode {
+		airbyteValues = append(airbyteValues,
+			"global.jobs.resources.requests.cpu=1m",
+			"global.jobs.resources.requests.memory=128m",
+		)
+	} else {
+		airbyteValues = append(airbyteValues,
+			"global.jobs.resources.limits.cpu=3",
+			"global.jobs.resources.limits.memory=4Gi",
+		)
 	}
 
 	if opts.dockerAuth() {
