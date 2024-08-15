@@ -141,7 +141,7 @@ Installs a local Airbyte instance or updates an existing installation which was 
 | --values          | ""        | Helm values file to further customize the Airbyte installation.                                                                                                                                                                                        |
 | --volume          | ""        | **Can be set multiple times**.<br />Mounts additional volumes in the kubernetes cluster.<br />Must be in the format of `<HOST_PATH>:<GUEST_PATH>`.                                                                                                     |
 | --low-resource-mode         | false        | Run Airbyte in low resource mode.                                                                                                                                                                                                                      |
-| --insecure-cookies| false     | The insecure cookies flag that will automatically set cookieSecureSetting and cookieSameSiteSetting to false and None respectively. Use this flag if you are running Airbyte on a host that is not localhost, but do not have TLS configured.          |
+| --insecure-cookies| -     | Disables secure cookie requirements.<br />Only set if using `--host` with an insecure (non `https`) connection.          |
 
 
 
