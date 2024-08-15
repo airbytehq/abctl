@@ -3,6 +3,7 @@ package local
 import (
 	"fmt"
 
+	"github.com/airbytehq/abctl/internal/cmd/local/airbyte"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
@@ -15,6 +16,10 @@ import (
 const (
 	airbyteAuthSecretName = "airbyte-auth-secrets"
 	airbyteNamespace      = "airbyte-abctl"
+
+	secretPassword     = "instance-admin-password"
+	secretClientID     = "instance-admin-client-id"
+	secretClientSecret = "instance-admin-client-secret"
 )
 
 func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
@@ -34,8 +39,27 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 					return err
 				}
 
+				clientId := string(secret.Data[secretClientID])
+				clientSecret := string(secret.Data[secretClientSecret])
+
+				port, err := getPort(cmd.Context(), provider)
+				if err != nil {
+					return err
+				}
+
+				abAPI := airbyte.New(fmt.Sprintf("http://localhost:%d", port), clientId, clientSecret)
+				orgEmail, err := abAPI.GetOrgEmail(cmd.Context())
+				if err != nil {
+					pterm.Error.Println("Unable to determine organization email")
+					return fmt.Errorf("unable to determine organization email: %w", err)
+				}
+
 				pterm.Success.Println(fmt.Sprintf("Getting your credentials: %s", secret.Name))
-				pterm.Info.Println(fmt.Sprintf("{\n  \"password\": \"%s\",\n  \"client-id\": \"%s\",\n  \"client-secret\": \"%s\"\n}", secret.Data["instance-admin-password"], secret.Data["instance-admin-client-id"], secret.Data["instance-admin-client-secret"]))
+				pterm.Info.Println(fmt.Sprintf(`Credentials:
+  Email: %s
+  Password: %s
+  Client-Id: %s
+  Client-Secret: %s`, orgEmail, secret.Data[secretPassword], clientId, clientSecret))
 				return nil
 			})
 		},
