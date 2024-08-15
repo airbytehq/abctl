@@ -2,16 +2,19 @@ package k8s
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 )
@@ -22,6 +25,7 @@ var DefaultPersistentVolumeSize = resource.MustParse("500Mi")
 
 // Client primarily for testing purposes
 type Client interface {
+	DeploymentRestart(ctx context.Context, namespace, name string) error
 	// IngressCreate creates an ingress in the given namespace
 	IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
 	// IngressExists returns true if the ingress exists in the namespace, false otherwise.
@@ -54,7 +58,7 @@ type Client interface {
 	SecretCreateOrUpdate(ctx context.Context, secret corev1.Secret) error
 	SecretGet(ctx context.Context, namespace, name string) (*corev1.Secret, error)
 
-	// ServiceGet returns a the service for the given namespace and name
+	// ServiceGet returns the service for the given namespace and name
 	ServiceGet(ctx context.Context, namespace, name string) (*corev1.Service, error)
 
 	// ServerVersionGet returns the kubernetes version.
@@ -70,6 +74,32 @@ var _ Client = (*DefaultK8sClient)(nil)
 // DefaultK8sClient converts the official kubernetes client to our more manageable (and testable) interface
 type DefaultK8sClient struct {
 	ClientSet *kubernetes.Clientset
+}
+
+func (d *DefaultK8sClient) DeploymentRestart(ctx context.Context, namespace, name string) error {
+	// similar to how kubectl rollout restart works, patch in a restartedAt annotation.
+	rawPatch := map[string]any{
+		"spec": map[string]any{
+			"template": map[string]any{
+				"metadata": map[string]any{
+					"annotations": map[string]string{
+						"kubectl.kubernetes.io/restartedAt": time.Now().Format(time.RFC3339),
+					},
+				},
+			},
+		},
+	}
+
+	jsonData, err := json.Marshal(rawPatch)
+	if err != nil {
+		return fmt.Errorf("unable to marshal raw patch: %w", err)
+	}
+	_, err = d.ClientSet.AppsV1().Deployments(namespace).Patch(ctx, name, types.StrategicMergePatchType, jsonData, metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to fetch deployment %s: %w", name, err)
+	}
+
+	return nil
 }
 
 func (d *DefaultK8sClient) IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {

@@ -63,10 +63,9 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 					pterm.Success.Println("Email updated")
 				}
 
-				if flagSetPassword != "" {
+				if flagSetPassword != "" && flagSetPassword != string(secret.Data[secretPassword]) {
 					pterm.Info.Println("Updating password for authentication")
 					secret.Data[secretPassword] = []byte(flagSetPassword)
-					// A7oXINa38MXltTdvlPomTb6uxRDWlCAu
 					if err := k8sClient.SecretCreateOrUpdate(cmd.Context(), *secret); err != nil {
 						pterm.Error.Println("Unable to update the password")
 						return fmt.Errorf("unable to update the password: %w", err)
@@ -78,6 +77,13 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 					if err != nil {
 						return err
 					}
+
+					if err := k8sClient.DeploymentRestart(cmd.Context(), airbyteNamespace, "airbyte-abctl-server"); err != nil {
+						pterm.Error.Println("Unable to restart airbyte-abctl-server")
+						return fmt.Errorf("unable to restart airbyte-abctl-server: %w", err)
+					}
+
+					// TODO block until the service is ready
 				}
 
 				orgEmail, err := abAPI.GetOrgEmail(cmd.Context())
