@@ -3,14 +3,15 @@ package migrate
 import (
 	"context"
 	"errors"
+	"io"
+	"strings"
+	"testing"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/docker/dockertest"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"io"
-	"strings"
-	"testing"
 )
 
 func TestFromDockerVolume(t *testing.T) {

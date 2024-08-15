@@ -3,6 +3,11 @@ package local
 import (
 	"context"
 	"errors"
+	"net"
+	"strconv"
+	"strings"
+	"testing"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker/dockertest"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
@@ -10,10 +15,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
-	"net"
-	"strconv"
-	"strings"
-	"testing"
 )
 
 func TestDockerInstalled(t *testing.T) {

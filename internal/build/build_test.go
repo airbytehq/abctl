@@ -1,9 +1,10 @@
 package build
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"runtime/debug"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestVersion(t *testing.T) {

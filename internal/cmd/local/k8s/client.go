@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -11,8 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"path"
-	"strings"
 )
 
 // DefaultPersistentVolumeSize is the size of the disks created by the persistent-volumes and requested by

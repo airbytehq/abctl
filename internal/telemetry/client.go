@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/pterm/pterm"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/google/uuid"
+	"github.com/pterm/pterm"
 )
 
 type EventState string

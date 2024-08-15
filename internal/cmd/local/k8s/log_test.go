@@ -2,10 +2,11 @@ package k8s
 
 import (
 	"bytes"
-	"github.com/google/go-cmp/cmp"
-	"github.com/pterm/pterm"
 	"os"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/pterm/pterm"
 )
 
 func TestLogger_HandleWarningHeader(t *testing.T) {
