@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"runtime"
+	"strconv"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/docker/docker/api/types"
@@ -13,9 +17,6 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"io"
-	"runtime"
-	"strconv"
 )
 
 // Version contains al the version information that is being tracked.

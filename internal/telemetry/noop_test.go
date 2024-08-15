@@ -3,10 +3,11 @@ package telemetry
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
-	"testing"
 )
 
 func TestNoopClient(t *testing.T) {

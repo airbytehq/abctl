@@ -2,10 +2,11 @@ package version
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"strings"
 )
 
 // NewCmdVersion returns a cobra command for printing the version information.

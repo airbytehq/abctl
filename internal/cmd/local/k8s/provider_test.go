@@ -2,11 +2,12 @@ package k8s
 
 import (
 	"errors"
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
-	"github.com/google/go-cmp/cmp"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestProvider_Defaults(t *testing.T) {

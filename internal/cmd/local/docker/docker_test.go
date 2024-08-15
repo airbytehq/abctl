@@ -3,13 +3,14 @@ package docker
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/docker/dockertest"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/google/go-cmp/cmp"
-	"testing"
 )
 
 // TODO: move this somewhere else.

@@ -4,11 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/airbytehq/abctl/internal/build"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/google/uuid"
-	"github.com/pbnjay/memory"
 	"io"
 	"net/http"
 	"runtime"
@@ -16,6 +11,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/airbytehq/abctl/internal/build"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
+	"github.com/pbnjay/memory"
 )
 
 var userID = uuid.New()

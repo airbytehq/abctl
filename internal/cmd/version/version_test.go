@@ -2,11 +2,12 @@ package version
 
 import (
 	"bytes"
+	"os"
+	"testing"
+
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pterm/pterm"
-	"os"
-	"testing"
 )
 
 func TestCmd_Output(t *testing.T) {
