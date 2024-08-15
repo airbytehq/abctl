@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,20 +12,24 @@ import (
 )
 
 const (
-	pathToken = "/api/v1/applications/token"
-	pathUser  = "/api/public/v1/organizations"
-	grantType = "client_credentials"
+	pathToken  = "/api/v1/applications/token"
+	pathOrgGet = "/api/v1/organizations/get"
+	pathOrgSet = "/api/v1/organizations/update"
+	grantType  = "client_credentials"
 )
+
+// Token represents an application token
+type Token string
 
 // Option for configuring the Command, primarily exists for testing
 type Option func(*Airbyte)
 
-type Token string
-
+// HTTPClient exists for testing purposes
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// Airbyte is used for communicating with the Airbyte API
 type Airbyte struct {
 	h     HTTPClient
 	token Token
@@ -37,6 +40,8 @@ type Airbyte struct {
 	host         string
 }
 
+// WithHTTPClient overrides the default http client.
+// Primarily for testing purposes.
 func WithHTTPClient(h HTTPClient) Option {
 	return func(a *Airbyte) {
 		a.h = h
@@ -63,22 +68,49 @@ func New(host, clientID, clientSecret string, opts ...Option) *Airbyte {
 
 // GetOrgEmail returns the organization email for the organization "00000000-0000-0000-0000-000000000000".
 func (a *Airbyte) GetOrgEmail(ctx context.Context) (string, error) {
+	org, err := a.getOrg(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get organization: %w", err)
+	}
+
+	return org.Email, nil
+}
+
+// SetOrgEmail updates the email assocated with the default organization "00000000-0000-0000-0000-000000000000".
+func (a *Airbyte) SetOrgEmail(ctx context.Context, email string) error {
+	org, err := a.getOrg(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get organization: %w", err)
+	}
+
+	org.Email = email
+
+	if err := a.setOrg(ctx, org); err != nil {
+		return fmt.Errorf("failed to update organization: %w", err)
+	}
+
+	return nil
+}
+
+// getOrg returns the default organization "00000000-0000-0000-0000-000000000000".
+func (a *Airbyte) getOrg(ctx context.Context) (organization, error) {
 	token, err := a.fetchToken(ctx)
 	if err != nil {
-		return "", fmt.Errorf("unable to determine application token: %w", err)
+		return organization{}, fmt.Errorf("unable to fetch token: %w", err)
 	}
 
-	type orgResponse struct {
-		Data []struct {
-			OrgID   string `json:"organizationId"`
-			OrgName string `json:"organizationName"`
-			Email   string `json:"email"`
-		} `json:"data"`
+	type orgReq struct {
+		OrgID string `json:"organizationId"`
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.host+pathUser, nil)
+	jsonData, err := json.Marshal(orgReq{OrgID: "00000000-0000-0000-0000-000000000000"})
 	if err != nil {
-		return "", fmt.Errorf("unable to create email request: %w", err)
+		return organization{}, fmt.Errorf("unable to marshal organization request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.host+pathOrgGet, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return organization{}, fmt.Errorf("unable to create organization request: %w", err)
 	}
 	req.Header.Add("content-type", "application/json")
 	req.Header.Add("accept", "application/json")
@@ -86,30 +118,58 @@ func (a *Airbyte) GetOrgEmail(ctx context.Context) (string, error) {
 
 	res, err := a.h.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("unable to send email request: %w", err)
+		fmt.Errorf("unable to send organization request: %w", err)
 	}
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return "", fmt.Errorf("unable to read email response: %w", err)
+		return organization{}, fmt.Errorf("unable to read organization response: %w", err)
 	}
 
-	var orgRes orgResponse
-	if err := json.Unmarshal(resBody, &orgRes); err != nil {
-		return "", fmt.Errorf("unable to decode email request: %w", err)
+	var org organization
+	if err := json.Unmarshal(resBody, &org); err != nil {
+		return organization{}, fmt.Errorf("unable to decode organization request: %w", err)
 	}
-
-	if len(orgRes.Data) < 1 {
-		return "", errors.New("unable to find any organizations")
-	}
-
-	if orgRes.Data[0].OrgID != "00000000-0000-0000-0000-000000000000" {
-		return "", fmt.Errorf("could not find expected organization, found %s", orgRes.Data[0].OrgID)
-	}
-
-	return orgRes.Data[0].Email, nil
+	return org, nil
 }
 
+// setOrg calls the organization/update endpoint.
+// This is a POST endpoint and does not support PATCH operations.
+// Make sure the org provides has all of its attributes defined.
+func (a *Airbyte) setOrg(ctx context.Context, org organization) error {
+	token, err := a.fetchToken(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to fetch token: %w", err)
+	}
+
+	jsonData, err := json.Marshal(org)
+	if err != nil {
+		return fmt.Errorf("unable to marshal organization request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.host+pathOrgSet, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("unable to create organization request: %w", err)
+	}
+	req.Header.Add("content-type", "application/json")
+	req.Header.Add("accept", "application/json")
+	req.Header.Add("Authorization", "Bearer "+string(token))
+
+	res, err := a.h.Do(req)
+	if err != nil {
+		fmt.Errorf("unable to send organization request: %w", err)
+	}
+	_ = res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+
+	return nil
+}
+
+// fetchToken returns the application token for the ClientID and ClientSecret.
+// The token will be cached when first called, returning the cached value for every following call.
 func (a *Airbyte) fetchToken(ctx context.Context) (Token, error) {
 	t := a.token
 	if t != "" {
@@ -142,7 +202,6 @@ func (a *Airbyte) fetchToken(ctx context.Context) (Token, error) {
 	if err != nil {
 		return "", fmt.Errorf("unable to create token request: %w", err)
 	}
-
 	req.Header.Add("content-type", "application/json")
 	req.Header.Add("accept", "application/json")
 
@@ -163,4 +222,14 @@ func (a *Airbyte) fetchToken(ctx context.Context) (Token, error) {
 
 	a.token = Token(tokenRes.AccessToken)
 	return a.token, nil
+}
+
+// organization is how the API models the Organization concept
+type organization struct {
+	ID       string `json:"organizationId"`
+	Name     string `json:"organizationName"`
+	Email    string `json:"email"`
+	PBA      bool   `json:"pba"`
+	Billing  bool   `json:"orgLevelBilling"`
+	SSORealm string `json:"ssoRealm"`
 }

@@ -23,18 +23,23 @@ const (
 )
 
 func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
+	var (
+		flagSetPassword string
+		flagSetEmail    string
+	)
+
 	cmd := &cobra.Command{
 		Use:   "credentials",
 		Short: "Get Airbyte user credentials",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return telClient.Wrap(cmd.Context(), telemetry.Install, func() error {
-
-				client, err := defaultK8s(provider.Kubeconfig, provider.Context)
+			return telClient.Wrap(cmd.Context(), telemetry.Credentials, func() error {
+				k8sClient, err := defaultK8s(provider.Kubeconfig, provider.Context)
 				if err != nil {
 					pterm.Error.Println("No existing cluster found")
 					return nil
 				}
-				secret, err := client.SecretGet(cmd.Context(), airbyteNamespace, airbyteAuthSecretName)
+
+				secret, err := k8sClient.SecretGet(cmd.Context(), airbyteNamespace, airbyteAuthSecretName)
 				if err != nil {
 					return err
 				}
@@ -48,6 +53,33 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 				}
 
 				abAPI := airbyte.New(fmt.Sprintf("http://localhost:%d", port), clientId, clientSecret)
+
+				if flagSetEmail != "" {
+					pterm.Info.Println("Updating email for authentication")
+					if err := abAPI.SetOrgEmail(cmd.Context(), flagSetEmail); err != nil {
+						pterm.Error.Println("Unable to update the email address")
+						return fmt.Errorf("unable to udpate the email address: %w", err)
+					}
+					pterm.Success.Println("Email updated")
+				}
+
+				if flagSetPassword != "" {
+					pterm.Info.Println("Updating password for authentication")
+					secret.Data[secretPassword] = []byte(flagSetPassword)
+					// A7oXINa38MXltTdvlPomTb6uxRDWlCAu
+					if err := k8sClient.SecretCreateOrUpdate(cmd.Context(), *secret); err != nil {
+						pterm.Error.Println("Unable to update the password")
+						return fmt.Errorf("unable to update the password: %w", err)
+					}
+					pterm.Success.Println("Password updated")
+
+					// as the secret was updated, fetch it again
+					secret, err = k8sClient.SecretGet(cmd.Context(), airbyteNamespace, airbyteAuthSecretName)
+					if err != nil {
+						return err
+					}
+				}
+
 				orgEmail, err := abAPI.GetOrgEmail(cmd.Context())
 				if err != nil {
 					pterm.Error.Println("Unable to determine organization email")
@@ -65,7 +97,18 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVar(&flagSetEmail, "email", "", "specify the new email address for authentication")
+	cmd.Flags().StringVar(&flagSetPassword, "password", "", "specify the new password for authentication")
+
 	return cmd
+}
+
+func updateEmail() {
+
+}
+
+func updatePassword() {
+
 }
 
 func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
