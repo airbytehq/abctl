@@ -3,14 +3,15 @@ package local
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"io/fs"
-	"os"
 )
 
 var telClient telemetry.Client

@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/airbytehq/abctl/internal/build"
-	"github.com/google/uuid"
-	"github.com/pbnjay/memory"
-	"github.com/pterm/pterm"
-	"k8s.io/apimachinery/pkg/util/json"
 	"maps"
 	"net/http"
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/airbytehq/abctl/internal/build"
+	"github.com/google/uuid"
+	"github.com/pbnjay/memory"
+	"github.com/pterm/pterm"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 var _ Client = (*SegmentClient)(nil)

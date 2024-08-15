@@ -3,15 +3,16 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/airbytehq/abctl/internal/build"
-	"github.com/airbytehq/abctl/internal/cmd"
-	"github.com/airbytehq/abctl/internal/update"
-	"github.com/pterm/pterm"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/airbytehq/abctl/internal/build"
+	"github.com/airbytehq/abctl/internal/cmd"
+	"github.com/airbytehq/abctl/internal/update"
+	"github.com/pterm/pterm"
 )
 
 func main() {

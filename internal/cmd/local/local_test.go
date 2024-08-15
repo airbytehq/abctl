@@ -1,11 +1,12 @@
 package local
 
 import (
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
-	"github.com/google/go-cmp/cmp"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestCheckAirbyteDir(t *testing.T) {

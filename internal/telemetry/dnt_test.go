@@ -1,9 +1,10 @@
 package telemetry
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"os"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestDNT(t *testing.T) {
