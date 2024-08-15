@@ -54,6 +54,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 		flagNoBrowser       bool
 		flagLowResourceMode bool
+		flagInsecureCookies bool
 	)
 
 	cmd := &cobra.Command{
@@ -161,6 +162,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 					NoBrowser:       flagNoBrowser,
 					LowResourceMode: flagLowResourceMode,
+					InsecureCookies: flagInsecureCookies,
 				}
 
 				if opts.HelmChartVersion == "latest" {
@@ -212,6 +214,7 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 
 	cmd.Flags().BoolVar(&flagNoBrowser, "no-browser", false, "disable launching the web-browser post install")
 	cmd.Flags().BoolVar(&flagLowResourceMode, "low-resource-mode", false, "run Airbyte in low resource mode")
+	cmd.Flags().BoolVar(&flagInsecureCookies, "insecure-cookies", false, "allow insecure cookies to be served over http")
 
 	cmd.MarkFlagsRequiredTogether("docker-username", "docker-password", "docker-email")
 
