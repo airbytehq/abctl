@@ -144,6 +144,7 @@ Installs a local Airbyte instance or updates an existing installation which was 
 | --insecure-cookies| -     | Disables secure cookie requirements.<br />Only set if using `--host` with an insecure (non `https`) connection.          |
 
 
+
 ### status
 
 ```abctl local status```
