@@ -111,14 +111,6 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 	return cmd
 }
 
-func updateEmail() {
-
-}
-
-func updatePassword() {
-
-}
-
 func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
 	if err != nil {
