@@ -362,6 +362,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 			"server.env_vars.JOIN_MAIN_CONTAINER_MEMORY_LIMIT=0",
 			"server.env_vars.JOIN_MAIN_CONTAINER_MEMORY_REQUEST=0",
 
+			"worker.env_vars.JOB_RESOURCE_VARIANT_OVERRIDE=lowresource",
 			"worker.env_vars.JOIN_MAIN_CONTAINER_CPU_LIMIT=0",
 			"worker.env_vars.JOIN_MAIN_CONTAINER_CPU_REQUEST=0",
 			"worker.env_vars.JOIN_MAIN_CONTAINER_MEMORY_LIMIT=0",
