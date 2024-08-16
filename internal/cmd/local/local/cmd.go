@@ -356,8 +356,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 
 	if opts.LowResourceMode {
 		airbyteValues = append(airbyteValues,
-			"global.jobs.resources.requests.cpu=1m",
-			"global.jobs.resources.requests.memory=128m",
+			"server.env_vars.JOB_RESOURCE_VARIANT_OVERRIDE=lowresource",
 		)
 	} else {
 		airbyteValues = append(airbyteValues,
