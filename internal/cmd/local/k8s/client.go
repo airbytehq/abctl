@@ -76,12 +76,17 @@ var _ Client = (*DefaultK8sClient)(nil)
 
 // DefaultK8sClient converts the official kubernetes client to our more manageable (and testable) interface
 type DefaultK8sClient struct {
-	ClientSet *kubernetes.Clientset
+	ClientSet kubernetes.Interface
 }
 
 func (d *DefaultK8sClient) DeploymentRestart(ctx context.Context, namespace, name string) error {
+	return d.deploymentRestart(ctx, namespace, name, time.Now(), 5*time.Minute)
+}
+
+// internal function so the restartedAt value can be specified for testing purposes
+func (d *DefaultK8sClient) deploymentRestart(ctx context.Context, namespace, name string, restartedAt time.Time, block time.Duration) error {
 	restartedAtName := "kubectl.kubernetes.io/restartedAt"
-	restartedAtValue := time.Now().Format(time.RFC3339)
+	restartedAtValue := restartedAt.Format(time.RFC3339)
 
 	// similar to how kubectl rollout restart works, patch in a restartedAt annotation.
 	rawPatch := map[string]any{
@@ -131,13 +136,13 @@ func (d *DefaultK8sClient) DeploymentRestart(ctx context.Context, namespace, nam
 			}
 		}
 
-		// if we're here, then all the pods are running with the correct restartedAt annotation
+		// if we're here, then all the pods are running with the correct restartedAt annotation,
 		// and they're in a ready state
 		return true, nil
 	}
 
 	// check every 10 seconds for up to 5 minutes to see if the pods have been restarted successfully
-	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 5*time.Minute, true, deploymentPods)
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, block, true, deploymentPods)
 	if err != nil {
 		return fmt.Errorf("unable to restart deployment %s: %w", name, err)
 	}
@@ -191,6 +196,7 @@ func (d *DefaultK8sClient) PersistentVolumeCreate(ctx context.Context, namespace
 			Capacity: corev1.ResourceList{corev1.ResourceStorage: DefaultPersistentVolumeSize},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
+					// TODO: is this a problem on windows?
 					Path: path.Join("/var/local-path-provisioner", name),
 					Type: &hostPathType,
 				},
@@ -223,7 +229,7 @@ func (d *DefaultK8sClient) PersistentVolumeClaimCreate(ctx context.Context, name
 	storageClass := "standard"
 
 	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources:        corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: DefaultPersistentVolumeSize}},
@@ -283,7 +289,7 @@ func (d *DefaultK8sClient) SecretGet(ctx context.Context, namespace, name string
 }
 
 func (d *DefaultK8sClient) ServerVersionGet() (string, error) {
-	ver, err := d.ClientSet.DiscoveryClient.ServerVersion()
+	ver, err := d.ClientSet.Discovery().ServerVersion()
 	if err != nil {
 		return "", err
 	}
