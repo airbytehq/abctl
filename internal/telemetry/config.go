@@ -2,11 +2,12 @@ package telemetry
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 	"gopkg.in/yaml.v3"
-	"os"
-	"path/filepath"
 )
 
 const (

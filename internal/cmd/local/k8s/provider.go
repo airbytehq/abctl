@@ -2,10 +2,11 @@ package k8s
 
 import (
 	"fmt"
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
-	"github.com/pterm/pterm"
 	"os"
 	"path/filepath"
+
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/pterm/pterm"
 	"sigs.k8s.io/kind/pkg/cluster"
 	"sigs.k8s.io/kind/pkg/log"
 )

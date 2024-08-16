@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 )
 

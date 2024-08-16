@@ -1,8 +1,9 @@
 package docker
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func Test_Secret(t *testing.T) {

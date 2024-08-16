@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/mod/semver"
 	"net/http"
+
+	"golang.org/x/mod/semver"
 )
 
 var ErrDevVersion = errors.New("dev version not supported")

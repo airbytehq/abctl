@@ -3,13 +3,14 @@ package local
 import (
 	"context"
 	"fmt"
-	"github.com/airbytehq/abctl/internal/cmd/local/docker"
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
-	"github.com/pterm/pterm"
 	"io"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/pterm/pterm"
 )
 
 // dockerClient is exposed here primarily for testing purposes.

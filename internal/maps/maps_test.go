@@ -1,9 +1,10 @@
 package maps
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"os"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestFromSlice(t *testing.T) {

@@ -2,9 +2,10 @@ package maps
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"os"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // FromSlice converts a slice of dot-delimited string values into a map[string]any.

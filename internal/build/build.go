@@ -2,9 +2,10 @@ package build
 
 import (
 	"fmt"
-	"golang.org/x/mod/semver"
 	"runtime/debug"
 	"strings"
+
+	"golang.org/x/mod/semver"
 )
 
 // Version is the build of this tool.

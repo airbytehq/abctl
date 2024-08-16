@@ -3,14 +3,15 @@ package telemetry
 import (
 	"errors"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/uuid"
-	"github.com/oklog/ulid/v2"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
+	"gopkg.in/yaml.v3"
 )
 
 var ulidID = ulid.Make()
