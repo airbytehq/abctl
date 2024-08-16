@@ -23,6 +23,8 @@ var (
 	Data = data()
 	// Kubeconfig is the full path to the kubeconfig file
 	Kubeconfig = kubeconfig()
+	// FlagsYml is the full path to a managed flags.yml file
+	FlagsYml = flagsyml()
 )
 
 func airbyte() string {
@@ -39,4 +41,8 @@ func data() string {
 
 func kubeconfig() string {
 	return filepath.Join(abctl(), FileKubeconfig)
+}
+
+func flagsyml() string {
+	return filepath.Join(abctl(), "flags.yml")
 }

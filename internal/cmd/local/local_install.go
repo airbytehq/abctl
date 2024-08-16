@@ -9,6 +9,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -124,6 +125,11 @@ func NewCmdInstall(provider k8s.Provider) *cobra.Command {
 					// no existing cluster, need to create one
 					pterm.Info.Println(fmt.Sprintf("No existing cluster found, cluster '%s' will be created", provider.ClusterName))
 					spinner.UpdateText(fmt.Sprintf("Creating cluster '%s'", provider.ClusterName))
+
+					// if --low-resource-mode is enabled, create a volume mount for `flags.yml`
+					if flagLowResourceMode {
+						flagExtraVolumeMounts = append(flagExtraVolumeMounts, paths.FlagsYml)
+					}
 
 					extraVolumeMounts, err := parseVolumeMounts(flagExtraVolumeMounts)
 					if err != nil {

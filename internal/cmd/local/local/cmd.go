@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/airbytehq/abctl/internal/airbyte/config"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
@@ -355,6 +356,15 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	if opts.LowResourceMode {
+		// Create a flags.yml file with the requisite `lowresource` mode
+		err := config.NewFlagsYml().
+			Flag("platform.resource-requirements-variant", "lowresource", nil).
+			WriteTo(paths.FlagsYml)
+		if err != nil {
+			pterm.Debug.Println("Unable to create 'flags.yml'")
+			return fmt.Errorf("unable to create 'flags.yml': %w", err)
+		}
+
 		airbyteValues = append(airbyteValues,
 			"global.jobs.resources.requests.cpu=1m",
 			"global.jobs.resources.requests.memory=128m",
