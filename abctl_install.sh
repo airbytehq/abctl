@@ -225,6 +225,7 @@ _install_darwin() {
     if ! _exists brew; then
         _install_binary darwin "$(_get_arch)"
     elif brew ls --version abctl > /dev/null; then
+        brew update
         brew upgrade abctl
     else
         brew tap airbytehq/tap

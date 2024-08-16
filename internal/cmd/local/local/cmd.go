@@ -367,8 +367,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 	if opts.InsecureCookies {
 		airbyteValues = append(airbyteValues,
-			"global.auth.cookieSecureSetting=false",
-			"global.auth.cookieSameSiteSetting=None")
+			"global.auth.cookieSecureSetting=false")
 	}
 
 	if opts.dockerAuth() {
