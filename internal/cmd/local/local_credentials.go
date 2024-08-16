@@ -23,6 +23,8 @@ const (
 )
 
 func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
+	spinner := &pterm.DefaultSpinner
+
 	var (
 		flagSetPassword string
 		flagSetEmail    string
@@ -78,12 +80,12 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 						return err
 					}
 
+					spinner, _ = spinner.Start("Restarting airbyte-abctl-server")
 					if err := k8sClient.DeploymentRestart(cmd.Context(), airbyteNamespace, "airbyte-abctl-server"); err != nil {
 						pterm.Error.Println("Unable to restart airbyte-abctl-server")
 						return fmt.Errorf("unable to restart airbyte-abctl-server: %w", err)
 					}
-
-					// TODO block until the service is ready
+					spinner.Success("Restarted airbyte-abctl-server")
 				}
 
 				orgEmail, err := abAPI.GetOrgEmail(cmd.Context())
@@ -92,7 +94,7 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 					return fmt.Errorf("unable to determine organization email: %w", err)
 				}
 
-				pterm.Success.Println(fmt.Sprintf("Getting your credentials: %s", secret.Name))
+				pterm.Success.Println(fmt.Sprintf("Retreiving your credentials from '%s'", secret.Name))
 				pterm.Info.Println(fmt.Sprintf(`Credentials:
   Email: %s
   Password: %s

@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 )
@@ -25,6 +26,8 @@ var DefaultPersistentVolumeSize = resource.MustParse("500Mi")
 
 // Client primarily for testing purposes
 type Client interface {
+	// DeploymentRestart will force a restart of the deployment name in the provided namespace.
+	// This is a blocking call, it should only return once the deployment has completed.
 	DeploymentRestart(ctx context.Context, namespace, name string) error
 	// IngressCreate creates an ingress in the given namespace
 	IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
@@ -77,13 +80,16 @@ type DefaultK8sClient struct {
 }
 
 func (d *DefaultK8sClient) DeploymentRestart(ctx context.Context, namespace, name string) error {
+	restartedAtName := "kubectl.kubernetes.io/restartedAt"
+	restartedAtValue := time.Now().Format(time.RFC3339)
+
 	// similar to how kubectl rollout restart works, patch in a restartedAt annotation.
 	rawPatch := map[string]any{
 		"spec": map[string]any{
 			"template": map[string]any{
 				"metadata": map[string]any{
 					"annotations": map[string]string{
-						"kubectl.kubernetes.io/restartedAt": time.Now().Format(time.RFC3339),
+						restartedAtName: restartedAtValue,
 					},
 				},
 			},
@@ -94,9 +100,46 @@ func (d *DefaultK8sClient) DeploymentRestart(ctx context.Context, namespace, nam
 	if err != nil {
 		return fmt.Errorf("unable to marshal raw patch: %w", err)
 	}
-	_, err = d.ClientSet.AppsV1().Deployments(namespace).Patch(ctx, name, types.StrategicMergePatchType, jsonData, metav1.PatchOptions{})
+
+	deployment, err := d.ClientSet.AppsV1().Deployments(namespace).Patch(ctx, name, types.StrategicMergePatchType, jsonData, metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to fetch deployment %s: %w", name, err)
+	}
+
+	label := metav1.FormatLabelSelector(deployment.Spec.Selector)
+
+	deploymentPods := func(ctx context.Context) (bool, error) {
+		pods, err := d.ClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: label,
+		})
+		if err != nil {
+			return false, fmt.Errorf("unable to list pods for deployment %s: %w", name, err)
+		}
+
+		for _, pod := range pods.Items {
+			// if any pods are not running or are missing the restartedAt annotation
+			// then the restart isn't complete
+			if pod.Status.Phase != corev1.PodRunning || pod.ObjectMeta.Annotations[restartedAtName] != restartedAtValue {
+				return false, nil
+			}
+
+			// even though a pod is running, doesn't mean it is ready
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type == corev1.PodReady && condition.Status != corev1.ConditionTrue {
+					return false, nil
+				}
+			}
+		}
+
+		// if we're here, then all the pods are running with the correct restartedAt annotation
+		// and they're in a ready state
+		return true, nil
+	}
+
+	// check every 10 seconds for up to 5 minutes to see if the pods have been restarted successfully
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 5*time.Minute, true, deploymentPods)
+	if err != nil {
+		return fmt.Errorf("unable to restart deployment %s: %w", name, err)
 	}
 
 	return nil
