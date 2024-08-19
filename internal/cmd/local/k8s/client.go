@@ -108,7 +108,7 @@ func (d *DefaultK8sClient) deploymentRestart(ctx context.Context, namespace, nam
 
 	deployment, err := d.ClientSet.AppsV1().Deployments(namespace).Patch(ctx, name, types.StrategicMergePatchType, jsonData, metav1.PatchOptions{})
 	if err != nil {
-		return fmt.Errorf("unable to fetch deployment %s: %w", name, err)
+		return fmt.Errorf("unable to patch deployment %s: %w", name, err)
 	}
 
 	label := metav1.FormatLabelSelector(deployment.Spec.Selector)

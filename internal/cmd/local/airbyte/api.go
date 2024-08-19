@@ -16,7 +16,10 @@ const (
 	pathOrgGet = "/api/v1/organizations/get"
 	pathOrgSet = "/api/v1/organizations/update"
 	grantType  = "client_credentials"
-	orgID      = "00000000-0000-0000-0000-000000000000"
+	// orgID is the ID of the default organization created when Airbyte if first
+	// configured.  In OSS, there can only be one organization, so for our purposes
+	// we only need to care about this one default organization.
+	orgID = "00000000-0000-0000-0000-000000000000"
 )
 
 // Token represents an application token
