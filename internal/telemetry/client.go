@@ -17,17 +17,18 @@ type EventState string
 
 const (
 	Start   EventState = "started"
-	Failed  EventState = "failed"
-	Success EventState = "succeeded"
+	Failed             = "failed"
+	Success            = "succeeded"
 )
 
 type EventType string
 
 const (
-	Install   EventType = "install"
-	Migrate   EventType = "migrate"
-	Status    EventType = "status"
-	Uninstall EventType = "uninstall"
+	Credentials EventType = "credentials"
+	Install               = "install"
+	Migrate               = "migrate"
+	Status                = "status"
+	Uninstall             = "uninstall"
 )
 
 // Client interface for telemetry data.

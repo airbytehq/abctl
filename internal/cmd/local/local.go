@@ -27,16 +27,6 @@ func NewCmdLocal(provider k8s.Provider) *cobra.Command {
 
 			telClient = telemetry.Get()
 
-			{
-				// show the deprecation warning for username and password
-				userFlag, _ := cmd.Flags().GetString("username")
-				passFlag, _ := cmd.Flags().GetString("password")
-				if (userFlag != "" && userFlag != "airbyte") || (passFlag != "" && passFlag != "password") {
-					pterm.Warning.Println("The --username and --password flags have been deprecated.\n" +
-						"  Credentials now are randomly generated and can be retrieved by running\n" +
-						pterm.LightBlue("  abctl local credentials"))
-				}
-			}
 			printProviderDetails(provider)
 
 			return nil

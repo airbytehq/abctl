@@ -3,7 +3,6 @@ package local
 import (
 	"fmt"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
@@ -48,25 +47,12 @@ func NewCmdStatus(provider k8s.Provider) *cobra.Command {
 					return nil
 				}
 
-				var port int
 				pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
 				spinner.UpdateText(fmt.Sprintf("Validating existing cluster '%s'", provider.ClusterName))
 
-				// only for kind do we need to check the existing port
-				if provider.Name == k8s.Kind {
-					if dockerClient == nil {
-						dockerClient, err = docker.New(cmd.Context())
-						if err != nil {
-							pterm.Error.Printfln("Unable to connect to Docker daemon")
-							return fmt.Errorf("unable to connect to docker: %w", err)
-						}
-					}
-
-					port, err = dockerClient.Port(cmd.Context(), fmt.Sprintf("%s-control-plane", provider.ClusterName))
-					if err != nil {
-						pterm.Warning.Printfln("Unable to determine docker port for cluster '%s'", provider.ClusterName)
-						return nil
-					}
+				port, err := getPort(cmd.Context(), provider)
+				if err != nil {
+					return err
 				}
 
 				lc, err := local.New(provider,

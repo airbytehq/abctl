@@ -2,16 +2,20 @@ package k8s
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 )
@@ -22,6 +26,9 @@ var DefaultPersistentVolumeSize = resource.MustParse("500Mi")
 
 // Client primarily for testing purposes
 type Client interface {
+	// DeploymentRestart will force a restart of the deployment name in the provided namespace.
+	// This is a blocking call, it should only return once the deployment has completed.
+	DeploymentRestart(ctx context.Context, namespace, name string) error
 	// IngressCreate creates an ingress in the given namespace
 	IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
 	// IngressExists returns true if the ingress exists in the namespace, false otherwise.
@@ -54,7 +61,7 @@ type Client interface {
 	SecretCreateOrUpdate(ctx context.Context, secret corev1.Secret) error
 	SecretGet(ctx context.Context, namespace, name string) (*corev1.Secret, error)
 
-	// ServiceGet returns a the service for the given namespace and name
+	// ServiceGet returns the service for the given namespace and name
 	ServiceGet(ctx context.Context, namespace, name string) (*corev1.Service, error)
 
 	// ServerVersionGet returns the kubernetes version.
@@ -69,7 +76,78 @@ var _ Client = (*DefaultK8sClient)(nil)
 
 // DefaultK8sClient converts the official kubernetes client to our more manageable (and testable) interface
 type DefaultK8sClient struct {
-	ClientSet *kubernetes.Clientset
+	ClientSet kubernetes.Interface
+}
+
+func (d *DefaultK8sClient) DeploymentRestart(ctx context.Context, namespace, name string) error {
+	return d.deploymentRestart(ctx, namespace, name, time.Now(), 5*time.Minute)
+}
+
+// internal function so the restartedAt value can be specified for testing purposes
+func (d *DefaultK8sClient) deploymentRestart(ctx context.Context, namespace, name string, restartedAt time.Time, timeout time.Duration) error {
+	restartedAtName := "kubectl.kubernetes.io/restartedAt"
+	restartedAtValue := restartedAt.Format(time.RFC3339)
+
+	// similar to how kubectl rollout restart works, patch in a restartedAt annotation.
+	rawPatch := map[string]any{
+		"spec": map[string]any{
+			"template": map[string]any{
+				"metadata": map[string]any{
+					"annotations": map[string]string{
+						restartedAtName: restartedAtValue,
+					},
+				},
+			},
+		},
+	}
+
+	jsonData, err := json.Marshal(rawPatch)
+	if err != nil {
+		return fmt.Errorf("unable to marshal raw patch: %w", err)
+	}
+
+	deployment, err := d.ClientSet.AppsV1().Deployments(namespace).Patch(ctx, name, types.StrategicMergePatchType, jsonData, metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("unable to patch deployment %s: %w", name, err)
+	}
+
+	label := metav1.FormatLabelSelector(deployment.Spec.Selector)
+
+	deploymentPods := func(ctx context.Context) (bool, error) {
+		pods, err := d.ClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: label,
+		})
+		if err != nil {
+			return false, fmt.Errorf("unable to list pods for deployment %s: %w", name, err)
+		}
+
+		for _, pod := range pods.Items {
+			// if any pods are not running or are missing the restartedAt annotation
+			// then the restart isn't complete
+			if pod.Status.Phase != corev1.PodRunning || pod.ObjectMeta.Annotations[restartedAtName] != restartedAtValue {
+				return false, nil
+			}
+
+			// even though a pod is running, doesn't mean it is ready
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type == corev1.PodReady && condition.Status != corev1.ConditionTrue {
+					return false, nil
+				}
+			}
+		}
+
+		// if we're here, then all the pods are running with the correct restartedAt annotation,
+		// and they're in a ready state
+		return true, nil
+	}
+
+	// check every 5 seconds for up to timeout duration to see if the pods have been restarted successfully
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true, deploymentPods)
+	if err != nil {
+		return fmt.Errorf("unable to restart deployment %s: %w", name, err)
+	}
+
+	return nil
 }
 
 func (d *DefaultK8sClient) IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
@@ -118,6 +196,7 @@ func (d *DefaultK8sClient) PersistentVolumeCreate(ctx context.Context, namespace
 			Capacity: corev1.ResourceList{corev1.ResourceStorage: DefaultPersistentVolumeSize},
 			PersistentVolumeSource: corev1.PersistentVolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
+					// TODO: is this a problem on windows?
 					Path: path.Join("/var/local-path-provisioner", name),
 					Type: &hostPathType,
 				},
@@ -150,7 +229,7 @@ func (d *DefaultK8sClient) PersistentVolumeClaimCreate(ctx context.Context, name
 	storageClass := "standard"
 
 	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources:        corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: DefaultPersistentVolumeSize}},
@@ -210,7 +289,7 @@ func (d *DefaultK8sClient) SecretGet(ctx context.Context, namespace, name string
 }
 
 func (d *DefaultK8sClient) ServerVersionGet() (string, error) {
-	ver, err := d.ClientSet.DiscoveryClient.ServerVersion()
+	ver, err := d.ClientSet.Discovery().ServerVersion()
 	if err != nil {
 		return "", err
 	}

@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/pterm/pterm"
 )
@@ -109,4 +111,24 @@ func portAvailable(ctx context.Context, port int) error {
 
 	pterm.Success.Printfln("Port %d appears to be available", port)
 	return nil
+}
+
+func getPort(ctx context.Context, provider k8s.Provider) (int, error) {
+	var err error
+
+	if dockerClient == nil {
+		dockerClient, err = docker.New(ctx)
+		if err != nil {
+			pterm.Error.Printfln("Unable to connect to Docker daemon")
+			return 0, fmt.Errorf("unable to connect to docker: %w", err)
+		}
+	}
+
+	clusterPort, err := dockerClient.Port(ctx, fmt.Sprintf("%s-control-plane", provider.ClusterName))
+	if err != nil {
+		pterm.Error.Printfln("Unable to determine docker port for cluster '%s'", provider.ClusterName)
+		return 0, errors.New("unable to determine port cluster was installed with")
+	}
+
+	return clusterPort, nil
 }

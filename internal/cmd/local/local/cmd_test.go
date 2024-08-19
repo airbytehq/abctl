@@ -411,6 +411,7 @@ func (m *mockHelmClient) UninstallReleaseByName(s string) error {
 var _ k8s.Client = (*mockK8sClient)(nil)
 
 type mockK8sClient struct {
+	deploymentRestart           func(ctx context.Context, namespace, name string) error
 	ingressCreate               func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
 	ingressExists               func(ctx context.Context, namespace string, ingress string) bool
 	ingressUpdate               func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
@@ -429,6 +430,13 @@ type mockK8sClient struct {
 	serverVersionGet            func() (string, error)
 	eventsWatch                 func(ctx context.Context, namespace string) (watch.Interface, error)
 	logsGet                     func(ctx context.Context, namespace string, name string) (string, error)
+}
+
+func (m *mockK8sClient) DeploymentRestart(ctx context.Context, namespace, name string) error {
+	if m.deploymentRestart == nil {
+		return m.deploymentRestart(ctx, namespace, name)
+	}
+	return nil
 }
 
 func (m *mockK8sClient) IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
