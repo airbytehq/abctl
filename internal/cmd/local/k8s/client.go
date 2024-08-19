@@ -141,7 +141,7 @@ func (d *DefaultK8sClient) deploymentRestart(ctx context.Context, namespace, nam
 		return true, nil
 	}
 
-	// check every 10 seconds for up to 5 minutes to see if the pods have been restarted successfully
+	// check every 5 seconds for up to timeout duration to see if the pods have been restarted successfully
 	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true, deploymentPods)
 	if err != nil {
 		return fmt.Errorf("unable to restart deployment %s: %w", name, err)
