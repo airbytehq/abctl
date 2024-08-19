@@ -16,6 +16,7 @@ const (
 	pathOrgGet = "/api/v1/organizations/get"
 	pathOrgSet = "/api/v1/organizations/update"
 	grantType  = "client_credentials"
+	orgID      = "00000000-0000-0000-0000-000000000000"
 )
 
 // Token represents an application token
@@ -45,6 +46,14 @@ type Airbyte struct {
 func WithHTTPClient(h HTTPClient) Option {
 	return func(a *Airbyte) {
 		a.h = h
+	}
+}
+
+// WithToken sets the token to use with this client.
+// Primarily for testing purposes
+func WithToken(token Token) Option {
+	return func(a *Airbyte) {
+		a.token = token
 	}
 }
 
@@ -92,6 +101,10 @@ func (a *Airbyte) SetOrgEmail(ctx context.Context, email string) error {
 	return nil
 }
 
+type orgReq struct {
+	OrgID string `json:"organizationId"`
+}
+
 // getOrg returns the default organization "00000000-0000-0000-0000-000000000000".
 func (a *Airbyte) getOrg(ctx context.Context) (organization, error) {
 	token, err := a.fetchToken(ctx)
@@ -99,11 +112,7 @@ func (a *Airbyte) getOrg(ctx context.Context) (organization, error) {
 		return organization{}, fmt.Errorf("unable to fetch token: %w", err)
 	}
 
-	type orgReq struct {
-		OrgID string `json:"organizationId"`
-	}
-
-	jsonData, err := json.Marshal(orgReq{OrgID: "00000000-0000-0000-0000-000000000000"})
+	jsonData, err := json.Marshal(orgReq{OrgID: orgID})
 	if err != nil {
 		return organization{}, fmt.Errorf("unable to marshal organization request: %w", err)
 	}
@@ -118,7 +127,7 @@ func (a *Airbyte) getOrg(ctx context.Context) (organization, error) {
 
 	res, err := a.h.Do(req)
 	if err != nil {
-		fmt.Errorf("unable to send organization request: %w", err)
+		return organization{}, fmt.Errorf("unable to send organization request: %w", err)
 	}
 
 	resBody, err := io.ReadAll(res.Body)
@@ -157,7 +166,7 @@ func (a *Airbyte) setOrg(ctx context.Context, org organization) error {
 
 	res, err := a.h.Do(req)
 	if err != nil {
-		fmt.Errorf("unable to send organization request: %w", err)
+		return fmt.Errorf("unable to send organization request: %w", err)
 	}
 	_ = res.Body.Close()
 
@@ -167,6 +176,17 @@ func (a *Airbyte) setOrg(ctx context.Context, org organization) error {
 
 	return nil
 }
+
+type (
+	tokenRequest struct {
+		GrantType    string `json:"grant_type"`
+		ClientID     string `json:"client_id"`
+		ClientSecret string `json:"client_secret"`
+	}
+	tokenResponse struct {
+		AccessToken string `json:"access_token"`
+	}
+)
 
 // fetchToken returns the application token for the ClientID and ClientSecret.
 // The token will be cached when first called, returning the cached value for every following call.
@@ -181,17 +201,6 @@ func (a *Airbyte) fetchToken(ctx context.Context) (Token, error) {
 	if a.token != "" {
 		return a.token, nil
 	}
-
-	type (
-		tokenResponse struct {
-			AccessToken string `json:"access_token"`
-		}
-		tokenRequest struct {
-			GrantType    string `json:"grant_type"`
-			ClientID     string `json:"client_id"`
-			ClientSecret string `json:"client_secret"`
-		}
-	)
 
 	jsonData, err := json.Marshal(tokenRequest{GrantType: grantType, ClientID: a.clientID, ClientSecret: a.clientSecret})
 	if err != nil {
