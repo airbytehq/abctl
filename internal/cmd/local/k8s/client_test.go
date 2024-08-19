@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apimachinery/pkg/watch"
-	fake2 "k8s.io/client-go/discovery/fake"
+	fakeDiscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	testingk8s "k8s.io/client-go/testing"
 )
@@ -999,7 +999,7 @@ func TestDefaultK8sClient_SecretGet(t *testing.T) {
 func TestDefaultK8sClient_ServerVersionGet(t *testing.T) {
 	expected := "v12.15"
 	cs := fake.NewSimpleClientset()
-	cs.Discovery().(*fake2.FakeDiscovery).FakedServerVersion = &version.Info{GitVersion: expected}
+	cs.Discovery().(*fakeDiscovery.FakeDiscovery).FakedServerVersion = &version.Info{GitVersion: expected}
 
 	cli := &DefaultK8sClient{ClientSet: cs}
 
