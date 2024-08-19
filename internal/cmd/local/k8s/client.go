@@ -84,7 +84,7 @@ func (d *DefaultK8sClient) DeploymentRestart(ctx context.Context, namespace, nam
 }
 
 // internal function so the restartedAt value can be specified for testing purposes
-func (d *DefaultK8sClient) deploymentRestart(ctx context.Context, namespace, name string, restartedAt time.Time, block time.Duration) error {
+func (d *DefaultK8sClient) deploymentRestart(ctx context.Context, namespace, name string, restartedAt time.Time, timeout time.Duration) error {
 	restartedAtName := "kubectl.kubernetes.io/restartedAt"
 	restartedAtValue := restartedAt.Format(time.RFC3339)
 
@@ -142,7 +142,7 @@ func (d *DefaultK8sClient) deploymentRestart(ctx context.Context, namespace, nam
 	}
 
 	// check every 10 seconds for up to 5 minutes to see if the pods have been restarted successfully
-	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, block, true, deploymentPods)
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true, deploymentPods)
 	if err != nil {
 		return fmt.Errorf("unable to restart deployment %s: %w", name, err)
 	}
