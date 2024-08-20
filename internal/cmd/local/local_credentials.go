@@ -93,6 +93,9 @@ func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
 					pterm.Error.Println("Unable to determine organization email")
 					return fmt.Errorf("unable to determine organization email: %w", err)
 				}
+				if orgEmail == "" {
+					orgEmail = "[not set]"
+				}
 
 				pterm.Success.Println(fmt.Sprintf("Retreiving your credentials from '%s'", secret.Name))
 				pterm.Info.Println(fmt.Sprintf(`Credentials:
