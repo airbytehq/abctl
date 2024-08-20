@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"os"
 
@@ -9,8 +8,8 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/version"
+	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
-	"github.com/spf13/cobra"
 )
 
 // Help messages to display for specific error situations.
@@ -40,67 +39,58 @@ This could be in indication that the ingress port is already in use by a differe
 The ingress port can be changed by passing the flag --port.`
 )
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute(ctx context.Context, cmd *cobra.Command) {
-	if err := cmd.ExecuteContext(ctx); err != nil {
-		pterm.Error.Println(err)
-
-		switch {
-		case errors.Is(err, localerr.ErrAirbyteDir):
-			pterm.Println()
-			pterm.Info.Println(helpAirbyteDir)
-		case errors.Is(err, localerr.ErrDocker):
-			pterm.Println()
-			pterm.Info.Println(helpDocker)
-		case errors.Is(err, localerr.ErrKubernetes):
-			pterm.Println()
-			pterm.Info.Println(helpKubernetes)
-		case errors.Is(err, localerr.ErrIngress):
-			pterm.Println()
-			pterm.Info.Println(helpIngress)
-		case errors.Is(err, localerr.ErrPort):
-			pterm.Println()
-			pterm.Info.Printfln(helpPort)
-		}
-
-		os.Exit(1)
+func HandleErr(err error) {
+	if err == nil {
+		return
 	}
+
+	pterm.Error.Println(err)
+
+	var errParse *kong.ParseError
+	if errors.As(err, &errParse) {
+		_ = kong.DefaultHelpPrinter(kong.HelpOptions{}, errParse.Context)
+	}
+
+	switch {
+	case errors.Is(err, localerr.ErrAirbyteDir):
+		pterm.Println()
+		pterm.Info.Println(helpAirbyteDir)
+	case errors.Is(err, localerr.ErrDocker):
+		pterm.Println()
+		pterm.Info.Println(helpDocker)
+	case errors.Is(err, localerr.ErrKubernetes):
+		pterm.Println()
+		pterm.Info.Println(helpKubernetes)
+	case errors.Is(err, localerr.ErrIngress):
+		pterm.Println()
+		pterm.Info.Println(helpIngress)
+	case errors.Is(err, localerr.ErrPort):
+		pterm.Println()
+		pterm.Info.Printfln(helpPort)
+	}
+
+	os.Exit(1)
 }
 
-// NewCmd returns the abctl root cobra command.
-func NewCmd() *cobra.Command {
-	cobra.EnableTraverseRunHooks = true
+type verbose bool
 
-	var (
-		flagVerbose bool
-	)
+func (v verbose) BeforeApply() error {
+	pterm.EnableDebugMessages()
+	return nil
+}
 
-	cmd := &cobra.Command{
-		Use:   "abctl",
-		Short: pterm.LightBlue("Airbyte") + "'s command line tool",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if flagVerbose {
-				pterm.EnableDebugMessages()
-			}
+type Cmd struct {
+	Local   local.Cmd   `cmd:"" help:"Manage the local Airbyte installation."`
+	Version version.Cmd `cmd:"" help:"Display version information."`
+	Verbose verbose     `short:"v" help:"Enable verbose output."`
+}
 
-			if _, envVarDNT := os.LookupEnv("DO_NOT_TRACK"); envVarDNT {
-				pterm.Info.Println("Telemetry collection disabled (DO_NOT_TRACK)")
-			}
-
-			return nil
-		},
+func (c *Cmd) BeforeApply(ctx *kong.Context) error {
+	//fmt.Println("root before apply")
+	if _, envVarDNT := os.LookupEnv("DO_NOT_TRACK"); envVarDNT {
+		pterm.Info.Println("Telemetry collection disabled (DO_NOT_TRACK)")
 	}
+	ctx.BindTo(k8s.DefaultProvider, (*k8s.Provider)(nil))
 
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
-	cmd.CompletionOptions.DisableDefaultCmd = true
-	cmd.FParseErrWhitelist.UnknownFlags = true
-
-	cmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "enable verbose output")
-
-	cmd.AddCommand(version.NewCmdVersion())
-	cmd.AddCommand(local.NewCmdLocal(k8s.DefaultProvider))
-
-	return cmd
+	return nil
 }

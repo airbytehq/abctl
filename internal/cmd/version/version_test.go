@@ -79,9 +79,9 @@ func TestCmd_Output(t *testing.T) {
 			build.ModificationTime = tt.modificationTime
 			build.Modified = tt.modified
 
-			cmd := NewCmdVersion()
+			cmd := Cmd{}
 
-			if err := cmd.Execute(); err != nil {
+			if err := cmd.Run(); err != nil {
 				t.Fatal(err)
 			}
 
