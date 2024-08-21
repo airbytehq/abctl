@@ -14,7 +14,7 @@ type UninstallCmd struct {
 	Persisted bool `help:"Remove persisted data."`
 }
 
-func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider) error {
+func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
 	spinner := &pterm.DefaultSpinner
 
 	spinner, _ = spinner.Start("Starting uninstallation")

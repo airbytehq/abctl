@@ -29,7 +29,7 @@ type InstallCmd struct {
 	Volume          []string `help:"Additional volume mounts. Must be in the format <HOST_PATH>:<GUEST_PATH>."`
 }
 
-func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider) error {
+func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
 	spinner := &pterm.DefaultSpinner
 	spinner, _ = spinner.Start("Starting installation")
 	spinner.UpdateText("Checking for Docker installation")

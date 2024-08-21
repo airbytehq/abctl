@@ -27,7 +27,7 @@ type CredentialsCmd struct {
 	Password string `help:"Specify a new password to use for authentication."`
 }
 
-func (cc *CredentialsCmd) Run(ctx context.Context, provider k8s.Provider) error {
+func (cc *CredentialsCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
 	spinner := &pterm.DefaultSpinner
 
 	return telClient.Wrap(ctx, telemetry.Credentials, func() error {

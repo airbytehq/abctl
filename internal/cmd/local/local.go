@@ -9,11 +9,8 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
-	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 )
-
-var telClient telemetry.Client
 
 type Cmd struct {
 	Credentials CredentialsCmd `cmd:"" help:"Get local Airbyte user credentials."`
@@ -27,7 +24,7 @@ func (c *Cmd) BeforeApply() error {
 		return fmt.Errorf("%w: %w", localerr.ErrAirbyteDir, err)
 	}
 
-	telClient = telemetry.Get()
+	//telClient = telemetry.Get()
 	return nil
 }
 

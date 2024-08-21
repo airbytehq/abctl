@@ -12,18 +12,18 @@ import (
 
 type StatusCmd struct{}
 
-func (s *StatusCmd) Run(ctx context.Context, provider k8s.Provider) error {
+func (s *StatusCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
 	spinner := &pterm.DefaultSpinner
-	if err := checkDocker(ctx, spinner); err != nil {
+	if err := checkDocker(ctx, telClient, spinner); err != nil {
 		return err
 	}
 
 	return telClient.Wrap(ctx, telemetry.Status, func() error {
-		return status(ctx, provider, spinner)
+		return status(ctx, provider, telClient, spinner)
 	})
 }
 
-func checkDocker(ctx context.Context, spinner *pterm.SpinnerPrinter) error {
+func checkDocker(ctx context.Context, telClient telemetry.Client, spinner *pterm.SpinnerPrinter) error {
 	spinner, _ = spinner.Start("Starting status check")
 	spinner.UpdateText("Checking for Docker installation")
 
@@ -40,7 +40,7 @@ func checkDocker(ctx context.Context, spinner *pterm.SpinnerPrinter) error {
 	return nil
 }
 
-func status(ctx context.Context, provider k8s.Provider, spinner *pterm.SpinnerPrinter) error {
+func status(ctx context.Context, provider k8s.Provider, telClient telemetry.Client, spinner *pterm.SpinnerPrinter) error {
 	spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
 	cluster, err := provider.Cluster()

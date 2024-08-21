@@ -8,6 +8,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/version"
+	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 )
@@ -86,11 +87,11 @@ type Cmd struct {
 }
 
 func (c *Cmd) BeforeApply(ctx *kong.Context) error {
-	//fmt.Println("root before apply")
 	if _, envVarDNT := os.LookupEnv("DO_NOT_TRACK"); envVarDNT {
 		pterm.Info.Println("Telemetry collection disabled (DO_NOT_TRACK)")
 	}
 	ctx.BindTo(k8s.DefaultProvider, (*k8s.Provider)(nil))
+	ctx.BindTo(telemetry.Get(), (*telemetry.Client)(nil))
 
 	return nil
 }
