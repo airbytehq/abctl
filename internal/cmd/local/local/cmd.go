@@ -724,6 +724,8 @@ func (c *Command) handleChart(
 			} else {
 				pterm.Debug.Println(fmt.Sprintf("Uninstalled Helm Chart %s", req.chartRelease))
 			}
+		case install:
+			pterm.Debug.Println(fmt.Sprintf("Will only attempt to install Helm Chart %s", req.chartRelease))
 		default:
 			pterm.Debug.Println(fmt.Sprintf("Unexpected response %d", action))
 		}
@@ -860,6 +862,7 @@ type helmReleaseAction int
 
 const (
 	none helmReleaseAction = iota
+	install
 	uninstall
 )
 
@@ -875,11 +878,12 @@ func determineHelmChartAction(helm helm.Client, chart *chart.Chart, releaseName 
 		if strings.Contains(err.Error(), "not found") {
 			// chart hasn't been installed previously
 			pterm.Debug.Println(fmt.Sprintf("Unable to find %s Helm Release", releaseName))
+			return install
 		} else {
 			// chart may or may not exist, log error and ignore
 			pterm.Debug.Println(fmt.Sprintf("Unable to fetch %s Helm Release: %s", releaseName, err))
+			return uninstall
 		}
-		return uninstall
 	}
 
 	if rel.Info.Status != release.StatusDeployed {
