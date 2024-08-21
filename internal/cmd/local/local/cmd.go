@@ -708,8 +708,8 @@ func (c *Command) handleChart(
 	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
 
 	if req.uninstallFirst {
-		action := determineHelmChartAction(c.helm, helmChart, req.chartRelease)
-		switch action {
+		chartAction := determineHelmChartAction(c.helm, helmChart, req.chartRelease)
+		switch chartAction {
 		case none:
 			pterm.Success.Println(fmt.Sprintf(
 				"Found matching existing Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  AppVersion: %s",
@@ -727,7 +727,7 @@ func (c *Command) handleChart(
 		case install:
 			pterm.Debug.Println(fmt.Sprintf("Will only attempt to install Helm Chart %s", req.chartRelease))
 		default:
-			pterm.Debug.Println(fmt.Sprintf("Unexpected response %d", action))
+			pterm.Debug.Println(fmt.Sprintf("Unexpected response %d", chartAction))
 		}
 	}
 
@@ -869,8 +869,8 @@ const (
 // determineHelmChartAction determines the state of the existing chart compared
 // to what chart is being considered for installation.
 //
-// returns none if no additional action needs to be taken, uninstall if the chart exists and the
-// version differs or not.
+// Returns none if no additional action needs to be taken. uninstall if the chart exists and the
+// version differs. install if the chart doesn't exist and needs to be created.
 func determineHelmChartAction(helm helm.Client, chart *chart.Chart, releaseName string) helmReleaseAction {
 	// look for an existing release, see if it matches the existing chart
 	rel, err := helm.GetRelease(releaseName)
