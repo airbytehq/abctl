@@ -24,7 +24,6 @@ func (c *Cmd) BeforeApply() error {
 		return fmt.Errorf("%w: %w", localerr.ErrAirbyteDir, err)
 	}
 
-	//telClient = telemetry.Get()
 	return nil
 }
 
