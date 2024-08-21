@@ -717,15 +717,15 @@ func (c *Command) handleChart(
 			))
 			return nil
 		case uninstall:
-			pterm.Debug.Println(fmt.Sprintf("Attempting to uninstall Helm Chart %s", req.chartRelease))
+			pterm.Debug.Println(fmt.Sprintf("Attempting to uninstall Helm Release %s", req.chartRelease))
 			if err := c.helm.UninstallReleaseByName(req.chartRelease); err != nil {
-				pterm.Error.Println(fmt.Sprintf("Unable to uninstall Helm Chart %s", req.chartRelease))
-				return fmt.Errorf("unable to uninstall Helm Chart %s: %w", req.chartRelease, err)
+				pterm.Error.Println(fmt.Sprintf("Unable to uninstall Helm Release %s", req.chartRelease))
+				return fmt.Errorf("unable to uninstall Helm Release %s: %w", req.chartRelease, err)
 			} else {
-				pterm.Debug.Println(fmt.Sprintf("Uninstalled Helm Chart %s", req.chartRelease))
+				pterm.Debug.Println(fmt.Sprintf("Uninstalled Helm Release %s", req.chartRelease))
 			}
 		case install:
-			pterm.Debug.Println(fmt.Sprintf("Will only attempt to install Helm Chart %s", req.chartRelease))
+			pterm.Debug.Println(fmt.Sprintf("Will only attempt to install Helm Release %s", req.chartRelease))
 		default:
 			pterm.Debug.Println(fmt.Sprintf("Unexpected response %d", chartAction))
 		}
