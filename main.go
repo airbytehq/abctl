@@ -45,12 +45,10 @@ func main() {
 
 	var root cmd.Cmd
 	parser, err := kong.New(
-		//parsed := kong.Parse(
 		&root,
 		kong.Name("abctl"),
 		kong.Description("Airbyte's command line tool for managing a local Airbyte installation."),
 		kong.UsageOnError(),
-		//kong.ShortUsageOnError(),
 	)
 	if err != nil {
 		cmd.HandleErr(err)
@@ -64,9 +62,6 @@ func main() {
 	}
 
 	cmd.HandleErr(parsed.Run())
-	//cmd.HandleErr(parsed.Run())
-	//root := cmd.NewCmd()
-	//cmd.Execute(ctx, root)
 
 	newRelease := <-updateChan
 	if newRelease.err != nil {
