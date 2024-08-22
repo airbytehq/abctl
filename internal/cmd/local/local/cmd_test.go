@@ -138,6 +138,14 @@ func TestCommand_Install(t *testing.T) {
 
 			return &expChart[expChartCnt].release, nil
 		},
+
+		uninstallReleaseByName: func(s string) error {
+			if d := cmp.Diff(expChart[expChartCnt].release.Name, s); d != "" {
+				t.Error("release mismatch", d)
+			}
+
+			return nil
+		},
 	}
 
 	k8sClient := mockK8sClient{
@@ -297,6 +305,14 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 			defer func() { expChartCnt++ }()
 
 			return &expChart[expChartCnt].release, nil
+		},
+
+		uninstallReleaseByName: func(s string) error {
+			if d := cmp.Diff(expChart[expChartCnt].release.Name, s); d != "" {
+				t.Error("release mismatch", d)
+			}
+
+			return nil
 		},
 	}
 
