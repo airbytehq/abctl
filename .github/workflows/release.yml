@@ -24,5 +24,5 @@ jobs:
       - uses: ncipollo/release-action@v1
         with:
           generateReleaseNotes: true
-          artifacts: "build/release/*.tar.gz"
+          artifacts: "build/release/*.tar.gz,build/release/*.zip"
         
