@@ -25,4 +25,20 @@ jobs:
         with:
           generateReleaseNotes: true
           artifacts: "build/release/*.tar.gz,build/release/*.zip"
+      - uses: actions/checkout@v4
+        with:
+          repository: abuchanan-airbyte/homebrew-tap
+          ssh-key: ${{ secrets.ABCTL_HOMEBREW_KEY }}
+      - name: Replace version
+        run: |
+          sed -i 's/ABCTL_VERSION = ".*"/ABCTL_VERSION = "'$ABCTL_VERSION'"/' Formula/abctl.rb
+      - name: Show diff
+        run: git diff
+      - name: Commit changes
+        run: |
+          git config user.email "robot@airbyte.io"
+          git config user.name "abctl release action"
+          git commit -a -m "Update abctl to $ABCTL_VERSION"
+      - name: Push change
+        run: git push
         
