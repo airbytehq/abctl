@@ -9,34 +9,27 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
-	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
-	"github.com/spf13/cobra"
 )
 
-var telClient telemetry.Client
+type Cmd struct {
+	Credentials CredentialsCmd `cmd:"" help:"Get local Airbyte user credentials."`
+	Install     InstallCmd     `cmd:"" help:"Install local Airbyte."`
+	Status      StatusCmd      `cmd:"" help:"Get local Airbyte status."`
+	Uninstall   UninstallCmd   `cmd:"" help:"Uninstall local Airbyte."`
+}
 
-// NewCmdLocal represents the local command.
-func NewCmdLocal(provider k8s.Provider) *cobra.Command {
-	cmd := &cobra.Command{
-		Use: "local",
-		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			if err := checkAirbyteDir(); err != nil {
-				return fmt.Errorf("%w: %w", localerr.ErrAirbyteDir, err)
-			}
-
-			telClient = telemetry.Get()
-
-			printProviderDetails(provider)
-
-			return nil
-		},
-		Short: "Manages local Airbyte installations",
+func (c *Cmd) BeforeApply() error {
+	if err := checkAirbyteDir(); err != nil {
+		return fmt.Errorf("%w: %w", localerr.ErrAirbyteDir, err)
 	}
 
-	cmd.AddCommand(NewCmdInstall(provider), NewCmdUninstall(provider), NewCmdStatus(provider), NewCmdCredentials(provider))
+	return nil
+}
 
-	return cmd
+func (c *Cmd) AfterApply(provider k8s.Provider) error {
+	printProviderDetails(provider)
+	return nil
 }
 
 func printProviderDetails(p k8s.Provider) {

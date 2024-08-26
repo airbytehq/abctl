@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/airbyte"
@@ -8,7 +9,6 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
-	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -22,96 +22,85 @@ const (
 	secretClientSecret = "instance-admin-client-secret"
 )
 
-func NewCmdCredentials(provider k8s.Provider) *cobra.Command {
+type CredentialsCmd struct {
+	Email    string `help:"Specify a new email address to use for authentication."`
+	Password string `help:"Specify a new password to use for authentication."`
+}
+
+func (cc *CredentialsCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
 	spinner := &pterm.DefaultSpinner
 
-	var (
-		flagSetPassword string
-		flagSetEmail    string
-	)
+	return telClient.Wrap(ctx, telemetry.Credentials, func() error {
+		k8sClient, err := defaultK8s(provider.Kubeconfig, provider.Context)
+		if err != nil {
+			pterm.Error.Println("No existing cluster found")
+			return nil
+		}
 
-	cmd := &cobra.Command{
-		Use:   "credentials",
-		Short: "Get Airbyte user credentials",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return telClient.Wrap(cmd.Context(), telemetry.Credentials, func() error {
-				k8sClient, err := defaultK8s(provider.Kubeconfig, provider.Context)
-				if err != nil {
-					pterm.Error.Println("No existing cluster found")
-					return nil
-				}
+		secret, err := k8sClient.SecretGet(ctx, airbyteNamespace, airbyteAuthSecretName)
+		if err != nil {
+			return err
+		}
 
-				secret, err := k8sClient.SecretGet(cmd.Context(), airbyteNamespace, airbyteAuthSecretName)
-				if err != nil {
-					return err
-				}
+		clientId := string(secret.Data[secretClientID])
+		clientSecret := string(secret.Data[secretClientSecret])
 
-				clientId := string(secret.Data[secretClientID])
-				clientSecret := string(secret.Data[secretClientSecret])
+		port, err := getPort(ctx, provider)
+		if err != nil {
+			return err
+		}
 
-				port, err := getPort(cmd.Context(), provider)
-				if err != nil {
-					return err
-				}
+		abAPI := airbyte.New(fmt.Sprintf("http://localhost:%d", port), clientId, clientSecret)
 
-				abAPI := airbyte.New(fmt.Sprintf("http://localhost:%d", port), clientId, clientSecret)
+		if cc.Email != "" {
+			pterm.Info.Println("Updating email for authentication")
+			if err := abAPI.SetOrgEmail(ctx, cc.Email); err != nil {
+				pterm.Error.Println("Unable to update the email address")
+				return fmt.Errorf("unable to udpate the email address: %w", err)
+			}
+			pterm.Success.Println("Email updated")
+		}
 
-				if flagSetEmail != "" {
-					pterm.Info.Println("Updating email for authentication")
-					if err := abAPI.SetOrgEmail(cmd.Context(), flagSetEmail); err != nil {
-						pterm.Error.Println("Unable to update the email address")
-						return fmt.Errorf("unable to udpate the email address: %w", err)
-					}
-					pterm.Success.Println("Email updated")
-				}
+		if cc.Password != "" && cc.Password != string(secret.Data[secretPassword]) {
+			pterm.Info.Println("Updating password for authentication")
+			secret.Data[secretPassword] = []byte(cc.Password)
+			if err := k8sClient.SecretCreateOrUpdate(ctx, *secret); err != nil {
+				pterm.Error.Println("Unable to update the password")
+				return fmt.Errorf("unable to update the password: %w", err)
+			}
+			pterm.Success.Println("Password updated")
 
-				if flagSetPassword != "" && flagSetPassword != string(secret.Data[secretPassword]) {
-					pterm.Info.Println("Updating password for authentication")
-					secret.Data[secretPassword] = []byte(flagSetPassword)
-					if err := k8sClient.SecretCreateOrUpdate(cmd.Context(), *secret); err != nil {
-						pterm.Error.Println("Unable to update the password")
-						return fmt.Errorf("unable to update the password: %w", err)
-					}
-					pterm.Success.Println("Password updated")
+			// as the secret was updated, fetch it again
+			secret, err = k8sClient.SecretGet(ctx, airbyteNamespace, airbyteAuthSecretName)
+			if err != nil {
+				return err
+			}
 
-					// as the secret was updated, fetch it again
-					secret, err = k8sClient.SecretGet(cmd.Context(), airbyteNamespace, airbyteAuthSecretName)
-					if err != nil {
-						return err
-					}
+			spinner, _ = spinner.Start("Restarting airbyte-abctl-server")
+			if err := k8sClient.DeploymentRestart(ctx, airbyteNamespace, "airbyte-abctl-server"); err != nil {
+				pterm.Error.Println("Unable to restart airbyte-abctl-server")
+				return fmt.Errorf("unable to restart airbyte-abctl-server: %w", err)
+			}
+			spinner.Success("Restarted airbyte-abctl-server")
+		}
 
-					spinner, _ = spinner.Start("Restarting airbyte-abctl-server")
-					if err := k8sClient.DeploymentRestart(cmd.Context(), airbyteNamespace, "airbyte-abctl-server"); err != nil {
-						pterm.Error.Println("Unable to restart airbyte-abctl-server")
-						return fmt.Errorf("unable to restart airbyte-abctl-server: %w", err)
-					}
-					spinner.Success("Restarted airbyte-abctl-server")
-				}
+		orgEmail, err := abAPI.GetOrgEmail(ctx)
+		if err != nil {
+			pterm.Error.Println("Unable to determine organization email")
+			return fmt.Errorf("unable to determine organization email: %w", err)
+		}
+		if orgEmail == "" {
+			orgEmail = "[not set]"
+		}
 
-				orgEmail, err := abAPI.GetOrgEmail(cmd.Context())
-				if err != nil {
-					pterm.Error.Println("Unable to determine organization email")
-					return fmt.Errorf("unable to determine organization email: %w", err)
-				}
-				if orgEmail == "" {
-					orgEmail = "[not set]"
-				}
-
-				pterm.Success.Println(fmt.Sprintf("Retreiving your credentials from '%s'", secret.Name))
-				pterm.Info.Println(fmt.Sprintf(`Credentials:
+		pterm.Success.Println(fmt.Sprintf("Retreiving your credentials from '%s'", secret.Name))
+		pterm.Info.Println(fmt.Sprintf(`Credentials:
   Email: %s
   Password: %s
   Client-Id: %s
   Client-Secret: %s`, orgEmail, secret.Data[secretPassword], clientId, clientSecret))
-				return nil
-			})
-		},
-	}
-
-	cmd.Flags().StringVar(&flagSetEmail, "email", "", "specify the new email address for authentication")
-	cmd.Flags().StringVar(&flagSetPassword, "password", "", "specify the new password for authentication")
-
-	return cmd
+		return nil
+	})
 }
 
 func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
