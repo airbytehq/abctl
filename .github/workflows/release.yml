@@ -1,0 +1,28 @@
+on:
+  push:
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+name: Create Release
+
+jobs:
+  create-release:
+    name: Build and Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the version
+        id: get_version
+        run: echo "ABCTL_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+           go-version: 'stable'
+      - name: Make Release
+        run: make clean release
+      - name: Check version
+        run: ./build/release/abctl-$ABCTL_VERSION-linux-amd64/abctl version
+      - uses: ncipollo/release-action@v1
+        with:
+          generateReleaseNotes: true
+          artifacts: "build/release/*.tar.gz,build/release/*.zip"
+        
