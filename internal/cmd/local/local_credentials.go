@@ -93,7 +93,7 @@ func (cc *CredentialsCmd) Run(ctx context.Context, provider k8s.Provider, telCli
 			orgEmail = "[not set]"
 		}
 
-		pterm.Success.Println(fmt.Sprintf("Retreiving your credentials from '%s'", secret.Name))
+		pterm.Success.Println(fmt.Sprintf("Retrieving your credentials from '%s'", secret.Name))
 		pterm.Info.Println(fmt.Sprintf(`Credentials:
   Email: %s
   Password: %s
