@@ -36,8 +36,8 @@ jobs:
         run: git diff
       - name: Commit changes
         run: |
-          git config user.email "robot@airbyte.io"
-          git config user.name "abctl release action"
+          git config user.email ${{ secrets.PRODENG_BOT_EMAIL }}
+          git config user.name "airbyte-prodeng"
           git commit -a -m "chore: update abctl to $ABCTL_VERSION"
       - name: Push change
         run: git push
