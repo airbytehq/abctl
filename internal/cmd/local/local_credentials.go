@@ -104,10 +104,10 @@ func (cc *CredentialsCmd) Run(ctx context.Context, provider k8s.Provider, telCli
 }
 
 func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
-	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
-	}
+	k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
+		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
+	)
 
 	restCfg, err := k8sCfg.ClientConfig()
 	if err != nil {
@@ -119,12 +119,4 @@ func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	}
 
 	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
-}
-
-// k8sClientConfig returns a k8s client config using the ~/.kube/config file and the k8sContext context.
-func k8sClientConfig(kubecfg, kubectx string) (clientcmd.ClientConfig, error) {
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
-		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
-	), nil
 }

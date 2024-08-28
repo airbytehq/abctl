@@ -15,6 +15,7 @@ import (
 type Cmd struct {
 	Credentials CredentialsCmd `cmd:"" help:"Get local Airbyte user credentials."`
 	Install     InstallCmd     `cmd:"" help:"Install local Airbyte."`
+	Deployments DeploymentsCmd `cmd:"" help:"View local Airbyte deployments."`
 	Status      StatusCmd      `cmd:"" help:"Get local Airbyte status."`
 	Uninstall   UninstallCmd   `cmd:"" help:"Uninstall local Airbyte."`
 }

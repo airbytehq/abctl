@@ -20,7 +20,8 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
-	coreV1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -152,7 +153,7 @@ func TestCommand_Install(t *testing.T) {
 		serverVersionGet: func() (string, error) {
 			return "test", nil
 		},
-		secretCreateOrUpdate: func(ctx context.Context, secret coreV1.Secret) error {
+		secretCreateOrUpdate: func(ctx context.Context, secret corev1.Secret) error {
 			return nil
 		},
 		ingressExists: func(ctx context.Context, namespace string, ingress string) bool {
@@ -320,7 +321,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		serverVersionGet: func() (string, error) {
 			return "test", nil
 		},
-		secretCreateOrUpdate: func(ctx context.Context, secret coreV1.Secret) error {
+		secretCreateOrUpdate: func(ctx context.Context, secret corev1.Secret) error {
 			return nil
 		},
 		ingressExists: func(ctx context.Context, namespace string, ingress string) bool {
@@ -440,12 +441,17 @@ type mockK8sClient struct {
 	persistentVolumeClaimCreate func(ctx context.Context, namespace, name, volumeName string) error
 	persistentVolumeClaimExists func(ctx context.Context, namespace, name, volumeName string) bool
 	persistentVolumeClaimDelete func(ctx context.Context, namespace, name, volumeName string) error
-	secretCreateOrUpdate        func(ctx context.Context, secret coreV1.Secret) error
-	secretGet                   func(ctx context.Context, namespace, name string) (*coreV1.Secret, error)
-	serviceGet                  func(ctx context.Context, namespace, name string) (*coreV1.Service, error)
+	secretCreateOrUpdate        func(ctx context.Context, secret corev1.Secret) error
+	secretGet                   func(ctx context.Context, namespace, name string) (*corev1.Secret, error)
 	serverVersionGet            func() (string, error)
+	serviceGet                  func(ctx context.Context, namespace, name string) (*corev1.Service, error)
+	deploymentList              func(ctx context.Context, namespace string) (*v1.DeploymentList, error)
 	eventsWatch                 func(ctx context.Context, namespace string) (watch.Interface, error)
 	logsGet                     func(ctx context.Context, namespace string, name string) (string, error)
+}
+
+func (m *mockK8sClient) DeploymentList(ctx context.Context, namespace string) (*v1.DeploymentList, error) {
+	return m.deploymentList(ctx, namespace)
 }
 
 func (m *mockK8sClient) DeploymentRestart(ctx context.Context, namespace, name string) error {
@@ -535,7 +541,7 @@ func (m *mockK8sClient) PersistentVolumeClaimDelete(ctx context.Context, namespa
 	return nil
 }
 
-func (m *mockK8sClient) SecretCreateOrUpdate(ctx context.Context, secret coreV1.Secret) error {
+func (m *mockK8sClient) SecretCreateOrUpdate(ctx context.Context, secret corev1.Secret) error {
 	if m.secretCreateOrUpdate != nil {
 		return m.secretCreateOrUpdate(ctx, secret)
 	}
@@ -543,7 +549,7 @@ func (m *mockK8sClient) SecretCreateOrUpdate(ctx context.Context, secret coreV1.
 	return nil
 }
 
-func (m *mockK8sClient) SecretGet(ctx context.Context, namespace, name string) (*coreV1.Secret, error) {
+func (m *mockK8sClient) SecretGet(ctx context.Context, namespace, name string) (*corev1.Secret, error) {
 	if m.secretGet != nil {
 		return m.secretGet(ctx, namespace, name)
 	}
@@ -551,7 +557,7 @@ func (m *mockK8sClient) SecretGet(ctx context.Context, namespace, name string) (
 	return nil, nil
 }
 
-func (m *mockK8sClient) ServiceGet(ctx context.Context, namespace, name string) (*coreV1.Service, error) {
+func (m *mockK8sClient) ServiceGet(ctx context.Context, namespace, name string) (*corev1.Service, error) {
 	return m.serviceGet(ctx, namespace, name)
 }
 

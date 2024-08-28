@@ -27,6 +27,7 @@ const (
 	Credentials EventType = "credentials"
 	Install               = "install"
 	Migrate               = "migrate"
+	Restart               = "restart"
 	Status                = "status"
 	Uninstall             = "uninstall"
 )
