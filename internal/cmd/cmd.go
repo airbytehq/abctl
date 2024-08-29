@@ -110,6 +110,8 @@ func (c *Cmd) BeforeApply(ctx *kong.Context) error {
 	return nil
 }
 
+// bindK8sClient allows kong to make the k8s.Client injectable into a command's Run method.
+// If the cluster does exist, this will return ErrClusterNotFound.
 func bindK8sClient(provider *k8s.Provider) func() (k8s.Client, error) {
 	return func() (k8s.Client, error) {
 		k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
