@@ -13,39 +13,33 @@ type DeploymentsCmd struct {
 	Restart string `help:"Deployment to restart."`
 }
 
-func (d *DeploymentsCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
+func (d *DeploymentsCmd) Run(ctx context.Context, telClient telemetry.Client, k8sClient k8s.Client) error {
 	spinner := &pterm.DefaultSpinner
 	if err := checkDocker(ctx, telClient, spinner); err != nil {
 		return err
 	}
 
 	return telClient.Wrap(ctx, telemetry.Restart, func() error {
-		return d.deployments(ctx, provider, telClient, spinner)
+		return d.deployments(ctx, k8sClient, spinner)
 	})
 }
 
-func (d *DeploymentsCmd) deployments(ctx context.Context, provider k8s.Provider, telClient telemetry.Client, spinner *pterm.SpinnerPrinter) error {
-	k8sClient, err := defaultK8s(provider.Kubeconfig, provider.Context)
-	if err != nil {
-		pterm.Error.Println("No existing cluster found")
-		return nil
-	}
-
+func (d *DeploymentsCmd) deployments(ctx context.Context, k8sClient k8s.Client, spinner *pterm.SpinnerPrinter) error {
 	if d.Restart == "" {
 		spinner.UpdateText("Fetching deployments")
-		svcs, err := k8sClient.DeploymentList(ctx, airbyteNamespace)
+		deployments, err := k8sClient.DeploymentList(ctx, airbyteNamespace)
 		if err != nil {
 			pterm.Error.Println("Unable to list deployments")
 			return fmt.Errorf("unable to list deployments: %w", err)
 		}
 
-		if len(svcs.Items) == 0 {
+		if len(deployments.Items) == 0 {
 			pterm.Info.Println("No deployments found")
 			return nil
 		}
 		output := "Found the following deployments:"
-		for _, svc := range svcs.Items {
-			output += "\n  " + svc.Name
+		for _, deployment := range deployments.Items {
+			output += "\n  " + deployment.Name
 		}
 		pterm.Info.Println(output)
 
