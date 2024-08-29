@@ -18,7 +18,3 @@ test:
 .PHONY: vet
 vet:
 	go vet ./...
-
-.PHONY: release
-release:
-	@./create-release-builds
