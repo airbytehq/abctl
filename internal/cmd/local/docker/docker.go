@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -47,6 +48,7 @@ type Client interface {
 
 	ServerVersion(ctx context.Context) (types.Version, error)
 	VolumeInspect(ctx context.Context, volumeID string) (volume.Volume, error)
+	Info(ctx context.Context) (system.Info, error)
 }
 
 var _ Client = (*client.Client)(nil)

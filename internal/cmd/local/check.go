@@ -12,6 +12,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 )
 
@@ -23,7 +24,7 @@ var dockerClient *docker.Docker
 // dockerInstalled checks if docker is installed on the host machine.
 // Returns a nil error if docker was successfully detected, otherwise an error will be returned.  Any error returned
 // is guaranteed to include the ErrDocker error in the error chain.
-func dockerInstalled(ctx context.Context) (docker.Version, error) {
+func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Version, error) {
 	var err error
 	if dockerClient == nil {
 		if dockerClient, err = docker.New(ctx); err != nil {
@@ -37,6 +38,16 @@ func dockerInstalled(ctx context.Context) (docker.Version, error) {
 		pterm.Error.Println("Unable to communicate with the Docker daemon")
 		return docker.Version{}, fmt.Errorf("%w: %w", localerr.ErrDocker, err)
 	}
+
+	telClient.Attr("docker_version", version.Version)
+	telClient.Attr("docker_arch", version.Arch)
+	telClient.Attr("docker_platform", version.Platform)
+
+	if info, err := dockerClient.Client.Info(ctx); err == nil {
+		telClient.Attr("docker_ncpu", fmt.Sprintf("%d", info.NCPU))
+		telClient.Attr("docker_memtotal", fmt.Sprintf("%d", info.MemTotal))
+	}
+
 	pterm.Success.Println(fmt.Sprintf("Found Docker installation: version %s", version.Version))
 	return version, nil
 
