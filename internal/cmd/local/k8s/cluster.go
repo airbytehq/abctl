@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/pterm/pterm"
 	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/kind/pkg/cluster"
+	kindExec "sigs.k8s.io/kind/pkg/exec"
 )
 
 // ExtraVolumeMount defines a host volume mount for the Kind cluster
@@ -74,7 +76,7 @@ func (k *kindCluster) Create(port int, extraMounts []ExtraVolumeMount) error {
 	}
 
 	if err := k.p.Create(k.clusterName, opts...); err != nil {
-		return fmt.Errorf("unable to create kind cluster: %w", err)
+		return fmt.Errorf("unable to create kind cluster: %w", formatKindErr(err))
 	}
 
 	return nil
@@ -82,7 +84,7 @@ func (k *kindCluster) Create(port int, extraMounts []ExtraVolumeMount) error {
 
 func (k *kindCluster) Delete() error {
 	if err := k.p.Delete(k.clusterName, k.kubeconfig); err != nil {
-		return fmt.Errorf("unable to delete kind cluster: %w", err)
+		return fmt.Errorf("unable to delete kind cluster: %w", formatKindErr(err))
 	}
 
 	return nil
@@ -97,4 +99,12 @@ func (k *kindCluster) Exists() bool {
 	}
 
 	return false
+}
+
+func formatKindErr(err error) error {
+	var kindErr *kindExec.RunError
+	if errors.As(err, &kindErr) {
+		return fmt.Errorf("%w: %s", err, string(kindErr.Output))
+	}
+	return err
 }
