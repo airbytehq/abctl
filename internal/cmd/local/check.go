@@ -5,12 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"runtime"
 	"strconv"
 	"syscall"
-	"time"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
@@ -54,14 +52,6 @@ func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Ve
 	return version, nil
 
 }
-
-// doer interface for testing purposes
-type doer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
-// httpClient can be overwritten for testing purposes
-var httpClient doer = &http.Client{Timeout: 3 * time.Second}
 
 // portAvailable returns a nil error if the port is available, or already is use by Airbyte, otherwise returns an error.
 //
@@ -157,7 +147,7 @@ var ErrUnableToInspect = errors.New("unable to inspect container")
 
 type ContainerNotRunningError struct {
 	Container string
-	Status string
+	Status    string
 }
 
 func (e ContainerNotRunningError) Error() string {
@@ -165,9 +155,10 @@ func (e ContainerNotRunningError) Error() string {
 }
 
 type InvalidPortError struct {
-	Port string
+	Port  string
 	Inner error
 }
+
 func (e InvalidPortError) Unwrap() error {
 	return e.Inner
 }
