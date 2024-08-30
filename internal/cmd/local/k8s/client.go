@@ -63,7 +63,7 @@ type Client interface {
 
 	// SecretCreateOrUpdate will update or create the secret name with the payload of data in the specified namespace
 	SecretCreateOrUpdate(ctx context.Context, secret corev1.Secret) error
-	// SecretGet returns the services for the namespace and name
+	// SecretGet returns the secrets for the namespace and name
 	SecretGet(ctx context.Context, namespace, name string) (*corev1.Secret, error)
 
 	// ServiceGet returns the service for the given namespace and name
