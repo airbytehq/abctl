@@ -15,6 +15,7 @@ import (
 type Cmd struct {
 	Credentials CredentialsCmd `cmd:"" help:"Get local Airbyte user credentials."`
 	Install     InstallCmd     `cmd:"" help:"Install local Airbyte."`
+	Deployments DeploymentsCmd `cmd:"" help:"View local Airbyte deployments."`
 	Status      StatusCmd      `cmd:"" help:"Get local Airbyte status."`
 	Uninstall   UninstallCmd   `cmd:"" help:"Uninstall local Airbyte."`
 }
@@ -28,15 +29,12 @@ func (c *Cmd) BeforeApply() error {
 }
 
 func (c *Cmd) AfterApply(provider k8s.Provider) error {
-	printProviderDetails(provider)
-	return nil
-}
-
-func printProviderDetails(p k8s.Provider) {
 	pterm.Info.Println(fmt.Sprintf(
 		"Using Kubernetes provider:\n  Provider: %s\n  Kubeconfig: %s\n  Context: %s",
-		p.Name, p.Kubeconfig, p.Context,
+		provider.Name, provider.Kubeconfig, provider.Context,
 	))
+
+	return nil
 }
 
 // checkAirbyteDir verifies that, if the paths.Airbyte directory exists, that it has proper permissions.

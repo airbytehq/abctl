@@ -74,6 +74,7 @@ func main() {
 	}
 }
 
+// bindCtx exists to allow kong to correctly inject a context.Context into the Run methods on the commands.
 func bindCtx(ctx context.Context) func() (context.Context, error) {
 	return func() (context.Context, error) {
 		return ctx, nil

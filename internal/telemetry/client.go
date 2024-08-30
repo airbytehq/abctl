@@ -25,6 +25,7 @@ type EventType string
 
 const (
 	Credentials EventType = "credentials"
+	Deployments           = "deployments"
 	Install               = "install"
 	Migrate               = "migrate"
 	Status                = "status"
