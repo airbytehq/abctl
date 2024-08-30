@@ -14,6 +14,8 @@ func ingress(host string) *networkingv1.Ingress {
 	// Always add a localhost route.
 	// This is necessary to ensure that this code can verify the Airbyte installation via `localhost`.
 	rules := []networkingv1.IngressRule{ingressRule("localhost")}
+	// Make it easy for dockerized applications, like Airflow to communicate with Airbyte
+	rules = append(rules, ingressRule("host.docker.internal"))
 	// If a host that isn't `localhost` was provided, create a second rule for that host.
 	// This is required to support non-local installation, such as running on an EC2 instance.
 	if host != "localhost" {
