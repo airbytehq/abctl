@@ -13,6 +13,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/system"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 )
@@ -31,10 +32,17 @@ func TestDockerInstalled(t *testing.T) {
 					Arch:     "arch",
 				}, nil
 			},
+			FnInfo: func(ctx context.Context) (system.Info, error) {
+				return system.Info{}, nil
+			},
 		},
 	}
 
-	version, err := dockerInstalled(context.Background())
+	tel := mockTelemetryClient{
+		attr: func(key, val string) {},
+	}
+
+	version, err := dockerInstalled(context.Background(), &tel)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -63,7 +71,7 @@ func TestDockerInstalled_Error(t *testing.T) {
 		},
 	}
 
-	_, err := dockerInstalled(context.Background())
+	_, err := dockerInstalled(context.Background(), &mockTelemetryClient{})
 	if err == nil {
 		t.Error("unexpected error:", err)
 	}

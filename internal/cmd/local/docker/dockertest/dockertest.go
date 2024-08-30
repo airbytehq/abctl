@@ -8,6 +8,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/api/types/volume"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -26,6 +27,7 @@ type MockClient struct {
 	FnImagePull            func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
 	FnServerVersion        func(ctx context.Context) (types.Version, error)
 	FnVolumeInspect        func(ctx context.Context, volumeID string) (volume.Volume, error)
+	FnInfo                   func(ctx context.Context) (system.Info, error)
 }
 
 func (m MockClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error) {
@@ -78,4 +80,8 @@ func (m MockClient) ServerVersion(ctx context.Context) (types.Version, error) {
 
 func (m MockClient) VolumeInspect(ctx context.Context, volumeID string) (volume.Volume, error) {
 	return m.FnVolumeInspect(ctx, volumeID)
+}
+
+func (m MockClient) Info(ctx context.Context) (system.Info, error) {
+	return m.FnInfo(ctx)
 }

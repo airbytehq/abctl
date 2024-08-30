@@ -34,15 +34,11 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 	spinner, _ = spinner.Start("Starting installation")
 	spinner.UpdateText("Checking for Docker installation")
 
-	dockerVersion, err := dockerInstalled(ctx)
+	_, err := dockerInstalled(ctx, telClient)
 	if err != nil {
 		pterm.Error.Println("Unable to determine if Docker is installed")
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
-
-	telClient.Attr("docker_version", dockerVersion.Version)
-	telClient.Attr("docker_arch", dockerVersion.Arch)
-	telClient.Attr("docker_platform", dockerVersion.Platform)
 
 	spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", i.Port))
 	if err := portAvailable(ctx, i.Port); err != nil {

@@ -20,15 +20,11 @@ func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient
 	spinner, _ = spinner.Start("Starting uninstallation")
 	spinner.UpdateText("Checking for Docker installation")
 
-	dockerVersion, err := dockerInstalled(ctx)
+	_, err := dockerInstalled(ctx, telClient)
 	if err != nil {
 		pterm.Error.Println("Unable to determine if Docker is installed")
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
-
-	telClient.Attr("docker_version", dockerVersion.Version)
-	telClient.Attr("docker_arch", dockerVersion.Arch)
-	telClient.Attr("docker_platform", dockerVersion.Platform)
 
 	return telClient.Wrap(ctx, telemetry.Uninstall, func() error {
 		spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))

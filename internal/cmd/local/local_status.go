@@ -27,15 +27,11 @@ func checkDocker(ctx context.Context, telClient telemetry.Client, spinner *pterm
 	spinner, _ = spinner.Start("Starting status check")
 	spinner.UpdateText("Checking for Docker installation")
 
-	dockerVersion, err := dockerInstalled(ctx)
+	_, err := dockerInstalled(ctx, telClient)
 	if err != nil {
 		pterm.Error.Println("Unable to determine if Docker is installed")
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
-
-	telClient.Attr("docker_version", dockerVersion.Version)
-	telClient.Attr("docker_arch", dockerVersion.Arch)
-	telClient.Attr("docker_platform", dockerVersion.Platform)
 
 	return nil
 }
