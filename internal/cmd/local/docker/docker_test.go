@@ -35,6 +35,11 @@ func TestNewWithOptions(t *testing.T) {
 			goos: "linux",
 		},
 	}
+	expVersion := Version{
+		Platform: dockertest.DefaultServerVersion.Platform.Name,
+		Arch:     dockertest.DefaultServerVersion.Arch,
+		Version:  dockertest.DefaultServerVersion.Version,
+	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -72,7 +77,7 @@ func TestNewWithOptions(t *testing.T) {
 			if err != nil {
 				t.Fatal("failed fetching version", err)
 			}
-			if d := cmp.Diff(dockertest.DefaultServerVersion, ver); d != "" {
+			if d := cmp.Diff(expVersion, ver); d != "" {
 				t.Error("unexpected version", d)
 			}
 		})
