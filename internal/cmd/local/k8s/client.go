@@ -84,6 +84,10 @@ type DefaultK8sClient struct {
 	ClientSet kubernetes.Interface
 }
 
+func (d *DefaultK8sClient) DeploymentList(ctx context.Context, namespace string) (*v1.DeploymentList, error) {
+	return d.ClientSet.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+}
+
 func (d *DefaultK8sClient) DeploymentRestart(ctx context.Context, namespace, name string) error {
 	return d.deploymentRestart(ctx, namespace, name, time.Now(), 5*time.Minute)
 }
@@ -301,12 +305,7 @@ func (d *DefaultK8sClient) ServerVersionGet() (string, error) {
 }
 
 func (d *DefaultK8sClient) ServiceGet(ctx context.Context, namespace string, name string) (*corev1.Service, error) {
-	d.ClientSet.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
 	return d.ClientSet.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
-}
-
-func (d *DefaultK8sClient) DeploymentList(ctx context.Context, namespace string) (*v1.DeploymentList, error) {
-	return d.ClientSet.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 }
 
 func (d *DefaultK8sClient) EventsWatch(ctx context.Context, namespace string) (watch.Interface, error) {
