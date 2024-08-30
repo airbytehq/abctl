@@ -59,25 +59,10 @@ func HandleErr(err error) {
 		_ = kong.DefaultHelpPrinter(kong.HelpOptions{}, errParse.Context)
 	}
 
-	switch {
-	case errors.Is(err, localerr.ErrAirbyteDir):
+	var e *localerr.LocalError
+	if errors.As(err, &e) {
 		pterm.Println()
-		pterm.Info.Println(helpAirbyteDir)
-	case errors.Is(err, localerr.ErrClusterNotFound):
-		pterm.Println()
-		pterm.Info.Println(helpCluster)
-	case errors.Is(err, localerr.ErrDocker):
-		pterm.Println()
-		pterm.Info.Println(helpDocker)
-	case errors.Is(err, localerr.ErrKubernetes):
-		pterm.Println()
-		pterm.Info.Println(helpKubernetes)
-	case errors.Is(err, localerr.ErrIngress):
-		pterm.Println()
-		pterm.Info.Println(helpIngress)
-	case errors.Is(err, localerr.ErrPort):
-		pterm.Println()
-		pterm.Info.Printfln(helpPort)
+		pterm.Info.Println(e.Help())
 	}
 
 	os.Exit(1)
