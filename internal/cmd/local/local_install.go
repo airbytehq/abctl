@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
@@ -40,11 +39,6 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
 
-	spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", i.Port))
-	if err := portAvailable(ctx, i.Port); err != nil {
-		return fmt.Errorf("port %d is not available: %w", i.Port, err)
-	}
-
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
 		spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
@@ -61,16 +55,8 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 
 			// only for kind do we need to check the existing port
 			if provider.Name == k8s.Kind {
-				if dockerClient == nil {
-					dockerClient, err = docker.New(ctx)
-					if err != nil {
-						pterm.Error.Printfln("Unable to connect to Docker daemon")
-						return fmt.Errorf("unable to connect to docker: %w", err)
-					}
-				}
-
 				providedPort := i.Port
-				i.Port, err = dockerClient.Port(ctx, fmt.Sprintf("%s-control-plane", provider.ClusterName))
+				i.Port, err = getPort(ctx, provider.ClusterName)
 				if err != nil {
 					pterm.Warning.Printfln("Unable to determine which port the existing cluster was configured to use.\n" +
 						"Installation will continue but may ultimately fail, in which case it will be necessarily to uninstall first.")
@@ -93,6 +79,12 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			if err != nil {
 				return err
 			}
+
+			spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", i.Port))
+			if err := portAvailable(ctx, i.Port); err != nil {
+				return err
+			}
+			pterm.Success.Printfln("Port %d appears to be available", i.Port)
 
 			if err := cluster.Create(i.Port, extraVolumeMounts); err != nil {
 				pterm.Error.Printfln("Cluster '%s' could not be created", provider.ClusterName)

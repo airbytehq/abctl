@@ -53,7 +53,7 @@ func status(ctx context.Context, provider k8s.Provider, telClient telemetry.Clie
 	pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
 	spinner.UpdateText(fmt.Sprintf("Validating existing cluster '%s'", provider.ClusterName))
 
-	port, err := getPort(ctx, provider)
+	port, err := getPort(ctx, provider.ClusterName)
 	if err != nil {
 		return err
 	}

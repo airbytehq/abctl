@@ -45,7 +45,7 @@ func (cc *CredentialsCmd) Run(ctx context.Context, provider k8s.Provider, telCli
 		clientId := string(secret.Data[secretClientID])
 		clientSecret := string(secret.Data[secretClientSecret])
 
-		port, err := getPort(ctx, provider)
+		port, err := getPort(ctx, provider.ClusterName)
 		if err != nil {
 			return err
 		}

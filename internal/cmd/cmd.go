@@ -42,7 +42,7 @@ This could be in indication that the ingress port is already in use by a differe
 The ingress port can be changed by passing the flag --port.`
 
 	// helpPort is displayed if ErrPort is ever returned
-	helpPort = `An error occurred while verifying if the request port is available.
+	helpPort = `An error occurred while verifying if the requested port is available.
 This could be in indication that the ingress port is already in use by a different application.
 The ingress port can be changed by passing the flag --port.`
 )

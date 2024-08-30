@@ -13,7 +13,9 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/system"
+	"github.com/docker/go-connections/nat"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 )
@@ -110,6 +112,142 @@ func TestPortAvailable_Unavailable(t *testing.T) {
 	}
 	if !errors.Is(err, localerr.ErrPort) {
 		t.Error("error should be of type ErrPort")
+	}
+}
+
+func TestGetPort_Found(t *testing.T) {
+	t.Cleanup(func() {
+		dockerClient = nil
+	})
+
+	dockerClient = &docker.Docker{
+		Client: dockertest.MockClient{
+			FnContainerInspect: func(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+				return types.ContainerJSON{
+					ContainerJSONBase: &types.ContainerJSONBase{
+						State: &types.ContainerState{
+							Status: "running",
+						},
+						HostConfig: &container.HostConfig{
+							PortBindings: nat.PortMap{
+								"tcp/80": {{
+									HostIP:   "0.0.0.0",
+									HostPort: "8000",
+								}},
+							},
+						},
+					},
+				}, nil
+			},
+		},
+	}
+
+	port, err := getPort(context.Background(), "test")
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+		return
+	}
+	if port != 8000 {
+		t.Errorf("expected 8000 but got %d", port)
+	}
+}
+
+func TestGetPort_NotRunning(t *testing.T) {
+	t.Cleanup(func() {
+		dockerClient = nil
+	})
+
+	dockerClient = &docker.Docker{
+		Client: dockertest.MockClient{
+			FnContainerInspect: func(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+				return types.ContainerJSON{
+					ContainerJSONBase: &types.ContainerJSONBase{
+						State: &types.ContainerState{
+							Status: "stopped",
+						},
+						HostConfig: &container.HostConfig{
+							PortBindings: nat.PortMap{
+								"tcp/80": {{
+									HostIP:   "0.0.0.0",
+									HostPort: "8000",
+								}},
+							},
+						},
+					},
+				}, nil
+			},
+		},
+	}
+
+	_, err := getPort(context.Background(), "test")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestGetPort_Missing(t *testing.T) {
+	t.Cleanup(func() {
+		dockerClient = nil
+	})
+
+	dockerClient = &docker.Docker{
+		Client: dockertest.MockClient{
+			FnContainerInspect: func(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+				return types.ContainerJSON{
+					ContainerJSONBase: &types.ContainerJSONBase{
+						State: &types.ContainerState{
+							Status: "running",
+						},
+						HostConfig: &container.HostConfig{
+							PortBindings: nat.PortMap{
+								"tcp/80": {{
+									HostIP:   "1.2.3.4",
+									HostPort: "8000",
+								}},
+							},
+						},
+					},
+				}, nil
+			},
+		},
+	}
+
+	_, err := getPort(context.Background(), "test")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestGetPort_Invalid(t *testing.T) {
+	t.Cleanup(func() {
+		dockerClient = nil
+	})
+
+	dockerClient = &docker.Docker{
+		Client: dockertest.MockClient{
+			FnContainerInspect: func(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+				return types.ContainerJSON{
+					ContainerJSONBase: &types.ContainerJSONBase{
+						State: &types.ContainerState{
+							Status: "running",
+						},
+						HostConfig: &container.HostConfig{
+							PortBindings: nat.PortMap{
+								"tcp/80": {{
+									HostIP:   "1.2.3.4",
+									HostPort: "NaN",
+								}},
+							},
+						},
+					},
+				}, nil
+			},
+		},
+	}
+
+	_, err := getPort(context.Background(), "test")
+	if err == nil {
+		t.Error("expected error")
 	}
 }
 
