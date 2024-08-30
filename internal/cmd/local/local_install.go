@@ -58,10 +58,11 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 				providedPort := i.Port
 				i.Port, err = getPort(ctx, provider.ClusterName)
 				if err != nil {
-					pterm.Warning.Printfln("Unable to determine which port the existing cluster was configured to use.\n" +
-						"Installation will continue but may ultimately fail, in which case it will be necessarily to uninstall first.")
+					return err
+					// pterm.Warning.Printfln("Unable to determine which port the existing cluster was configured to use.\n" +
+						// "Installation will continue but may ultimately fail, in which case it will be necessarily to uninstall first.")
 					// since we can't verify the port is correct, push forward with the provided port
-					i.Port = providedPort
+					// i.Port = providedPort
 				}
 				if providedPort != i.Port {
 					pterm.Warning.Printfln("The existing cluster was found to be using port %d, which differs from the provided port %d.\n"+

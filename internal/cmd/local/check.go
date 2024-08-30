@@ -127,14 +127,14 @@ func getPort(ctx context.Context, clusterName string) (int, error) {
 
 	ci, err := dockerClient.Client.ContainerInspect(ctx, container)
 	if err != nil {
-		return 0, fmt.Errorf("unable to inspect container: %w", err)
+		return 0, fmt.Errorf("%w: %w", ErrUnableToInspect, err)
 	}
 	if ci.State == nil || ci.State.Status != "running" {
 		status := "unknown"
 		if ci.State != nil {
 			status = ci.State.Status
 		}
-		return 0, fmt.Errorf("container %q is not running (status = %q)", container, status)
+		return 0, ContainerNotRunningError{container, status}
 	}
 
 	for _, bindings := range ci.HostConfig.PortBindings {
@@ -142,12 +142,35 @@ func getPort(ctx context.Context, clusterName string) (int, error) {
 			if ipPort.HostIP == "0.0.0.0" {
 				port, err := strconv.Atoi(ipPort.HostPort)
 				if err != nil {
-					return 0, fmt.Errorf("unable to convert host port %s to integer: %w", ipPort.HostPort, err)
+					return 0, InvalidPortError{ipPort.HostPort, err}
 				}
 				return port, nil
 			}
 		}
 	}
 
-	return 0, fmt.Errorf("no matching ports found on container %q", container)
+	return 0, fmt.Errorf("%w on container %q", ErrPortNotFound, container)
+}
+
+var ErrPortNotFound = errors.New("no matching port found")
+var ErrUnableToInspect = errors.New("unable to inspect container")
+
+type ContainerNotRunningError struct {
+	Container string
+	Status string
+}
+
+func (e ContainerNotRunningError) Error() string {
+	return fmt.Sprintf("container %q is not running (status = %q)", e.Container, e.Status)
+}
+
+type InvalidPortError struct {
+	Port string
+	Inner error
+}
+func (e InvalidPortError) Unwrap() error {
+	return e.Inner
+}
+func (e InvalidPortError) Error() string {
+	return fmt.Sprintf("unable to convert host port %s to integer: %s", e.Port, e.Inner)
 }
