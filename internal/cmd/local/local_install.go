@@ -70,7 +70,6 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		} else {
 			// no existing cluster, need to create one
 			pterm.Info.Println(fmt.Sprintf("No existing cluster found, cluster '%s' will be created", provider.ClusterName))
-			spinner.UpdateText(fmt.Sprintf("Creating cluster '%s'", provider.ClusterName))
 
 			extraVolumeMounts, err := parseVolumeMounts(i.Volume)
 			if err != nil {
@@ -82,6 +81,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 				return err
 			}
 			pterm.Success.Printfln("Port %d appears to be available", i.Port)
+			spinner.UpdateText(fmt.Sprintf("Creating cluster '%s'", provider.ClusterName))
 
 			if err := cluster.Create(i.Port, extraVolumeMounts); err != nil {
 				pterm.Error.Printfln("Cluster '%s' could not be created", provider.ClusterName)
