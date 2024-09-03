@@ -124,7 +124,7 @@ func getPort(ctx context.Context, clusterName string) (int, error) {
 		if ci.State != nil {
 			status = ci.State.Status
 		}
-		return 0, ContainerNotRunningError{container, status}
+		return 0, ContainerNotRunningError{Container: container, Status: status}
 	}
 
 	for _, bindings := range ci.HostConfig.PortBindings {
@@ -132,7 +132,7 @@ func getPort(ctx context.Context, clusterName string) (int, error) {
 			if ipPort.HostIP == "0.0.0.0" {
 				port, err := strconv.Atoi(ipPort.HostPort)
 				if err != nil {
-					return 0, InvalidPortError{ipPort.HostPort, err}
+					return 0, InvalidPortError{Port: ipPort.HostPort, Inner: err}
 				}
 				return port, nil
 			}
