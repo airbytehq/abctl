@@ -42,12 +42,12 @@ func getLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, er
 
 	idxPath, err := chartRepo.DownloadIndexFile()
 	if err != nil {
-		return "", fmt.Errorf("unable to access repo index: %w", err)
+		return "", fmt.Errorf("unable to download index file: %w", err)
 	}
 
 	idx, err := repo.LoadIndexFile(idxPath)
 	if err != nil {
-		return "", fmt.Errorf("unable to access repo index: %w", err)
+		return "", fmt.Errorf("unable to load index file (%s): %w", idxPath, err)
 	}
 
 	airbyteEntry, ok := idx.Entries["airbyte"]
