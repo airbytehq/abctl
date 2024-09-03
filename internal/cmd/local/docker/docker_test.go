@@ -9,7 +9,6 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -17,12 +16,6 @@ import (
 // This check is done here instead of the dockertest package to
 // avoid a circular dependency.
 var _ Client = (*dockertest.MockClient)(nil)
-
-var expVersion = Version{
-	Version:  "version",
-	Arch:     "arch",
-	Platform: "platform name",
-}
 
 func TestNewWithOptions(t *testing.T) {
 	tests := []struct {
@@ -42,6 +35,11 @@ func TestNewWithOptions(t *testing.T) {
 			goos: "linux",
 		},
 	}
+	expVersion := Version{
+		Platform: dockertest.DefaultServerVersion.Platform.Name,
+		Arch:     dockertest.DefaultServerVersion.Arch,
+		Version:  dockertest.DefaultServerVersion.Version,
+	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -49,10 +47,7 @@ func TestNewWithOptions(t *testing.T) {
 			pingCalled := 0
 
 			p := mockPinger{
-				MockClient: dockertest.MockClient{
-					FnContainerInspect: defaultContainerInspect,
-					FnServerVersion:    defaultServerVersion,
-				},
+				MockClient: dockertest.NewMockClient(),
 				ping: func(ctx context.Context) (types.Ping, error) {
 					pingCalled++
 					return types.Ping{}, nil
@@ -76,14 +71,6 @@ func TestNewWithOptions(t *testing.T) {
 
 			if d := cmp.Diff(1, pingCalled); d != "" {
 				t.Error("ping called incorrect number of times", d)
-			}
-
-			port, err := cli.Port(ctx, "container")
-			if err != nil {
-				t.Fatal("failed fetching port", err)
-			}
-			if d := cmp.Diff(12345, port); d != "" {
-				t.Error("unexpected port", d)
 			}
 
 			ver, err := cli.Version(ctx)
@@ -245,92 +232,6 @@ func TestVersion_Err(t *testing.T) {
 	}
 }
 
-func TestPort_Missing(t *testing.T) {
-	ctx := context.Background()
-	p := mockPinger{
-		MockClient: dockertest.MockClient{
-			FnContainerInspect: func(ctx context.Context, containerID string) (types.ContainerJSON, error) {
-				return types.ContainerJSON{
-					NetworkSettings: &types.NetworkSettings{
-						NetworkSettingsBase: types.NetworkSettingsBase{
-							Ports: map[nat.Port][]nat.PortBinding{},
-						},
-					},
-				}, nil
-			},
-		},
-	}
-
-	f := func(opts ...client.Opt) (pinger, error) { return p, nil }
-
-	cli, err := newWithOptions(ctx, f, "darwin")
-	if err != nil {
-		t.Fatal("failed creating client", err)
-	}
-
-	_, err = cli.Port(ctx, "container")
-	if err == nil {
-		t.Error("expected error")
-	}
-}
-
-func TestPort_Invalid(t *testing.T) {
-	ctx := context.Background()
-	p := mockPinger{
-		MockClient: dockertest.MockClient{
-			FnContainerInspect: func(ctx context.Context, containerID string) (types.ContainerJSON, error) {
-				return types.ContainerJSON{
-					NetworkSettings: &types.NetworkSettings{
-						NetworkSettingsBase: types.NetworkSettingsBase{
-							Ports: map[nat.Port][]nat.PortBinding{
-								"12345": {{
-									HostIP:   "0.0.0.0",
-									HostPort: "NaN",
-								}},
-							},
-						},
-					},
-				}, nil
-			},
-		},
-	}
-
-	f := func(opts ...client.Opt) (pinger, error) { return p, nil }
-
-	cli, err := newWithOptions(ctx, f, "darwin")
-	if err != nil {
-		t.Fatal("failed creating client", err)
-	}
-
-	_, err = cli.Port(ctx, "container")
-	if err == nil {
-		t.Error("expected error")
-	}
-}
-
-func TestPort_Err(t *testing.T) {
-	ctx := context.Background()
-	p := mockPinger{
-		MockClient: dockertest.MockClient{
-			FnContainerInspect: func(ctx context.Context, containerID string) (types.ContainerJSON, error) {
-				return types.ContainerJSON{}, errors.New("test error")
-			},
-		},
-	}
-
-	f := func(opts ...client.Opt) (pinger, error) { return p, nil }
-
-	cli, err := newWithOptions(ctx, f, "darwin")
-	if err != nil {
-		t.Fatal("failed creating client", err)
-	}
-
-	_, err = cli.Port(ctx, "container")
-	if err == nil {
-		t.Error("expected error")
-	}
-}
-
 // --- mocks
 var _ pinger = (*mockPinger)(nil)
 
@@ -345,27 +246,4 @@ func (m mockPinger) Ping(ctx context.Context) (types.Ping, error) {
 	}
 
 	return m.ping(ctx)
-}
-
-func defaultContainerInspect(_ context.Context, _ string) (types.ContainerJSON, error) {
-	return types.ContainerJSON{
-		NetworkSettings: &types.NetworkSettings{
-			NetworkSettingsBase: types.NetworkSettingsBase{
-				Ports: map[nat.Port][]nat.PortBinding{
-					"12345": {{
-						HostIP:   "0.0.0.0",
-						HostPort: "12345",
-					}},
-				},
-			},
-		},
-	}, nil
-}
-
-func defaultServerVersion(_ context.Context) (types.Version, error) {
-	return types.Version{
-		Version:  expVersion.Version,
-		Arch:     expVersion.Arch,
-		Platform: struct{ Name string }{Name: expVersion.Platform},
-	}, nil
 }

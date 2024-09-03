@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/api/types/volume"
+	"github.com/docker/go-connections/nat"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -27,7 +28,14 @@ type MockClient struct {
 	FnImagePull            func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
 	FnServerVersion        func(ctx context.Context) (types.Version, error)
 	FnVolumeInspect        func(ctx context.Context, volumeID string) (volume.Volume, error)
-	FnInfo                   func(ctx context.Context) (system.Info, error)
+	FnInfo                 func(ctx context.Context) (system.Info, error)
+}
+
+func NewMockClient() MockClient {
+	return MockClient{
+		FnContainerInspect: func(_ context.Context, _ string) (types.ContainerJSON, error) { return DefaultContainerInspect, nil },
+		FnServerVersion:    func(_ context.Context) (types.Version, error) { return DefaultServerVersion, nil },
+	}
 }
 
 func (m MockClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error) {
@@ -84,4 +92,23 @@ func (m MockClient) VolumeInspect(ctx context.Context, volumeID string) (volume.
 
 func (m MockClient) Info(ctx context.Context) (system.Info, error) {
 	return m.FnInfo(ctx)
+}
+
+var DefaultContainerInspect = types.ContainerJSON{
+	NetworkSettings: &types.NetworkSettings{
+		NetworkSettingsBase: types.NetworkSettingsBase{
+			Ports: map[nat.Port][]nat.PortBinding{
+				"12345": {{
+					HostIP:   "0.0.0.0",
+					HostPort: "12345",
+				}},
+			},
+		},
+	},
+}
+
+var DefaultServerVersion = types.Version{
+	Version:  "version",
+	Arch:     "arch",
+	Platform: struct{ Name string }{Name: "platform name"},
 }

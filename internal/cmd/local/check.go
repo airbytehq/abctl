@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
-	"time"
+	"os"
+	"runtime"
+	"strconv"
+	"syscall"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
@@ -53,14 +53,6 @@ func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Ve
 
 }
 
-// doer interface for testing purposes
-type doer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
-// httpClient can be overwritten for testing purposes
-var httpClient doer = &http.Client{Timeout: 3 * time.Second}
-
 // portAvailable returns a nil error if the port is available, or already is use by Airbyte, otherwise returns an error.
 //
 // This function works by attempting to establish a tcp listener on a port.
@@ -78,68 +70,98 @@ func portAvailable(ctx context.Context, port int) error {
 	// net.Listen doesn't support providing a context
 	lc := &net.ListenConfig{}
 	listener, err := lc.Listen(ctx, "tcp", fmt.Sprintf("localhost:%d", port))
+	if isErrorAddressAlreadyInUse(err) {
+		return fmt.Errorf("%w: port %d is already in use", localerr.ErrPort, port)
+	}
 	if err != nil {
-		pterm.Debug.Println(fmt.Sprintf("Unable to listen on port '%d': %s", port, err))
-
-		// check if an existing airbyte installation is already listening on this port
-		req, errInner := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:%d/api/v1/instance_configuration", port), nil)
-		if errInner != nil {
-			pterm.Error.Printfln("Port %d request could not be created", port)
-			return fmt.Errorf("%w: unable to create request: %w", localerr.ErrPort, err)
-		}
-
-		res, errInner := httpClient.Do(req)
-		if errInner != nil {
-			pterm.Error.Printfln("Port %d appears to already be in use", port)
-			return fmt.Errorf("%w: unable to send request: %w", localerr.ErrPort, err)
-		}
-
-		if res.StatusCode == http.StatusOK {
-			pterm.Success.Printfln("Port %d appears to be running a previous Airbyte installation", port)
-			return nil
-		}
-
-		// if we're here, we haven't been able to determine why this port may or may not be available
-		body, errInner := io.ReadAll(res.Body)
-		if errInner != nil {
-			pterm.Debug.Println(fmt.Sprintf("Unable to read response body: %s", errInner))
-		}
-		pterm.Debug.Println(fmt.Sprintf(
-			"Unable to determine if port '%d' is in use:\n  StatusCode: %d\n  Body: %s",
-			port, res.StatusCode, body,
-		))
-
-		pterm.Error.Println(fmt.Sprintf(
-			"Unable to determine if port '%d' is available, consider specifying a different port",
-			port,
-		))
-		return fmt.Errorf("unable to determine if port '%d' is available: %w", port, err)
+		return fmt.Errorf("%w: unable to determine if port '%d' is available: %w", localerr.ErrPort, port, err)
 	}
 	// if we're able to bind to the port (and then release it), it should be available
 	defer func() {
 		_ = listener.Close()
 	}()
 
-	pterm.Success.Printfln("Port %d appears to be available", port)
 	return nil
 }
 
-func getPort(ctx context.Context, provider k8s.Provider) (int, error) {
+func isErrorAddressAlreadyInUse(err error) bool {
+	var eOsSyscall *os.SyscallError
+	if !errors.As(err, &eOsSyscall) {
+		return false
+	}
+	var errErrno syscall.Errno // doesn't need a "*" (ptr) because it's already a ptr (uintptr)
+	if !errors.As(eOsSyscall, &errErrno) {
+		return false
+	}
+	if errors.Is(errErrno, syscall.EADDRINUSE) {
+		return true
+	}
+	const WSAEADDRINUSE = 10048
+	if runtime.GOOS == "windows" && errErrno == WSAEADDRINUSE {
+		return true
+	}
+	return false
+}
+
+func getPort(ctx context.Context, clusterName string) (int, error) {
 	var err error
 
 	if dockerClient == nil {
 		dockerClient, err = docker.New(ctx)
 		if err != nil {
-			pterm.Error.Printfln("Unable to connect to Docker daemon")
 			return 0, fmt.Errorf("unable to connect to docker: %w", err)
 		}
 	}
 
-	clusterPort, err := dockerClient.Port(ctx, fmt.Sprintf("%s-control-plane", provider.ClusterName))
+	container := fmt.Sprintf("%s-control-plane", clusterName)
+
+	ci, err := dockerClient.Client.ContainerInspect(ctx, container)
 	if err != nil {
-		pterm.Error.Printfln("Unable to determine docker port for cluster '%s'", provider.ClusterName)
-		return 0, errors.New("unable to determine port cluster was installed with")
+		return 0, fmt.Errorf("%w: %w", ErrUnableToInspect, err)
+	}
+	if ci.State == nil || ci.State.Status != "running" {
+		status := "unknown"
+		if ci.State != nil {
+			status = ci.State.Status
+		}
+		return 0, ContainerNotRunningError{Container: container, Status: status}
 	}
 
-	return clusterPort, nil
+	for _, bindings := range ci.HostConfig.PortBindings {
+		for _, ipPort := range bindings {
+			if ipPort.HostIP == "0.0.0.0" {
+				port, err := strconv.Atoi(ipPort.HostPort)
+				if err != nil {
+					return 0, InvalidPortError{Port: ipPort.HostPort, Inner: err}
+				}
+				return port, nil
+			}
+		}
+	}
+
+	return 0, fmt.Errorf("%w on container %q", ErrPortNotFound, container)
+}
+
+var ErrPortNotFound = errors.New("no matching port found")
+var ErrUnableToInspect = errors.New("unable to inspect container")
+
+type ContainerNotRunningError struct {
+	Container string
+	Status    string
+}
+
+func (e ContainerNotRunningError) Error() string {
+	return fmt.Sprintf("container %q is not running (status = %q)", e.Container, e.Status)
+}
+
+type InvalidPortError struct {
+	Port  string
+	Inner error
+}
+
+func (e InvalidPortError) Unwrap() error {
+	return e.Inner
+}
+func (e InvalidPortError) Error() string {
+	return fmt.Sprintf("unable to convert host port %s to integer: %s", e.Port, e.Inner)
 }

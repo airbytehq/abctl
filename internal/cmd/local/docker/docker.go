@@ -2,11 +2,9 @@ package docker
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"runtime"
-	"strconv"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
@@ -152,27 +150,4 @@ func (d *Docker) Version(ctx context.Context) (Version, error) {
 		Arch:     ver.Arch,
 		Platform: ver.Platform.Name,
 	}, nil
-}
-
-// Port returns the host-port the underlying docker process is currently bound to, for the given container.
-// It determines this by walking through all the ports on the container and finding the one that is bound to ip 0.0.0.0.
-func (d *Docker) Port(ctx context.Context, container string) (int, error) {
-	ci, err := d.Client.ContainerInspect(ctx, container)
-	if err != nil {
-		return 0, fmt.Errorf("unable to inspect container: %w", err)
-	}
-
-	for _, bindings := range ci.NetworkSettings.Ports {
-		for _, ipPort := range bindings {
-			if ipPort.HostIP == "0.0.0.0" {
-				port, err := strconv.Atoi(ipPort.HostPort)
-				if err != nil {
-					return 0, fmt.Errorf("unable to convert host port %s to integer: %w", ipPort.HostPort, err)
-				}
-				return port, nil
-			}
-		}
-	}
-
-	return 0, errors.New("unable to determine port for container")
 }
