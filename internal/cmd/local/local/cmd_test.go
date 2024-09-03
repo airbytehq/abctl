@@ -26,6 +26,14 @@ import (
 )
 
 const portTest = 9999
+const testAirbyteChartLoc = "https://airbytehq.github.io/helm-charts/airbyte-1.2.3.tgz"
+
+func testChartLocator(chartName, chartVersion string) string {
+	if chartName == airbyteChartName && chartVersion == "" {
+		return testAirbyteChartLoc
+	}
+	return chartName
+}
 
 func TestCommand_Install(t *testing.T) {
 	expChartRepoCnt := 0
@@ -48,7 +56,7 @@ func TestCommand_Install(t *testing.T) {
 		{
 			chart: helmclient.ChartSpec{
 				ReleaseName:     airbyteChartRelease,
-				ChartName:       airbyteChartName,
+				ChartName:       testAirbyteChartLoc,
 				Namespace:       airbyteNamespace,
 				CreateNamespace: true,
 				Wait:            true,
@@ -106,7 +114,7 @@ func TestCommand_Install(t *testing.T) {
 
 		getChart: func(name string, _ *action.ChartPathOptions) (*chart.Chart, string, error) {
 			switch {
-			case name == airbyteChartName:
+			case name == testAirbyteChartLoc:
 				return &chart.Chart{Metadata: &chart.Metadata{Version: "test.airbyte.version"}}, "", nil
 			case name == nginxChartName:
 				return &chart.Chart{Metadata: &chart.Metadata{Version: "test.nginx.version"}}, "", nil
@@ -183,6 +191,7 @@ func TestCommand_Install(t *testing.T) {
 		WithBrowserLauncher(func(url string) error {
 			return nil
 		}),
+		WithChartLocator(testChartLocator),
 	)
 
 	if err != nil {
@@ -215,7 +224,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		{
 			chart: helmclient.ChartSpec{
 				ReleaseName:     airbyteChartRelease,
-				ChartName:       airbyteChartName,
+				ChartName:       testAirbyteChartLoc,
 				Namespace:       airbyteNamespace,
 				CreateNamespace: true,
 				Wait:            true,
@@ -274,7 +283,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 
 		getChart: func(name string, _ *action.ChartPathOptions) (*chart.Chart, string, error) {
 			switch {
-			case name == airbyteChartName:
+			case name == testAirbyteChartLoc:
 				return &chart.Chart{Metadata: &chart.Metadata{Version: "test.airbyte.version"}}, "", nil
 			case name == nginxChartName:
 				return &chart.Chart{Metadata: &chart.Metadata{Version: "test.nginx.version"}}, "", nil
@@ -351,6 +360,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		WithBrowserLauncher(func(url string) error {
 			return nil
 		}),
+		WithChartLocator(testChartLocator),
 	)
 
 	if err != nil {
