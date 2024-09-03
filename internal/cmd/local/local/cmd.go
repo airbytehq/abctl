@@ -62,18 +62,22 @@ type HTTPClient interface {
 // BrowserLauncher primarily for testing purposes.
 type BrowserLauncher func(url string) error
 
+// ChartLocator primarily for testing purposes.
+type ChartLocator func(repoName, repoUrl string) string
+
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
-	provider k8s.Provider
-	cluster  k8s.Cluster
-	http     HTTPClient
-	helm     helm.Client
-	k8s      k8s.Client
-	portHTTP int
-	spinner  *pterm.SpinnerPrinter
-	tel      telemetry.Client
-	launcher BrowserLauncher
-	userHome string
+	provider    k8s.Provider
+	cluster     k8s.Cluster
+	http        HTTPClient
+	helm        helm.Client
+	k8s         k8s.Client
+	portHTTP    int
+	spinner     *pterm.SpinnerPrinter
+	tel         telemetry.Client
+	launcher    BrowserLauncher
+	locateChart ChartLocator
+	userHome    string
 }
 
 // Option for configuring the Command, primarily exists for testing
@@ -114,6 +118,12 @@ func WithBrowserLauncher(launcher BrowserLauncher) Option {
 	}
 }
 
+func WithChartLocator(locator ChartLocator) Option {
+	return func(c *Command) {
+		c.locateChart = locator
+	}
+}
+
 // WithUserHome define the user's home directory.
 func WithUserHome(home string) Option {
 	return func(c *Command) {
@@ -138,6 +148,10 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	c := &Command{provider: provider}
 	for _, opt := range opts {
 		opt(c)
+	}
+
+	if c.locateChart == nil {
+		c.locateChart = locateLatestAirbyteChart
 	}
 
 	// determine userhome if not defined
@@ -698,11 +712,13 @@ func (c *Command) handleChart(
 		return fmt.Errorf("unable to add %s chart repo: %w", req.name, err)
 	}
 
-	c.spinner.UpdateText(fmt.Sprintf("Fetching %s Helm Chart", req.chartName))
-	helmChart, _, err := c.helm.GetChart(req.chartName, &action.ChartPathOptions{Version: req.chartVersion})
+	c.spinner.UpdateText(fmt.Sprintf("Fetching %s Helm Chart with version", req.chartName))
+
+	chartLoc := c.locateChart(req.chartName, req.chartVersion)
+
+	helmChart, _, err := c.helm.GetChart(chartLoc, &action.ChartPathOptions{Version: req.chartVersion})
 	if err != nil {
-		pterm.Error.Printfln("Unable to fetch %s Helm Chart", req.chartName)
-		return fmt.Errorf("unable to fetch chart %s: %w", req.chartName, err)
+		return fmt.Errorf("unable to fetch helm chart %q: %w", req.chartName, err)
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
@@ -741,7 +757,7 @@ func (c *Command) handleChart(
 	))
 	helmRelease, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
 		ReleaseName:     req.chartRelease,
-		ChartName:       req.chartName,
+		ChartName:       chartLoc,
 		CreateNamespace: true,
 		Namespace:       req.namespace,
 		Wait:            true,
