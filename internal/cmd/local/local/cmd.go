@@ -1,6 +1,7 @@
 package local
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"net/http"
@@ -549,6 +550,7 @@ func (c *Command) watchEvents(ctx context.Context) {
 				pterm.Debug.Println("Event watcher completed.")
 				return
 			}
+
 			if convertedEvent, ok := event.Object.(*eventsv1.Event); ok {
 				c.handleEvent(ctx, convertedEvent)
 			} else {
@@ -569,12 +571,55 @@ var now = func() *metav1.Time {
 	return &t
 }()
 
+func (c *Command) streamPodLogsToOutput(ctx context.Context, namespace string, podName string) error {
+	r, err := c.k8s.StreamPodLogs(ctx, namespace, podName)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		pterm.Debug.Println(scanner.Text())
+	}
+	
+	pterm.Debug.Printfln("done streaming logs for %s", podName)
+	return nil
+}
+
+// TODO probably want a better retrier, maybe with initial wait and backoff?
+func retry(msg string, maxAttempts int, sleep time.Duration, f func() error) {
+	for i := 1; i <= maxAttempts; i++ {
+		pterm.Debug.Println(msg)
+
+		err := f()
+		if err != nil {
+			if i == maxAttempts {
+				pterm.Error.Println("failed %s: %s", msg, err)
+				return
+			} else {
+				pterm.Debug.Println("error %s. will retry: %s", msg, err)
+				time.Sleep(sleep)
+			}
+		} else {
+			return
+		}
+	}
+}
+
+
 // handleEvent converts a kubernetes event into a console log message
 func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	// TODO: replace DeprecatedLastTimestamp,
 	// this is supposed to be replaced with series.lastObservedTime, however that field is always nil...
 	if e.DeprecatedLastTimestamp.Before(now) {
 		return
+	}
+
+	if e.Type == "Normal" && e.Reason == "Started" && e.Regarding.Kind == "Pod" {
+		go retry(fmt.Sprintf("streaming pod logs for %q", e.Regarding.Name), 5, 2 * time.Second, func() error {
+			return c.streamPodLogsToOutput(ctx, e.Regarding.Namespace, e.Regarding.Name)
+		})
 	}
 
 	switch {
