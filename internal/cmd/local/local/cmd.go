@@ -582,7 +582,7 @@ func (c *Command) streamPodLogsToOutput(ctx context.Context, namespace string, p
 	for scanner.Scan() {
 		pterm.Debug.Println(scanner.Text())
 	}
-	
+
 	pterm.Debug.Printfln("done streaming logs for %s", podName)
 	return nil
 }
@@ -607,7 +607,6 @@ func retry(msg string, maxAttempts int, sleep time.Duration, f func() error) {
 	}
 }
 
-
 // handleEvent converts a kubernetes event into a console log message
 func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	// TODO: replace DeprecatedLastTimestamp,
@@ -617,7 +616,7 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	}
 
 	if e.Type == "Normal" && e.Reason == "Started" && e.Regarding.Kind == "Pod" {
-		go retry(fmt.Sprintf("streaming pod logs for %q", e.Regarding.Name), 5, 2 * time.Second, func() error {
+		go retry(fmt.Sprintf("streaming pod logs for %q", e.Regarding.Name), 5, 2*time.Second, func() error {
 			return c.streamPodLogsToOutput(ctx, e.Regarding.Namespace, e.Regarding.Name)
 		})
 	}
