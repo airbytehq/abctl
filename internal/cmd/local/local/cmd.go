@@ -46,8 +46,8 @@ type BrowserLauncher func(url string) error
 // ChartLocator primarily for testing purposes.
 type ChartLocator func(repoName, repoUrl string) string
 
-// Command is the local command, responsible for installing, uninstalling, or other local actions.
-type Command struct {
+// Installer is the local command, responsible for installing, uninstalling, or other local actions.
+type Installer struct {
 	provider    k8s.Provider
 	http        HTTPClient
 	helm        helm.Client
@@ -61,71 +61,71 @@ type Command struct {
 }
 
 // Option for configuring the Command, primarily exists for testing
-type Option func(*Command)
+type Option func(*Installer)
 
 // WithTelemetryClient define the telemetry client for this command.
 func WithTelemetryClient(client telemetry.Client) Option {
-	return func(c *Command) {
+	return func(c *Installer) {
 		c.tel = client
 	}
 }
 
 // WithHTTPClient define the http client for this command.
 func WithHTTPClient(client HTTPClient) Option {
-	return func(c *Command) {
+	return func(c *Installer) {
 		c.http = client
 	}
 }
 
 // WithHelmClient define the helm client for this command.
 func WithHelmClient(client helm.Client) Option {
-	return func(c *Command) {
+	return func(c *Installer) {
 		c.helm = client
 	}
 }
 
 // WithK8sClient define the k8s client for this command.
 func WithK8sClient(client k8s.Client) Option {
-	return func(c *Command) {
+	return func(c *Installer) {
 		c.k8s = client
 	}
 }
 
 // WithBrowserLauncher define the browser launcher for this command.
 func WithBrowserLauncher(launcher BrowserLauncher) Option {
-	return func(c *Command) {
+	return func(c *Installer) {
 		c.launcher = launcher
 	}
 }
 
 func WithChartLocator(locator ChartLocator) Option {
-	return func(c *Command) {
+	return func(c *Installer) {
 		c.locateChart = locator
 	}
 }
 
 // WithUserHome define the user's home directory.
 func WithUserHome(home string) Option {
-	return func(c *Command) {
+	return func(c *Installer) {
 		c.userHome = home
 	}
 }
 
 func WithSpinner(spinner *pterm.SpinnerPrinter) Option {
-	return func(c *Command) {
+	return func(c *Installer) {
 		c.spinner = spinner
 	}
 }
 
 func WithPortHTTP(port int) Option {
-	return func(c *Command) {
+	return func(c *Installer) {
 		c.portHTTP = port
 	}
 }
 
-// New creates a new Command
-func New(provider k8s.Provider, opts ...Option) (*Command, error) {
-	c := &Command{provider: provider}
+// NewInstaller creates a new Installer
+func NewInstaller(provider k8s.Provider, opts ...Option) (*Installer, error) {
+	c := &Installer{provider: provider}
 	for _, opt := range opts {
 		opt(c)
 	}

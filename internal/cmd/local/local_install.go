@@ -90,7 +90,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			pterm.Success.Printfln("Cluster '%s' created", provider.ClusterName)
 		}
 
-		lc, err := local.New(provider,
+		lc, err := local.NewInstaller(provider,
 			local.WithPortHTTP(i.Port),
 			local.WithTelemetryClient(telClient),
 			local.WithSpinner(spinner),

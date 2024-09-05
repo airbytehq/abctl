@@ -14,7 +14,7 @@ type UninstallOpts struct {
 }
 
 // Uninstall handles the uninstallation of Airbyte.
-func (c *Command) Uninstall(_ context.Context, opts UninstallOpts) error {
+func Uninstall(opts UninstallOpts) error {
 	// check if persisted data should be removed, if not this is a noop
 	if opts.Persisted {
 		c.spinner.UpdateText("Removing persisted data")

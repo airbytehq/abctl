@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
@@ -58,17 +59,13 @@ func status(ctx context.Context, provider k8s.Provider, telClient telemetry.Clie
 		return err
 	}
 
-	lc, err := local.New(provider,
-		local.WithPortHTTP(port),
-		local.WithTelemetryClient(telClient),
-		local.WithSpinner(spinner),
-	)
+	helmClient, err := helm.New(provider.Kubeconfig, provider.Context, airbyteNamespace)
 	if err != nil {
-		pterm.Error.Printfln("Failed to initialize 'local' command")
+		pterm.Error.Printfln("Failed to initialize 'local' command: failed to get helm client")
 		return fmt.Errorf("unable to initialize local command: %w", err)
 	}
 
-	if err := lc.Status(ctx); err != nil {
+	if err := local.Status(spinner, port, helmClient); err != nil {
 		spinner.Fail("Unable to install Airbyte locally")
 		return err
 	}

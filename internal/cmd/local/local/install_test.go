@@ -179,7 +179,7 @@ func TestCommand_Install(t *testing.T) {
 		return &http.Response{StatusCode: 200}, nil
 	}}
 
-	c, err := New(
+	c, err := NewInstaller(
 		k8s.TestProvider,
 		WithPortHTTP(portTest),
 		WithHelmClient(&helm),
@@ -348,7 +348,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		return &http.Response{StatusCode: 200}, nil
 	}}
 
-	c, err := New(
+	c, err := NewInstaller(
 		k8s.TestProvider,
 		WithPortHTTP(portTest),
 		WithHelmClient(&helm),
@@ -371,7 +371,7 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 }
 
 func TestCommand_Install_InvalidValuesFile(t *testing.T) {
-	c, err := New(
+	c, err := NewInstaller(
 		k8s.TestProvider,
 		WithPortHTTP(portTest),
 		WithHelmClient(&mockHelmClient{}),

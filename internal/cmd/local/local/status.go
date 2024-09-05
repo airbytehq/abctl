@@ -1,19 +1,19 @@
 package local
 
 import (
-	"context"
 	"fmt"
 
+	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/pterm/pterm"
 )
 
 // Status handles the status of local Airbyte.
-func (c *Command) Status(_ context.Context) error {
+func Status(spinner *pterm.SpinnerPrinter, port int, helm helm.Client) error {
 	charts := []string{airbyteChartRelease, nginxChartRelease}
 	for _, name := range charts {
-		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", name))
+		spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", name))
 
-		rel, err := c.helm.GetRelease(name)
+		rel, err := helm.GetRelease(name)
 		if err != nil {
 			pterm.Warning.Println("Unable to fetch airbyte release")
 			pterm.Debug.Printfln("unable to fetch airbyte release: %s", err)
@@ -26,7 +26,7 @@ func (c *Command) Status(_ context.Context) error {
 		))
 	}
 
-	pterm.Info.Println(fmt.Sprintf("Airbyte should be accessible via http://localhost:%d", c.portHTTP))
+	pterm.Info.Println(fmt.Sprintf("Airbyte should be accessible via http://localhost:%d", port))
 
 	return nil
 }

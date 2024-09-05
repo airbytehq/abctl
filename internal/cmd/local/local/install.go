@@ -27,8 +27,8 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -67,7 +67,7 @@ func (i *InstallOpts) dockerAuth() bool {
 // persistentVolume creates a persistent volume in the namespace with the name provided.
 // if uid (user id) and gid (group id) are non-zero, the persistent directory on the host machine that holds the
 // persistent volume will be changed to be owned by
-func (c *Command) persistentVolume(ctx context.Context, namespace, name string) error {
+func (c *Installer) persistentVolume(ctx context.Context, namespace, name string) error {
 	if !c.k8s.PersistentVolumeExists(ctx, namespace, name) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume '%s'", name))
 
@@ -121,7 +121,7 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 	return nil
 }
 
-func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, volumeName string) error {
+func (c *Installer) persistentVolumeClaim(ctx context.Context, namespace, name, volumeName string) error {
 	if !c.k8s.PersistentVolumeClaimExists(ctx, namespace, name, volumeName) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume claim '%s'", name))
 		if err := c.k8s.PersistentVolumeClaimCreate(ctx, namespace, name, volumeName); err != nil {
@@ -137,7 +137,7 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 }
 
 // Install handles the installation of Airbyte
-func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
+func (c *Installer) Install(ctx context.Context, opts InstallOpts) error {
 	go c.watchEvents(ctx)
 
 	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
@@ -329,7 +329,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	return nil
 }
 
-func (c *Command) handleIngress(ctx context.Context, host string) error {
+func (c *Installer) handleIngress(ctx context.Context, host string) error {
 	c.spinner.UpdateText("Checking for existing Ingress")
 
 	if c.k8s.IngressExists(ctx, airbyteNamespace, airbyteIngress) {
@@ -351,7 +351,7 @@ func (c *Command) handleIngress(ctx context.Context, host string) error {
 	return nil
 }
 
-func (c *Command) watchEvents(ctx context.Context) {
+func (c *Installer) watchEvents(ctx context.Context) {
 	watcher, err := c.k8s.EventsWatch(ctx, airbyteNamespace)
 	if err != nil {
 		pterm.Warning.Printfln("Unable to watch airbyte events\n  %s", err)
@@ -387,7 +387,7 @@ var now = func() *metav1.Time {
 }()
 
 // handleEvent converts a kubernetes event into a console log message
-func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
+func (c *Installer) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	// TODO: replace DeprecatedLastTimestamp,
 	// this is supposed to be replaced with series.lastObservedTime, however that field is always nil...
 	if e.DeprecatedLastTimestamp.Before(now) {
@@ -432,7 +432,7 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	}
 }
 
-func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
+func (c *Installer) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
 	secretBody, err := docker.Secret(server, user, pass, email)
 	if err != nil {
 		pterm.Error.Println("Unable to create docker secret")
@@ -472,7 +472,7 @@ type chartRequest struct {
 }
 
 // handleChart will handle the installation of a chart
-func (c *Command) handleChart(
+func (c *Installer) handleChart(
 	ctx context.Context,
 	req chartRequest,
 ) error {
@@ -558,7 +558,7 @@ func (c *Command) handleChart(
 
 // verifyIngress will open the url in the user's browser but only if the url returns a 200 response code first
 // TODO: clean up this method, make it testable
-func (c *Command) verifyIngress(ctx context.Context, url string) error {
+func (c *Installer) verifyIngress(ctx context.Context, url string) error {
 	c.spinner.UpdateText("Verifying ingress")
 
 	ingressCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
@@ -604,7 +604,7 @@ func (c *Command) verifyIngress(ctx context.Context, url string) error {
 	return nil
 }
 
-func (c *Command) launch(url string) {
+func (c *Installer) launch(url string) {
 	c.spinner.UpdateText(fmt.Sprintf("Attempting to launch web-browser for %s", url))
 
 	if err := c.launcher(url); err != nil {
