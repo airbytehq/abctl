@@ -49,4 +49,18 @@ func Test_Paths(t *testing.T) {
 			t.Errorf("Kubeconfig mismatch (-want +got):\n%s", d)
 		}
 	})
+
+	t.Run("HelmRepoConfig", func(t *testing.T) {
+		exp := filepath.Join(UserHome, ".airbyte", "abctl", ".helmrepo")
+		if d := cmp.Diff(exp, HelmRepoConfig); d != "" {
+			t.Errorf("HelmRepoConfig mismatch (-want +got):\n%s", d)
+		}
+	})
+
+	t.Run("HelmRepoCache", func(t *testing.T) {
+		exp := filepath.Join(UserHome, ".airbyte", "abctl", ".helmcache")
+		if d := cmp.Diff(exp, HelmRepoCache); d != "" {
+			t.Errorf("HelmRepoCache mismatch (-want +got):\n%s", d)
+		}
+	})
 }
