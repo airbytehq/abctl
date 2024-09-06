@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/action"
@@ -39,10 +40,12 @@ func New(kubecfg, kubectx, namespace string) (Client, error) {
 	logger := helmLogger{}
 	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
 		Options: &helmclient.Options{
-			Namespace: namespace,
-			Output:    logger,
-			DebugLog:  logger.Debug,
-			Debug:     true,
+			Namespace:        namespace,
+			Output:           logger,
+			DebugLog:         logger.Debug,
+			Debug:            true,
+			RepositoryCache:  paths.HelmRepoCache,
+			RepositoryConfig: paths.HelmRepoConfig,
 		},
 		RestConfig: restCfg,
 	})
