@@ -68,5 +68,5 @@ func (d helmLogger) Write(p []byte) (int, error) {
 }
 
 func (d helmLogger) Debug(format string, v ...interface{}) {
-	pterm.Debug.Println(fmt.Sprintf("helm - DEBUG: "+format, v...))
+	pterm.Debug.Println(fmt.Sprintf("helm: "+format, v...))
 }
