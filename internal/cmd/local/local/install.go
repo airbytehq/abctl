@@ -233,6 +233,11 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		}
 		pterm.Debug.Println(fmt.Sprintf("Created '%s' secret", dockerAuthSecretName))
 		airbyteValues = append(airbyteValues, fmt.Sprintf("global.imagePullSecrets[0].name=%s", dockerAuthSecretName))
+
+		if err := c.k8s.ServiceAccountPatch(ctx, airbyteNamespace, "default", `{"imagePullSecrets": [{"name": "docker-auth"}]}`); err != nil {
+			pterm.Error.Printfln("failed to patch service account with docker creds: %s", err)
+		}
+			
 	}
 
 	for _, secretFile := range opts.Secrets {

@@ -75,6 +75,8 @@ type Client interface {
 	EventsWatch(ctx context.Context, namespace string) (watch.Interface, error)
 
 	LogsGet(ctx context.Context, namespace string, name string) (string, error)
+
+	ServiceAccountPatch(ctx context.Context, namespace string, name string, patch string) error
 }
 
 var _ Client = (*DefaultK8sClient)(nil)
@@ -82,6 +84,11 @@ var _ Client = (*DefaultK8sClient)(nil)
 // DefaultK8sClient converts the official kubernetes client to our more manageable (and testable) interface
 type DefaultK8sClient struct {
 	ClientSet kubernetes.Interface
+}
+
+func (d *DefaultK8sClient) 	ServiceAccountPatch(ctx context.Context, namespace string, name string, patch string) error {
+	_, err := d.ClientSet.CoreV1().ServiceAccounts(namespace).Patch(ctx, name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+	return err
 }
 
 func (d *DefaultK8sClient) DeploymentList(ctx context.Context, namespace string) (*v1.DeploymentList, error) {
