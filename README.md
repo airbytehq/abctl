@@ -235,7 +235,7 @@ Install `go`
    ``` 
 - Via [go.dev](https://go.dev/doc/install)
 
-This repository contains a [Makefile](Makefile) for convenience. Wrapping the traditional `go` commands
+This repository utilises a [Makefile](Makefile), wrapping the traditional `go` commands
 used for formatting, vetting, building, and testing `go` code.
 
 The following `make` commands are supported:
