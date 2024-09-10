@@ -37,16 +37,18 @@ Airbyte's command line tool for local Airbyte deployments.
    - Via [Github ](https://github.com/airbytehq/abctl/releases/latest)
 3. Install `Airbyte`
    ```
+   # install Airbyte 
    abctl local install
+   # fetch the login credentials
    abctl local credentials
    ```
-> [!NOTE]
-> Depending on internet speed, `abctl local install` could take in excess of 15 minutes.
-> 
-> By default `abctl local install` will only allow Airbyte to accessible on the host `localhost` and port `8000`.
->
-> If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.<br />
-> If port `8000` is not available. or another port is preferred, `--port [PORT]` can be specified.
+   > [!NOTE]
+   > Depending on internet speed, `abctl local install` could take in excess of 15 minutes.
+   > 
+   > By default `abctl local install` will only allow Airbyte to accessible on the host `localhost` and port `8000`.
+   >
+   > If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.<br />
+   > If port `8000` is not available. or another port is preferred, `--port [PORT]` can be specified.
 
 4. Login to `Airbyte`
 
