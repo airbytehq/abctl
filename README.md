@@ -222,4 +222,29 @@ version: v0.12.0
 ```
 
 # Contributing
+
+## Report an Issue
 If you have found a problem with `abctl`, please open a [Github Issue](https://github.com/airbytehq/airbyte/issues/new/choose) and use the `🐛 [abctl] Report an issue with the abctl tool` template.
+
+## Build
+
+Install `go`
+- Via [brew](https://brew.sh/)
+   ```
+   brew install go
+   ``` 
+- Via [go.dev](https://go.dev/doc/install)
+
+This repository contains a [Makefile](Makefile) for convenience. Wrapping the traditional `go` commands
+used for formatting, vetting, building, and testing `go` code.
+
+The following `make` command are supported:
+
+| name         | description                                                                         |
+|--------------|-------------------------------------------------------------------------------------|
+| `make build` | Builds the `abctl` binary, placing it in the `build` directory.                     |
+| `make clean` | Removes the `build` directory.                                                      |
+| `make fmt`   | [Formats the code](https://pkg.go.dev/cmd/go#hdr-Gofmt__reformat__package_sources). |
+| `make test`  | Runs all the tests.                                                                 |
+| `make vet`   | Runs the [vet](https://pkg.go.dev/cmd/vet) command.                                 |
+
