@@ -381,7 +381,7 @@ func (c *Command) watchEvents(ctx context.Context) {
 }
 
 // 2024-09-10 20:16:24 WARN i.m.s.r.u.Loggers$Slf4JLogger(warn):299 - [273....
-var javaLogRx = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \x1b\[\d+m(?P<level>[A-Z]+)\x1b\[m (?P<msg>\S+ - .*)`)
+var javaLogRx = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \x1b\[(?:1;)?\d+m(?P<level>[A-Z]+)\x1b\[m (?P<msg>\S+ - .*)`)
 
 func (c *Command) streamPodLogs(ctx context.Context, namespace, podName, prefix string, since time.Time) error {
 	r, err := c.k8s.StreamPodLogs(ctx, airbyteNamespace, airbyteBootloaderPodName, since)
@@ -394,6 +394,12 @@ func (c *Command) streamPodLogs(ctx context.Context, namespace, podName, prefix 
 	scanner := bufio.NewScanner(r)
 
 	for scanner.Scan() {
+
+		// skip java stacktrace noise
+		if strings.HasPrefix(scanner.Text(), "\tat ") || strings.HasPrefix(scanner.Text(), "\t... ") {
+			continue
+		}
+
 		m := javaLogRx.FindSubmatch(scanner.Bytes())
 		var msg string
 
