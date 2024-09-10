@@ -17,7 +17,7 @@ type InstallCmd struct {
 	DockerPassword  string   `group:"docker" help:"Docker password." env:"ABCTL_LOCAL_INSTALL_DOCKER_PASSWORD"`
 	DockerServer    string   `group:"docker" default:"https://index.docker.io/v1/" help:"Docker server." env:"ABCTL_LOCAL_INSTALL_DOCKER_SERVER"`
 	DockerUsername  string   `group:"docker" help:"Docker username." env:"ABCTL_LOCAL_INSTALL_DOCKER_USERNAME"`
-	Host            string   `default:"localhost" help:"HTTP ingress host."`
+	Host            []string `help:"HTTP ingress host."`
 	InsecureCookies bool     `help:"Allow cookies to be served over HTTP."`
 	LowResourceMode bool     `help:"Run Airbyte in low resource mode."`
 	Migrate         bool     `help:"Migrate data from a previous Docker Compose Airbyte installation."`
@@ -106,7 +106,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			Secrets:          i.Secret,
 			Migrate:          i.Migrate,
 			Docker:           dockerClient,
-			Host:             i.Host,
+			Hosts:            i.Host,
 
 			DockerServer: i.DockerServer,
 			DockerUser:   i.DockerUsername,
