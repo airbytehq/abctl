@@ -1,11 +1,13 @@
 package local
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -27,8 +29,8 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -378,6 +380,57 @@ func (c *Command) watchEvents(ctx context.Context) {
 	}
 }
 
+// 2024-09-10 20:16:24 WARN i.m.s.r.u.Loggers$Slf4JLogger(warn):299 - [273....
+var javaLogRx = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \x1b\[\d+m(?P<level>[A-Z]+)\x1b\[m (?P<msg>\S+ - .*)`)
+
+func (c *Command) streamPodLogs(ctx context.Context, namespace, podName, prefix string, since time.Time) error {
+	r, err := c.k8s.StreamPodLogs(ctx, airbyteNamespace, airbyteBootloaderPodName, since)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	level := pterm.Debug
+	scanner := bufio.NewScanner(r)
+
+	for scanner.Scan() {
+		m := javaLogRx.FindSubmatch(scanner.Bytes())
+		var msg string
+
+		if m != nil {
+			msg = string(m[2])
+			if string(m[1]) == "ERROR" {
+				level = pterm.Error
+			} else {
+				level = pterm.Debug
+			}
+		} else {
+			msg = scanner.Text()
+		}
+
+		level.Printfln("%s: %s", prefix, msg)
+	}
+	return scanner.Err()
+}
+
+func (c *Command) watchBootloaderLogs(ctx context.Context) {
+	pterm.Debug.Printfln("start streaming bootloader logs")
+	since := time.Now()
+
+	for {
+		// Wait a few seconds on the first iteration, give the bootloaders some time to start.
+		time.Sleep(5 * time.Second)
+
+		err := c.streamPodLogs(ctx, airbyteNamespace, airbyteBootloaderPodName, "airbyte-bootloader", since)
+		if err == nil {
+			break
+		} else {
+			pterm.Debug.Printfln("error streaming bootloader logs. will retry: %s", err)
+		}
+	}
+	pterm.Debug.Printfln("done streaming bootloader logs")
+}
+
 // now is used to filter out kubernetes events that happened in the past.
 // Kubernetes wants us to use the ResourceVersion on the event watch request itself, but that approach
 // is more complicated as it requires determining which ResourceVersion to initially provide.
@@ -398,6 +451,8 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	case strings.EqualFold(e.Type, "normal"):
 		if strings.EqualFold(e.Reason, "backoff") {
 			pterm.Warning.Println(e.Note)
+		} else if e.Reason == "Started" && e.Regarding.Name == "airbyte-abctl-airbyte-bootloader" {
+			go c.watchBootloaderLogs(ctx)
 		} else {
 			pterm.Debug.Println(e.Note)
 		}
