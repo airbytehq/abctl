@@ -84,6 +84,7 @@ The following commands are supported:
 The local sub-commands are focused on managing the local Airbyte installation.
 The following sub-commands are supports:
 - [credentials](#credentials)
+- [deployments](#deployments)
 - [install](#install)
 - [status](#status)
 - [uninstall](#uninstall)
@@ -118,6 +119,18 @@ $ abctl local credentials
 |------------|---------|-------------------------------------------|
 | --email    | ""      | Changes the authentication email address. |
 | --password | ""      | Changes the authentication password.      |
+
+### deployments
+
+```abctl local deployments```
+
+Display kubernetes deployment information and allows for restarting a kubernetes deployment.
+
+`deployments` supports the following optional flags
+
+| Name      | Default | Description                       |
+|-----------|---------|-----------------------------------|
+| --restart | ""      | Restarts the provided deployment. | 
 
 ### install
 
