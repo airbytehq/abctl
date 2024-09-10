@@ -2,6 +2,8 @@ package k8stest
 
 import (
 	"context"
+	"io"
+	"time"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	v1 "k8s.io/api/apps/v1"
@@ -33,6 +35,7 @@ type MockClient struct {
 	FnServiceGet                  func(ctx context.Context, namespace, name string) (*corev1.Service, error)
 	FnEventsWatch                 func(ctx context.Context, namespace string) (watch.Interface, error)
 	FnLogsGet                     func(ctx context.Context, namespace string, name string) (string, error)
+	FnStreamPodLogs               func(ctx context.Context, namespace, podName string, since time.Time) (io.ReadCloser, error)
 }
 
 func (m *MockClient) DeploymentList(ctx context.Context, namespace string) (*v1.DeploymentList, error) {
@@ -165,4 +168,11 @@ func (m *MockClient) LogsGet(ctx context.Context, namespace string, name string)
 		return "LogsGet called", nil
 	}
 	return m.FnLogsGet(ctx, namespace, name)
+}
+
+func (m *MockClient) StreamPodLogs(ctx context.Context, namespace string, podName string, since time.Time) (io.ReadCloser, error) {
+	if m.FnStreamPodLogs == nil {
+		panic("FnStreamPodLogs is not configured")
+	}
+	return m.FnStreamPodLogs(ctx, namespace, podName, since)
 }
