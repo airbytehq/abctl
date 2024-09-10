@@ -37,7 +37,9 @@ Airbyte's command line tool for local Airbyte deployments.
    - Via [Github ](https://github.com/airbytehq/abctl/releases/latest)
 3. Install `Airbyte`
    ```
+   # install Airbyte 
    abctl local install
+   # fetch the login credentials
    abctl local credentials
    ```
 > [!NOTE]
@@ -82,6 +84,7 @@ The following commands are supported:
 The local sub-commands are focused on managing the local Airbyte installation.
 The following sub-commands are supports:
 - [credentials](#credentials)
+- [deployments](#deployments)
 - [install](#install)
 - [status](#status)
 - [uninstall](#uninstall)
@@ -116,6 +119,18 @@ $ abctl local credentials
 |------------|---------|-------------------------------------------|
 | --email    | ""      | Changes the authentication email address. |
 | --password | ""      | Changes the authentication password.      |
+
+### deployments
+
+```abctl local deployments```
+
+Display kubernetes deployment information and allows for restarting a kubernetes deployment.
+
+`deployments` supports the following optional flags
+
+| Name      | Default | Description                       |
+|-----------|---------|-----------------------------------|
+| --restart | ""      | Restarts the provided deployment. | 
 
 ### install
 
@@ -207,4 +222,29 @@ version: v0.12.0
 ```
 
 # Contributing
+
+## Report an Issue
 If you have found a problem with `abctl`, please open a [Github Issue](https://github.com/airbytehq/airbyte/issues/new/choose) and use the `🐛 [abctl] Report an issue with the abctl tool` template.
+
+## Build
+
+Install `go`
+- Via [brew](https://brew.sh/)
+   ```
+   brew install go
+   ``` 
+- Via [go.dev](https://go.dev/doc/install)
+
+This repository utilises a [Makefile](Makefile), wrapping the traditional `go` commands
+used for formatting, vetting, building, and testing `go` code.
+
+The following `make` commands are supported:
+
+| name         | description                                                                         |
+|--------------|-------------------------------------------------------------------------------------|
+| `make build` | Builds the `abctl` binary, placing it in the `build` directory.                     |
+| `make clean` | Removes the `build` directory.                                                      |
+| `make fmt`   | [Formats the code](https://pkg.go.dev/cmd/go#hdr-Gofmt__reformat__package_sources). |
+| `make test`  | Runs all the tests.                                                                 |
+| `make vet`   | Runs the [vet](https://pkg.go.dev/cmd/vet) command.                                 |
+
