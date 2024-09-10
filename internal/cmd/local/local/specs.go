@@ -2,6 +2,7 @@ package local
 
 import (
 	"fmt"
+	"slices"
 
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,12 +18,12 @@ func ingress(hosts []string) *networkingv1.Ingress {
 	} else {
 		// If a host that isn't `localhost` was provided, create a second rule for localhost.
 		// This is required to ensure we can talk to Airbyte via localhost
-		if !contains(hosts, "localhost") {
+		if !slices.Contains(hosts, "localhost") {
 			hosts = append(hosts, "localhost")
 		}
 		// If a host that isn't `host.docker.internal` was provided, create a second rule for localhost.
 		// This is required to ensure we can talk to other containers.
-		if !contains(hosts, "host.docker.internal") {
+		if !slices.Contains(hosts, "host.docker.internal") {
 			hosts = append(hosts, "host.docker.internal")
 		}
 	}
@@ -70,15 +71,4 @@ func ingressRule(host string) networkingv1.IngressRule {
 			},
 		},
 	}
-}
-
-// contains returns true if the slice contains the item, otherwise false.
-func contains[T comparable](slice []T, item T) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-
-	return false
 }
