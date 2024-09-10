@@ -238,7 +238,7 @@ Install `go`
 This repository contains a [Makefile](Makefile) for convenience. Wrapping the traditional `go` commands
 used for formatting, vetting, building, and testing `go` code.
 
-The following `make` command are supported:
+The following `make` commands are supported:
 
 | name         | description                                                                         |
 |--------------|-------------------------------------------------------------------------------------|
