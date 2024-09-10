@@ -8,16 +8,27 @@ import (
 )
 
 // ingress creates an ingress type for defining the webapp ingress rules.
-func ingress(host string) *networkingv1.Ingress {
+func ingress(hosts []string) *networkingv1.Ingress {
 	var ingressClassName = "nginx"
 
-	// Always add a localhost and host.docker.internal route.
-	// This is necessary to ensure that this code can verify the Airbyte installation via `localhost`.
-	// Additionally, make it easy for dockerized applications (Airflow) to talk with Airbyte over the docker host.
-	rules := []networkingv1.IngressRule{ingressRule("localhost"), ingressRule("host.docker.internal")}
-	// If a host that isn't `localhost` was provided, create a second rule for that host.
-	// This is required to support non-local installation, such as running on an EC2 instance.
-	if host != "localhost" {
+	// if no host is defined, default to an empty host
+	if len(hosts) == 0 {
+		hosts = append(hosts, "")
+	} else {
+		// If a host that isn't `localhost` was provided, create a second rule for localhost.
+		// This is required to ensure we can talk to Airbyte via localhost
+		if !contains(hosts, "localhost") {
+			hosts = append(hosts, "localhost")
+		}
+		// If a host that isn't `host.docker.internal` was provided, create a second rule for localhost.
+		// This is required to ensure we can talk to other containers.
+		if !contains(hosts, "host.docker.internal") {
+			hosts = append(hosts, "host.docker.internal")
+		}
+	}
+
+	var rules []networkingv1.IngressRule
+	for _, host := range hosts {
 		rules = append(rules, ingressRule(host))
 	}
 
@@ -59,4 +70,15 @@ func ingressRule(host string) networkingv1.IngressRule {
 			},
 		},
 	}
+}
+
+// contains returns true if the slice contains the item, otherwise false.
+func contains[T comparable](slice []T, item T) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+
+	return false
 }

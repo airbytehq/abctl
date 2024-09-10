@@ -27,8 +27,8 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -46,7 +46,7 @@ type InstallOpts struct {
 	ValuesFile       string
 	Secrets          []string
 	Migrate          bool
-	Host             string
+	Hosts            []string
 
 	Docker *docker.Docker
 
@@ -307,7 +307,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		return fmt.Errorf("unable to install nginx chart: %w", err)
 	}
 
-	if err := c.handleIngress(ctx, opts.Host); err != nil {
+	if err := c.handleIngress(ctx, opts.Hosts); err != nil {
 		return err
 	}
 
@@ -329,12 +329,12 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	return nil
 }
 
-func (c *Command) handleIngress(ctx context.Context, host string) error {
+func (c *Command) handleIngress(ctx context.Context, hosts []string) error {
 	c.spinner.UpdateText("Checking for existing Ingress")
 
 	if c.k8s.IngressExists(ctx, airbyteNamespace, airbyteIngress) {
 		pterm.Success.Println("Found existing Ingress")
-		if err := c.k8s.IngressUpdate(ctx, airbyteNamespace, ingress(host)); err != nil {
+		if err := c.k8s.IngressUpdate(ctx, airbyteNamespace, ingress(hosts)); err != nil {
 			pterm.Error.Printfln("Unable to update existing Ingress")
 			return fmt.Errorf("unable to update existing ingress: %w", err)
 		}
@@ -343,7 +343,7 @@ func (c *Command) handleIngress(ctx context.Context, host string) error {
 	}
 
 	pterm.Info.Println("No existing Ingress found, creating one")
-	if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress(host)); err != nil {
+	if err := c.k8s.IngressCreate(ctx, airbyteNamespace, ingress(hosts)); err != nil {
 		pterm.Error.Println("Unable to create ingress")
 		return fmt.Errorf("unable to create ingress: %w", err)
 	}
