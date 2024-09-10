@@ -396,35 +396,42 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 
 	switch {
 	case strings.EqualFold(e.Type, "normal"):
-		pterm.Debug.Println(e.Note)
+		if strings.EqualFold(e.Reason, "backoff") {
+			pterm.Warning.Println(e.Note)
+		} else {
+			pterm.Debug.Println(e.Note)
+		}
+
 	case strings.EqualFold(e.Type, "warning"):
-		var logs = ""
+		logs := ""
+		level := pterm.Debug
+
+		// only show the warning if the count is higher than 5
+		// TODO: replace DeprecatedCount
+		// Similar issue to DeprecatedLastTimestamp, the series attribute is always nil
+		if e.DeprecatedCount > 5 {
+			level = pterm.Warning
+		}
+
 		if strings.EqualFold(e.Reason, "backoff") {
 			var err error
 			logs, err = c.k8s.LogsGet(ctx, e.Regarding.Namespace, e.Regarding.Name)
 			if err != nil {
-				pterm.Debug.Printfln("Unable to retrieve logs for %s:%s\n  %s", e.Regarding.Namespace, e.Regarding.Name, err)
+				logs = fmt.Sprintf("Unable to retrieve logs for %s:%s\n  %s", e.Regarding.Namespace, e.Regarding.Name, err)
 			}
+		} else if strings.Contains(e.Note, "Failed to pull image") && strings.Contains(e.Note, "429 Too Many Requests") {
+			// The docker image is failing to pull because the user has hit a rate limit.
+			// This causes the install to go very slowly and possibly time out.
+			// Always warn in this case, so the user knows what's going on.
+			level = pterm.Warning
 		}
 
-		// TODO: replace DeprecatedCount
-		// Similar issue to DeprecatedLastTimestamp, the series attribute is always nil
 		if logs != "" {
-			msg := fmt.Sprintf("Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs: %s",
+			level.Printfln("Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d\n  Logs: %s",
 				e.Name, e.Reason, e.Note, e.DeprecatedCount, strings.TrimSpace(logs))
-			pterm.Debug.Println(msg)
-			// only show the warning if the count is higher than 5
-			if e.DeprecatedCount > 5 {
-				pterm.Warning.Printfln(msg)
-			}
 		} else {
-			msg := fmt.Sprintf("Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d",
+			level.Printfln("Encountered an issue deploying Airbyte:\n  Pod: %s\n  Reason: %s\n  Message: %s\n  Count: %d",
 				e.Name, e.Reason, e.Note, e.DeprecatedCount)
-			pterm.Debug.Printfln(msg)
-			// only show the warning if the count is higher than 5
-			if e.DeprecatedCount > 5 {
-				pterm.Warning.Printfln(msg)
-			}
 		}
 
 	default:
