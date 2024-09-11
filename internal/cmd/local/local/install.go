@@ -330,7 +330,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 
 func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr error) error {
 
-	if podList, err := c.k8s.ListPods(ctx, airbyteNamespace); err == nil {
+	if podList, err := c.k8s.PodList(ctx, airbyteNamespace); err == nil {
 
 		errors := []string{}
 		for _, pod := range podList.Items {
