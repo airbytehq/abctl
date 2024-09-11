@@ -76,7 +76,7 @@ type Client interface {
 
 	LogsGet(ctx context.Context, namespace string, name string) (string, error)
 	StreamPodLogs(ctx context.Context, namespace string, podName string, since time.Time) (io.ReadCloser, error)
-	ListPods(ctx context.Context, namespace string) (*corev1.PodList, error)
+	PodList(ctx context.Context, namespace string) (*corev1.PodList, error)
 }
 
 var _ Client = (*DefaultK8sClient)(nil)
