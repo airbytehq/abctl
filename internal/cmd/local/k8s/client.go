@@ -330,12 +330,12 @@ func (d *DefaultK8sClient) LogsGet(ctx context.Context, namespace string, name s
 
 func (d *DefaultK8sClient) StreamPodLogs(ctx context.Context, namespace string, podName string, since time.Time) (io.ReadCloser, error) {
 	req := d.ClientSet.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
-		Follow: true,
+		Follow:    true,
 		SinceTime: &metav1.Time{Time: since},
 	})
 	return req.Stream(ctx)
 }
 
-func (d *DefaultK8sClient) ListPods(ctx context.Context, namespace string) (*corev1.PodList, error) {
+func (d *DefaultK8sClient) PodList(ctx context.Context, namespace string) (*corev1.PodList, error) {
 	return d.ClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 }
