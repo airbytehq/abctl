@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +28,7 @@ var DefaultPersistentVolumeSize = resource.MustParse("500Mi")
 // Client primarily for testing purposes
 type Client interface {
 	// DeploymentList returns a list of all the services within the namespace
-	DeploymentList(ctx context.Context, namespace string) (*v1.DeploymentList, error)
+	DeploymentList(ctx context.Context, namespace string) (*appsv1.DeploymentList, error)
 	// DeploymentRestart will force a restart of the deployment name in the provided namespace.
 	// This is a blocking call, it should only return once the deployment has completed.
 	DeploymentRestart(ctx context.Context, namespace, name string) error
@@ -76,6 +76,7 @@ type Client interface {
 
 	LogsGet(ctx context.Context, namespace string, name string) (string, error)
 	StreamPodLogs(ctx context.Context, namespace string, podName string, since time.Time) (io.ReadCloser, error)
+	ListPods(ctx context.Context, namespace string) (*corev1.PodList, error)
 }
 
 var _ Client = (*DefaultK8sClient)(nil)
@@ -85,7 +86,7 @@ type DefaultK8sClient struct {
 	ClientSet kubernetes.Interface
 }
 
-func (d *DefaultK8sClient) DeploymentList(ctx context.Context, namespace string) (*v1.DeploymentList, error) {
+func (d *DefaultK8sClient) DeploymentList(ctx context.Context, namespace string) (*appsv1.DeploymentList, error) {
 	return d.ClientSet.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 }
 
@@ -333,4 +334,8 @@ func (d *DefaultK8sClient) StreamPodLogs(ctx context.Context, namespace string, 
 		SinceTime: &metav1.Time{Time: since},
 	})
 	return req.Stream(ctx)
+}
+
+func (d *DefaultK8sClient) ListPods(ctx context.Context, namespace string) (*corev1.PodList, error) {
+	return d.ClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 }
