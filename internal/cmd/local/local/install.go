@@ -384,7 +384,7 @@ func (c *Command) watchEvents(ctx context.Context) {
 var javaLogRx = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \x1b\[(?:1;)?\d+m(?P<level>[A-Z]+)\x1b\[m (?P<msg>\S+ - .*)`)
 
 func (c *Command) streamPodLogs(ctx context.Context, namespace, podName, prefix string, since time.Time) error {
-	r, err := c.k8s.StreamPodLogs(ctx, airbyteNamespace, airbyteBootloaderPodName, since)
+	r, err := c.k8s.StreamPodLogs(ctx, namespace, podName, since)
 	if err != nil {
 		return err
 	}
