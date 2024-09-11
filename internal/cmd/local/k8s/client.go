@@ -75,6 +75,7 @@ type Client interface {
 	EventsWatch(ctx context.Context, namespace string) (watch.Interface, error)
 
 	LogsGet(ctx context.Context, namespace string, name string) (string, error)
+	StreamPodLogs(ctx context.Context, namespace string, podName string, since time.Time) (io.ReadCloser, error)
 }
 
 var _ Client = (*DefaultK8sClient)(nil)
@@ -324,4 +325,12 @@ func (d *DefaultK8sClient) LogsGet(ctx context.Context, namespace string, name s
 		return "", fmt.Errorf("unable to copy logs from pod %s: %w", name, err)
 	}
 	return buf.String(), nil
+}
+
+func (d *DefaultK8sClient) StreamPodLogs(ctx context.Context, namespace string, podName string, since time.Time) (io.ReadCloser, error) {
+	req := d.ClientSet.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{
+		Follow: true,
+		SinceTime: &metav1.Time{Time: since},
+	})
+	return req.Stream(ctx)
 }

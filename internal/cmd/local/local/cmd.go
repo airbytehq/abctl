@@ -20,6 +20,7 @@ import (
 )
 
 const (
+	airbyteBootloaderPodName = "airbyte-abctl-airbyte-bootloader"
 	airbyteChartName    = "airbyte/airbyte"
 	airbyteChartRelease = "airbyte-abctl"
 	airbyteIngress      = "ingress-abctl"
