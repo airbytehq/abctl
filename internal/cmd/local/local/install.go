@@ -1,13 +1,12 @@
 package local
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -275,7 +274,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		namespace:    airbyteNamespace,
 		valuesYAML:   valuesYAML,
 	}); err != nil {
-		return fmt.Errorf("unable to install airbyte chart: %w", err)
+		return c.diagnoseAirbyteChartFailure(ctx, err)
 	}
 
 	if err := c.handleChart(ctx, chartRequest{
@@ -331,6 +330,36 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	return nil
 }
 
+func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr error) error {
+
+	if podList, err := c.k8s.ListPods(ctx, airbyteNamespace); err == nil {
+
+		errors := []string{}
+		for _, pod := range podList.Items {
+			if pod.Status.Phase == corev1.PodFailed {
+				msg := "unknown"
+
+				logs, err := c.k8s.LogsGet(ctx, airbyteNamespace, pod.Name)
+				if err != nil {
+					msg = "unknown: failed to get pod logs."
+				}
+				m, err := getLastJavaLogError(strings.NewReader(logs))
+				if err != nil {
+					msg = "unknown: failed to find error log."
+				}
+				if m != "" {
+					msg = m
+				}
+
+				errors = append(errors, fmt.Sprintf("pod %s: %s", pod.Name, msg))
+			}
+		}
+		return fmt.Errorf("unable to install airbyte chart:\n%s", strings.Join(errors, "\n"))
+	}
+
+	return fmt.Errorf("unable to install airbyte chart: %w", chartErr)
+}
+
 func (c *Command) handleIngress(ctx context.Context, host string) error {
 	c.spinner.UpdateText("Checking for existing Ingress")
 
@@ -380,9 +409,6 @@ func (c *Command) watchEvents(ctx context.Context) {
 	}
 }
 
-// 2024-09-10 20:16:24 WARN i.m.s.r.u.Loggers$Slf4JLogger(warn):299 - [273....
-var javaLogRx = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \x1b\[(?:1;)?\d+m(?P<level>[A-Z]+)\x1b\[m (?P<msg>\S+ - .*)`)
-
 func (c *Command) streamPodLogs(ctx context.Context, namespace, podName, prefix string, since time.Time) error {
 	r, err := c.k8s.StreamPodLogs(ctx, namespace, podName, since)
 	if err != nil {
@@ -390,33 +416,16 @@ func (c *Command) streamPodLogs(ctx context.Context, namespace, podName, prefix 
 	}
 	defer r.Close()
 
-	level := pterm.Debug
-	scanner := bufio.NewScanner(r)
-
-	for scanner.Scan() {
-
-		// skip java stacktrace noise
-		if strings.HasPrefix(scanner.Text(), "\tat ") || strings.HasPrefix(scanner.Text(), "\t... ") {
-			continue
-		}
-
-		m := javaLogRx.FindSubmatch(scanner.Bytes())
-		var msg string
-
-		if m != nil {
-			msg = string(m[2])
-			if string(m[1]) == "ERROR" {
-				level = pterm.Error
-			} else {
-				level = pterm.Debug
-			}
+	s := newJavaLogScanner(r)
+	for s.Scan() {
+		if s.line.level == "ERROR" {
+			pterm.Error.Printfln("%s: %s", prefix, s.line.msg)
 		} else {
-			msg = scanner.Text()
+			pterm.Debug.Printfln("%s: %s", prefix, s.line.msg)
 		}
-
-		level.Printfln("%s: %s", prefix, msg)
 	}
-	return scanner.Err()
+
+	return s.Err()
 }
 
 func (c *Command) watchBootloaderLogs(ctx context.Context) {
