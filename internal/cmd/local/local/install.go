@@ -23,7 +23,6 @@ import (
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
-	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
@@ -31,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 const (
