@@ -341,7 +341,7 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 				if err != nil {
 					msg = "unknown: failed to get pod logs."
 				}
-				m, err := getLastJavaLogError(strings.NewReader(logs))
+				m, err := getLastLogError(strings.NewReader(logs))
 				if err != nil {
 					msg = "unknown: failed to find error log."
 				}
@@ -413,7 +413,7 @@ func (c *Command) streamPodLogs(ctx context.Context, namespace, podName, prefix 
 	}
 	defer r.Close()
 
-	s := newJavaLogScanner(r)
+	s := newLogScanner(r)
 	for s.Scan() {
 		if s.line.level == "ERROR" {
 			pterm.Error.Printfln("%s: %s", prefix, s.line.msg)
