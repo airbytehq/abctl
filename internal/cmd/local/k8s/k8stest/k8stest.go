@@ -36,6 +36,7 @@ type MockClient struct {
 	FnEventsWatch                 func(ctx context.Context, namespace string) (watch.Interface, error)
 	FnLogsGet                     func(ctx context.Context, namespace string, name string) (string, error)
 	FnStreamPodLogs               func(ctx context.Context, namespace, podName string, since time.Time) (io.ReadCloser, error)
+	FnPodList					  func(ctx context.Context, namespace string) (*corev1.PodList, error)
 }
 
 func (m *MockClient) DeploymentList(ctx context.Context, namespace string) (*v1.DeploymentList, error) {
@@ -175,4 +176,11 @@ func (m *MockClient) StreamPodLogs(ctx context.Context, namespace string, podNam
 		panic("FnStreamPodLogs is not configured")
 	}
 	return m.FnStreamPodLogs(ctx, namespace, podName, since)
+}
+
+func (m *MockClient) PodList(ctx context.Context, namespace string) (*corev1.PodList, error) {
+	if m.FnPodList == nil {
+		return nil, nil
+	}
+	return m.FnPodList(ctx, namespace)
 }
