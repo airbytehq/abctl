@@ -332,7 +332,7 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 
 	if podList, err := c.k8s.PodList(ctx, airbyteNamespace); err == nil {
 
-		errors := []string{}
+		var errors []string
 		for _, pod := range podList.Items {
 			if pod.Status.Phase == corev1.PodFailed {
 				msg := "unknown"
@@ -352,7 +352,9 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 				errors = append(errors, fmt.Sprintf("pod %s: %s", pod.Name, msg))
 			}
 		}
-		return fmt.Errorf("unable to install airbyte chart:\n%s", strings.Join(errors, "\n"))
+		if errors != nil {
+			return fmt.Errorf("unable to install airbyte chart:\n%s", strings.Join(errors, "\n"))
+		}
 	}
 	return fmt.Errorf("unable to install airbyte chart: %w", chartErr)
 }
