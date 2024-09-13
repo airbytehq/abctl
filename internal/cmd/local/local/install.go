@@ -334,6 +334,8 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 
 		errors := []string{}
 		for _, pod := range podList.Items {
+			c.tel.Attr(fmt.Sprintf("pod-%s-phase", pod.Name), string(pod.Status.Phase))
+			
 			if pod.Status.Phase == corev1.PodFailed {
 				msg := "unknown"
 
