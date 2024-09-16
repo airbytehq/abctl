@@ -182,39 +182,27 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	airbyteValues := []string{
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + telUser,
 		"global.auth.enabled=true",
+		"global.jobs.resources.limits.cpu=3",
+		"global.jobs.resources.limits.memory=4Gi",
 	}
 
 	if opts.LowResourceMode {
 		airbyteValues = append(airbyteValues,
 			"server.env_vars.JOB_RESOURCE_VARIANT_OVERRIDE=lowresource",
-			"global.jobs.resources.limits.cpu=0",
 			"global.jobs.resources.requests.cpu=0",
-			"global.jobs.resources.limits.memory=0",
 			"global.jobs.resources.requests.memory=0",
 
-			"workload-launcher.env_vars.CHECK_JOB_MAIN_CONTAINER_CPU_LIMIT=0",
 			"workload-launcher.env_vars.CHECK_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
-			"workload-launcher.env_vars.CHECK_JOB_MAIN_CONTAINER_MEMORY_LIMIT=0",
 			"workload-launcher.env_vars.CHECK_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
-			"workload-launcher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_CPU_LIMIT=0",
 			"workload-launcher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
-			"workload-launcher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_MEMORY_LIMIT=0",
 			"workload-launcher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
-			"workload-launcher.env_vars.SPEC_JOB_MAIN_CONTAINER_CPU_LIMIT=0",
 			"workload-launcher.env_vars.SPEC_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
-			"workload-launcher.env_vars.SPEC_JOB_MAIN_CONTAINER_MEMORY_LIMIT=0",
 			"workload-launcher.env_vars.SPEC_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
-			"workload-launcher.env_vars.SIDECAR_MAIN_CONTAINER_CPU_LIMIT=0",
 			"workload-launcher.env_vars.SIDECAR_MAIN_CONTAINER_CPU_REQUEST=0",
-			"workload-launcher.env_vars.SIDECAR_MAIN_CONTAINER_MEMORY_LIMIT=0",
 			"workload-launcher.env_vars.SIDECAR_MAIN_CONTAINER_MEMORY_REQUEST=0",
 		)
-	} else {
-		airbyteValues = append(airbyteValues,
-			"global.jobs.resources.limits.cpu=3",
-			"global.jobs.resources.limits.memory=4Gi",
-		)
 	}
+
 	if opts.InsecureCookies {
 		airbyteValues = append(airbyteValues,
 			"global.auth.cookieSecureSetting=false")
