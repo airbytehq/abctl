@@ -45,9 +45,9 @@ Airbyte's command line tool for local Airbyte deployments.
 > [!NOTE]
 > Depending on internet speed, `abctl local install` could take in excess of 15 minutes.
 > 
-> By default `abctl local install` will only allow Airbyte to accessible on the host `localhost` and port `8000`.
+> By default `abctl local install` configures Airbyte to accessible by all inbound requests on port `8000`.
+> This typically includes access via the host's ip-address and `localhost`.
 >
-> If Airbyte will be accessed outside of `localhost`, `--host [hostname]` can be specified.<br />
 > If port `8000` is not available. or another port is preferred, `--port [PORT]` can be specified.
 
 4. Login to `Airbyte`
@@ -148,22 +148,22 @@ Installs a local Airbyte instance or updates an existing installation which was 
 > 
 > These flags behave as a switch, enabled if provided, disabled if not.
 
-| Name                | Default   | Description                                                                                                                                                                                                                                            |
-|---------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| --chart-version     | latest    | Which Airbyte helm-chart version to install.                                                                                                                                                                                                           | 
-| --docker-email      | ""        | Docker email address to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_EMAIL`.                                                                                             |
-| --docker-password   | ""        | Docker password to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_PASSWORD`.                                                                                               |
-| --docker-server     | ""        | Docker server to authenticate against.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_SERVER`.                                                                                                                     |
-| --docker-username   | ""        | Docker username to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_USERNAME`.                                                                                               |
-| --insecure-cookies  | -         | Disables secure cookie requirements.<br />Only set if using `--host` with an insecure (non `https`) connection.                                                                                                                                        |
-| --low-resource-mode | false     | Run Airbyte in low resource mode.                                                                                                                                                                                                                      |
-| --host              | localhost | FQDN where the Airbyte installation will be accessed.<br />Set this if the Airbyte installation will be accessed outside of localhost.                                                                                                                 |
-| --migrate           | -         | Enables data-migration from an existing docker-compose backed Airbyte installation.<br />Copies, leaving the original data unmodified, the data from a docker-compose<br />backed Airbyte installation into this `abctl` managed Airbyte installation. |
-| --no-browser        | -         | Disables launching the browser when installation completes.<br />Useful to set in situations where no browser is available.                                                                                                                            |
-| --port              | 8000      | Port where the Airbyte installation will be accessed.<br />Set this if port 8000 is already in use or if a different port is preferred.                                                                                                                |
-| --secret            | ""        | **Can be set multiple times**.<br />Creates a kubernetes secret based on the contents of the file provided.<br />Useful when used in conjunction with `--values` for customizing installation.                                                         |
-| --values            | ""        | Helm values file to further customize the Airbyte installation.                                                                                                                                                                                        |
-| --volume            | ""        | **Can be set multiple times**.<br />Mounts additional volumes in the kubernetes cluster.<br />Must be in the format of `<HOST_PATH>:<GUEST_PATH>`.                                                                                                     |
+| Name                | Default | Description                                                                                                                                                                                                                                            |
+|---------------------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| --chart-version     | latest  | Which Airbyte helm-chart version to install.                                                                                                                                                                                                           | 
+| --docker-email      | ""      | Docker email address to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_EMAIL`.                                                                                             |
+| --docker-password   | ""      | Docker password to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_PASSWORD`.                                                                                               |
+| --docker-server     | ""      | Docker server to authenticate against.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_SERVER`.                                                                                                                     |
+| --docker-username   | ""      | Docker username to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_USERNAME`.                                                                                               |
+| --insecure-cookies  | -       | Disables secure cookie requirements.<br />Only set if using `--host` with an insecure (non `https`) connection.                                                                                                                                        |
+| --low-resource-mode | false   | Run Airbyte in low resource mode.                                                                                                                                                                                                                      |
+| --host              | ""      | FQDN where the Airbyte installation will be accessed. Default is to allow for all incoming traffic on port `--port`.<br />Set this if the Airbyte installation needs a more restricted host configuration.                                             |
+| --migrate           | -       | Enables data-migration from an existing docker-compose backed Airbyte installation.<br />Copies, leaving the original data unmodified, the data from a docker-compose<br />backed Airbyte installation into this `abctl` managed Airbyte installation. |
+| --no-browser        | -       | Disables launching the browser when installation completes.<br />Useful to set in situations where no browser is available.                                                                                                                            |
+| --port              | 8000    | Port where the Airbyte installation will be accessed.<br />Set this if port 8000 is already in use or if a different port is preferred.                                                                                                                |
+| --secret            | ""      | **Can be set multiple times**.<br />Creates a kubernetes secret based on the contents of the file provided.<br />Useful when used in conjunction with `--values` for customizing installation.                                                         |
+| --values            | ""      | Helm values file to further customize the Airbyte installation.                                                                                                                                                                                        |
+| --volume            | ""      | **Can be set multiple times**.<br />Mounts additional volumes in the kubernetes cluster.<br />Must be in the format of `<HOST_PATH>:<GUEST_PATH>`.                                                                                                     |
 
 ### status
 
