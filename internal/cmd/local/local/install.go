@@ -196,6 +196,8 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 			"workload-launcher.env_vars.CHECK_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
 			"workload-launcher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
 			"workload-launcher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
+			"workload-launcher.env_vars.JOB_MAIN_CONTAINER_CPU_REQUEST=0",
+			"workload-launcher.env_vars.JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
 			"workload-launcher.env_vars.SPEC_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
 			"workload-launcher.env_vars.SPEC_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
 			"workload-launcher.env_vars.SIDECAR_MAIN_CONTAINER_CPU_REQUEST=0",
