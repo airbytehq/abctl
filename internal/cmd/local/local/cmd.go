@@ -45,7 +45,7 @@ type HTTPClient interface {
 type BrowserLauncher func(url string) error
 
 // ChartLocator primarily for testing purposes.
-type ChartLocator func(repoName, repoUrl string) string
+type ChartLocator func(repoName, repoUrl, chartFlag string) string
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {

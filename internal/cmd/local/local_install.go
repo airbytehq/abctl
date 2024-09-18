@@ -12,6 +12,7 @@ import (
 )
 
 type InstallCmd struct {
+	Chart           string   `help:"Path to chart."`
 	ChartVersion    string   `default:"latest" help:"Version to install."`
 	DockerEmail     string   `group:"docker" help:"Docker email." env:"ABCTL_LOCAL_INSTALL_DOCKER_EMAIL"`
 	DockerPassword  string   `group:"docker" help:"Docker password." env:"ABCTL_LOCAL_INSTALL_DOCKER_PASSWORD"`
@@ -101,6 +102,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		}
 
 		opts := local.InstallOpts{
+			HelmChartFlag:        i.Chart,
 			HelmChartVersion: i.ChartVersion,
 			ValuesFile:       i.Values,
 			Secrets:          i.Secret,

@@ -26,7 +26,7 @@ import (
 const portTest = 9999
 const testAirbyteChartLoc = "https://airbytehq.github.io/helm-charts/airbyte-1.2.3.tgz"
 
-func testChartLocator(chartName, chartVersion string) string {
+func testChartLocator(chartName, chartVersion, chartFlag string) string {
 	if chartName == airbyteChartName && chartVersion == "" {
 		return testAirbyteChartLoc
 	}
@@ -396,5 +396,4 @@ func TestCommand_Install_InvalidValuesFile(t *testing.T) {
 	if !strings.Contains(err.Error(), fmt.Sprintf("unable to read values from yaml file '%s'", valuesFile)) {
 		t.Error("unexpected error:", err)
 	}
-
 }
