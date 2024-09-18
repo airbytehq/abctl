@@ -3,7 +3,7 @@ package local
 import (
 	"context"
 	"fmt"
-	"regexp"
+	"net"
 	"strings"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
@@ -53,7 +53,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 	}
 
 	for _, host := range i.Host {
-		if regexp.MustCompile(`\d+\.\d+\.\d+\.\d+`).MatchString(host) {
+		if ip := net.ParseIP(host); ip != nil {
 			return localerr.ErrIpAddressForHostFlag
 		}
 	}
