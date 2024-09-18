@@ -3,13 +3,12 @@ package local
 import (
 	"context"
 	"fmt"
-	"net"
 	"strings"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/maps"
+
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 )
@@ -53,8 +52,8 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 	}
 
 	for _, host := range i.Host {
-		if ip := net.ParseIP(host); ip != nil {
-			return localerr.ErrIpAddressForHostFlag
+		if err := validateHostFlag(host); err != nil {
+			return err
 		}
 	}
 

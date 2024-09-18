@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"runtime"
 	"strconv"
 	"syscall"
@@ -164,4 +165,14 @@ func (e InvalidPortError) Unwrap() error {
 }
 func (e InvalidPortError) Error() string {
 	return fmt.Sprintf("unable to convert host port %s to integer: %s", e.Port, e.Inner)
+}
+
+func validateHostFlag(host string) error {
+	if ip := net.ParseIP(host); ip != nil {
+		return localerr.ErrIpAddressForHostFlag
+	}
+	if !regexp.MustCompile(`^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9](?:[-a-z0-9]*[a-z0-9])?)*$`).MatchString(host) {
+		return localerr.ErrInvalidHostFlag
+	}
+	return nil
 }

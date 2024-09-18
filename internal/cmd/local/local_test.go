@@ -135,10 +135,18 @@ foo:
 	}
 }
 
-func TestInvalidHostFlag(t *testing.T) {
+func TestInvalidHostFlag_IpAddr(t *testing.T) {
 	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4"}}
 	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
 	if !errors.Is(err, localerr.ErrIpAddressForHostFlag) {
 		t.Errorf("expected ErrIpAddressForHostFlag but got %v", err)
+	}
+}
+
+func TestInvalidHostFlag_IpAddrWithPort(t *testing.T) {
+	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4:8000"}}
+	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+	if !errors.Is(err, localerr.ErrInvalidHostFlag) {
+		t.Errorf("expected ErrInvalidHostFlag but got %v", err)
 	}
 }

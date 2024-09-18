@@ -68,7 +68,16 @@ The ingress port can be changed by passing the flag --port.`,
 	ErrIpAddressForHostFlag = &LocalError{
 		msg: "invalid host - can't use an IP address",
 		help: `Looks like you provided an IP address to the --host flag.
-This won't work. K8s ingress rules require a DNS-style name.
+This won't work, because Kubernetes ingress rules require a lowercase domain name.
+
+By default, abctl will allow access from any hostname or IP, so you might not need the --host flag.`,
+	}
+
+	ErrInvalidHostFlag = &LocalError{
+		msg: "invalid host",
+		help: `The --host flag expects a lowercase domain name, e.g. "example.com". 
+IP addresses won't work. Ports won't work (e.g. example:8000). URLs won't work (e.g. http://example.com).
+
 By default, abctl will allow access from any hostname or IP, so you might not need the --host flag.`,
 	}
 )
