@@ -154,6 +154,10 @@ func (e ContainerNotRunningError) Error() string {
 	return fmt.Sprintf("container %q is not running (status = %q)", e.Container, e.Status)
 }
 
+func (e ContainerNotRunningError) ErrorCode() string {
+	return "ContainerNotRunning"
+}
+
 type InvalidPortError struct {
 	Port  string
 	Inner error
@@ -162,6 +166,7 @@ type InvalidPortError struct {
 func (e InvalidPortError) Unwrap() error {
 	return e.Inner
 }
+
 func (e InvalidPortError) Error() string {
 	return fmt.Sprintf("unable to convert host port %s to integer: %s", e.Port, e.Inner)
 }

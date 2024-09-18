@@ -3,6 +3,7 @@ package telemetry
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -135,6 +136,7 @@ func (s *SegmentClient) send(ctx context.Context, es EventState, et EventType, e
 
 	if ee != nil {
 		properties["error"] = ee.Error()
+		findErrorCode(properties, ee)
 	}
 
 	body := body{
@@ -171,4 +173,14 @@ type body struct {
 	Properties map[string]string `json:"properties"`
 	Timestamp  string            `json:"timestamp"`
 	WriteKey   string            `json:"writeKey"`
+}
+
+func findErrorCode(properties map[string]string, err error) {
+	if v, ok := err.(interface{ErrorCode() string}); ok {
+		properties["error_code"] = v.ErrorCode()
+		return
+	}
+	if sub := errors.Unwrap(err); sub != nil {
+		findErrorCode(properties, sub)
+	}
 }
