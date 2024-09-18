@@ -3,10 +3,12 @@ package local
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/maps"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
@@ -45,6 +47,17 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		return err
 	}
 
+	extraVolumeMounts, err := parseVolumeMounts(i.Volume)
+	if err != nil {
+		return err
+	}
+
+	for _, host := range i.Host {
+		if regexp.MustCompile(`\d+\.\d+\.\d+\.\d+`).MatchString(host) {
+			return localerr.ErrIpAddressForHostFlag
+		}
+	}
+
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
 		spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
@@ -76,11 +89,6 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		} else {
 			// no existing cluster, need to create one
 			pterm.Info.Println(fmt.Sprintf("No existing cluster found, cluster '%s' will be created", provider.ClusterName))
-
-			extraVolumeMounts, err := parseVolumeMounts(i.Volume)
-			if err != nil {
-				return err
-			}
 
 			spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", i.Port))
 			if err := portAvailable(ctx, i.Port); err != nil {
