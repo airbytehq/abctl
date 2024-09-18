@@ -46,6 +46,8 @@ func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Ve
 	if info, err := dockerClient.Client.Info(ctx); err == nil {
 		telClient.Attr("docker_ncpu", fmt.Sprintf("%d", info.NCPU))
 		telClient.Attr("docker_memtotal", fmt.Sprintf("%d", info.MemTotal))
+		telClient.Attr("docker_cgroup_driver", info.CgroupDriver)
+		telClient.Attr("docker_cgroup_version", info.CgroupVersion)
 	}
 
 	pterm.Success.Println(fmt.Sprintf("Found Docker installation: version %s", version.Version))
