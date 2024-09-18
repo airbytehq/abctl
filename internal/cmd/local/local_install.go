@@ -12,8 +12,8 @@ import (
 )
 
 type InstallCmd struct {
-	Chart           string   `help:"Path to chart."`
-	ChartVersion    string   `default:"latest" help:"Version to install."`
+	Chart           string   `help:"Path to chart." xor:"chartver"`
+	ChartVersion    string   `default:"latest" help:"Version to install." xor:"chartver"`
 	DockerEmail     string   `group:"docker" help:"Docker email." env:"ABCTL_LOCAL_INSTALL_DOCKER_EMAIL"`
 	DockerPassword  string   `group:"docker" help:"Docker password." env:"ABCTL_LOCAL_INSTALL_DOCKER_PASSWORD"`
 	DockerServer    string   `group:"docker" default:"https://index.docker.io/v1/" help:"Docker server." env:"ABCTL_LOCAL_INSTALL_DOCKER_SERVER"`
