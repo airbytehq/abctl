@@ -22,28 +22,14 @@ import (
 //	}
 func Secret(server, user, pass, email string) ([]byte, error) {
 	// map of the server to the credentials
-	servers := map[string]credential{
-		server: newCredential(user, pass, email),
-	}
-	auths := map[string]map[string]credential{
-		"auths": servers,
-	}
-
-	return json.Marshal(auths)
-}
-
-type credential struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
-	Auth     string `json:"auth"`
-}
-
-func newCredential(user, pass, email string) credential {
-	return credential{
-		Username: user,
-		Password: pass,
-		Email:    email,
-		Auth:     base64.StdEncoding.EncodeToString([]byte(user + ":" + pass)),
-	}
+	return json.Marshal(map[string]any{
+		"auths": map[string]any {
+			server: map[string]any {
+				"username": user,
+				"password": pass,
+				"email":    email,
+				"auth":     base64.StdEncoding.EncodeToString([]byte(user + ":" + pass)),
+			},
+		},
+	})
 }
