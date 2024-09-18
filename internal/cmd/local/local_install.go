@@ -102,7 +102,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		}
 
 		opts := local.InstallOpts{
-			HelmChartFlag:        i.Chart,
+			HelmChartFlag:    i.Chart,
 			HelmChartVersion: i.ChartVersion,
 			ValuesFile:       i.Values,
 			Secrets:          i.Secret,

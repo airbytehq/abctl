@@ -42,7 +42,7 @@ const (
 )
 
 type InstallOpts struct {
-	HelmChartFlag     string
+	HelmChartFlag    string
 	HelmChartVersion string
 	ValuesFile       string
 	Secrets          []string

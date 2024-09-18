@@ -150,6 +150,7 @@ Installs a local Airbyte instance or updates an existing installation which was 
 
 | Name                | Default | Description                                                                                                                                                                                                                                            |
 |---------------------|---------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| --chart             | ""      | Path to chart. |
 | --chart-version     | latest  | Which Airbyte helm-chart version to install.                                                                                                                                                                                                           | 
 | --docker-email      | ""      | Docker email address to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_EMAIL`.                                                                                             |
 | --docker-password   | ""      | Docker password to authenticate against `--docker-server`.<br />Can also be specified by the environment-variable `ABCTL_LOCAL_INSTALL_DOCKER_PASSWORD`.                                                                                               |
