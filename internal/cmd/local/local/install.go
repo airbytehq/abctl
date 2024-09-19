@@ -43,7 +43,7 @@ const (
 
 type InstallOpts struct {
 	HelmChartVersion string
-	ValuesFile       string
+	HelmValues       map[string]any
 	Secrets          []string
 	Migrate          bool
 	Hosts            []string
@@ -241,9 +241,9 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		pterm.Success.Println(fmt.Sprintf("Secret from '%s' created or updated", secretFile))
 	}
 
-	valuesYAML, err := mergeValuesWithValuesYAML(airbyteValues, opts.ValuesFile)
+	valuesYAML, err := mergeValuesWithValuesYAML(airbyteValues, opts.HelmValues)
 	if err != nil {
-		return fmt.Errorf("unable to merge values with values file '%s': %w", opts.ValuesFile, err)
+		return err
 	}
 
 	if err := c.handleChart(ctx, chartRequest{
@@ -744,19 +744,15 @@ func determineHelmChartAction(helm helm.Client, chart *chart.Chart, releaseName 
 // defined in this code at a higher priority than the values defined in the values.yaml file.
 // This function returns a string representation of the value.yaml file after all
 // values provided were potentially overridden by the valuesYML file.
-func mergeValuesWithValuesYAML(values []string, valuesYAML string) (string, error) {
+func mergeValuesWithValuesYAML(values []string, userValues map[string]any) (string, error) {
 	a := maps.FromSlice(values)
-	b, err := maps.FromYAMLFile(valuesYAML)
-	if err != nil {
-		return "", fmt.Errorf("unable to read values from yaml file '%s': %w", valuesYAML, err)
-	}
-	maps.Merge(a, b)
+	
+	maps.Merge(a, userValues)
 
 	res, err := maps.ToYAML(a)
 	if err != nil {
-		return "", fmt.Errorf("unable to merge values from yaml file '%s': %w", valuesYAML, err)
+		return "", fmt.Errorf("unable to merge values: %w", err)
 	}
 
 	return res, nil
-
 }

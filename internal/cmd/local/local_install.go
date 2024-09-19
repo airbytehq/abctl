@@ -7,6 +7,7 @@ import (
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
+	"github.com/airbytehq/abctl/internal/maps"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 )
@@ -37,6 +38,11 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 	if err != nil {
 		pterm.Error.Println("Unable to determine if Docker is installed")
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
+	}
+
+	helmValues, err := maps.FromYAMLFile(i.Values)
+	if err != nil {
+		return err
 	}
 
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
@@ -102,7 +108,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 
 		opts := local.InstallOpts{
 			HelmChartVersion: i.ChartVersion,
-			ValuesFile:       i.Values,
+			HelmValues:       helmValues,
 			Secrets:          i.Secret,
 			Migrate:          i.Migrate,
 			Docker:           dockerClient,
