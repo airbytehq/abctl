@@ -22,8 +22,8 @@ type doer interface {
 // This is accomplished by fetching the latest github tag and comparing it to the version provided.
 // Returns the latest version, or an empty string if we're already running the latest version.
 // Will return ErrDevVersion if the build.Version is currently set to "dev".
-func Check() (string, error) {
-	ctx, updateCancel := context.WithTimeout(context.Background(), 2*time.Second)
+func Check(ctx context.Context) (string, error) {
+	ctx, updateCancel := context.WithTimeout(ctx, 2*time.Second)
 	defer updateCancel()
 	return check(ctx, http.DefaultClient, build.Version)
 }

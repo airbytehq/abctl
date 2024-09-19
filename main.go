@@ -18,14 +18,15 @@ import (
 func main() {
 	// ensure the pterm info width matches the other printers
 	pterm.Info.Prefix.Text = " INFO  "
-	printUpdateMsg := checkForNewerAbctlVersion()
-	handleErr(run())
+
+	ctx := cliContext()
+	printUpdateMsg := checkForNewerAbctlVersion(ctx)
+	handleErr(run(ctx))
 	printUpdateMsg()
 }
 
-func run() error {
-	ctx, cancel := cliContext()
-	defer cancel()
+func run(ctx context.Context) error {
+
 
 	var root cmd.Cmd
 	parser, err := kong.New(
@@ -68,11 +69,11 @@ func handleErr(err error) {
 
 // checks for a newer version of abctl.
 // returns a function that, when called, will print the message about the new version.
-func checkForNewerAbctlVersion() func() {
+func checkForNewerAbctlVersion(ctx context.Context) func() {
 	c := make(chan string)
 	go func() {
 		defer close(c)
-		ver, err := update.Check()
+		ver, err := update.Check(ctx)
 		if err != nil {
 			pterm.Debug.Printfln("update check: %s", err)
 		} else {
@@ -90,7 +91,7 @@ func checkForNewerAbctlVersion() func() {
 }
 
 // get a context that listens for interrupt/shutdown signals.
-func cliContext() (context.Context, context.CancelFunc) {
+func cliContext() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	// listen for shutdown signals
 	go func() {
@@ -100,7 +101,7 @@ func cliContext() (context.Context, context.CancelFunc) {
 
 		cancel()
 	}()
-	return ctx, cancel
+	return ctx
 }
 
 // bindCtx exists to allow kong to correctly inject a context.Context into the Run methods on the commands.
