@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/airbytehq/abctl/internal/build"
 	"golang.org/x/mod/semver"
 )
 
@@ -20,7 +22,13 @@ type doer interface {
 // This is accomplished by fetching the latest github tag and comparing it to the version provided.
 // Returns the latest version, or an empty string if we're already running the latest version.
 // Will return ErrDevVersion if the build.Version is currently set to "dev".
-func Check(ctx context.Context, doer doer, version string) (string, error) {
+func Check(ctx context.Context) (string, error) {
+	ctx, updateCancel := context.WithTimeout(ctx, 2*time.Second)
+	defer updateCancel()
+	return check(ctx, http.DefaultClient, build.Version)
+}
+
+func check(ctx context.Context, doer doer, version string) (string, error) {
 	if version == "dev" {
 		return "", ErrDevVersion
 	}

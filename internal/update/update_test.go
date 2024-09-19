@@ -58,7 +58,7 @@ func TestCheck(t *testing.T) {
 				},
 			}
 
-			latest, err := Check(ctx, h, tt.local)
+			latest, err := check(ctx, h, tt.local)
 			if d := cmp.Diff(tt.wantErr, err, cmpopts.EquateErrors()); d != "" {
 				t.Errorf("unexpected error: %s", err)
 			}
@@ -82,7 +82,7 @@ func TestCheck_HTTPRequest(t *testing.T) {
 		},
 	}
 
-	if _, err := Check(context.Background(), h, "v0.1.0"); err != nil {
+	if _, err := check(context.Background(), h, "v0.1.0"); err != nil {
 		t.Error("unexpected error:", err)
 	}
 	// verify method
@@ -147,7 +147,7 @@ func TestCheck_HTTPErr(t *testing.T) {
 				},
 			}
 
-			_, err := Check(context.Background(), h, "v0.1.0")
+			_, err := check(context.Background(), h, "v0.1.0")
 			if err == nil {
 				t.Error("unexpected success")
 			}

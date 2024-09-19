@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -15,27 +14,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
-
-func HandleErr(err error) {
-	if err == nil {
-		return
-	}
-
-	pterm.Error.Println(err)
-
-	var errParse *kong.ParseError
-	if errors.As(err, &errParse) {
-		_ = kong.DefaultHelpPrinter(kong.HelpOptions{}, errParse.Context)
-	}
-
-	var e *localerr.LocalError
-	if errors.As(err, &e) {
-		pterm.Println()
-		pterm.Info.Println(e.Help())
-	}
-
-	os.Exit(1)
-}
 
 type verbose bool
 
