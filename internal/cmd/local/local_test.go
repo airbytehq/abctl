@@ -2,12 +2,16 @@ package local
 
 import (
 	"context"
+	"errors"
+
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
@@ -127,5 +131,22 @@ foo:
 
 	if !strings.HasPrefix(err.Error(), "failed to unmarshal file") {
 		t.Errorf("unexpected error: %v", err)
+
+	}
+}
+
+func TestInvalidHostFlag_IpAddr(t *testing.T) {
+	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4"}}
+	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+	if !errors.Is(err, localerr.ErrIpAddressForHostFlag) {
+		t.Errorf("expected ErrIpAddressForHostFlag but got %v", err)
+	}
+}
+
+func TestInvalidHostFlag_IpAddrWithPort(t *testing.T) {
+	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4:8000"}}
+	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+	if !errors.Is(err, localerr.ErrInvalidHostFlag) {
+		t.Errorf("expected ErrInvalidHostFlag but got %v", err)
 	}
 }

@@ -272,6 +272,31 @@ func TestGetPort_InpsectErr(t *testing.T) {
 	}
 }
 
+func TestValidateHostFlag(t *testing.T) {
+	expectErr := func(host string, expect error) {
+		err := validateHostFlag(host)
+		if !errors.Is(err, expect) {
+			t.Errorf("expected error %v for host %q but got %v", expect, host, err)
+		}
+	}
+	expectErr("1.2.3.4", localerr.ErrIpAddressForHostFlag)
+	expectErr("1.2.3.4:8000", localerr.ErrInvalidHostFlag)
+	expectErr("1.2.3.4:8000", localerr.ErrInvalidHostFlag)
+	expectErr("ABC-DEF-GHI.abcd.efgh", localerr.ErrInvalidHostFlag)
+	expectErr("http://airbyte.foo-data-platform-sbx.bar.cloud", localerr.ErrInvalidHostFlag)
+
+	expectOk := func(host string) {
+		err := validateHostFlag(host)
+		if err != nil {
+			t.Errorf("unexpected error for host %q: %s", host, err)
+		}
+	}
+	expectOk("foo")
+	expectOk("foo.bar")
+	expectOk("example.com")
+	expectOk("sub.example01.com")
+}
+
 // port returns the port from a string value in the format of "ipv4:port" or "ip::v6:port"
 func port(s string) int {
 	vals := strings.Split(s, ":")
