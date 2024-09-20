@@ -98,7 +98,7 @@ func TestLocate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defaultLoadIndexFile = mockLoadIndexFile(repo.IndexFile{Entries: tt.entries})
-			act := locateLatestAirbyteChart(airbyteChartName, "")
+			act := locateLatestAirbyteChart(airbyteChartName, "", "")
 			if d := cmp.Diff(tt.exp, act); d != "" {
 				t.Errorf("mismatch (-want +got):\n%s", d)
 			}

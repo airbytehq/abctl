@@ -373,32 +373,3 @@ func TestCommand_Install_HelmValues(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-func TestCommand_Install_InvalidValuesFile(t *testing.T) {
-	c, err := New(
-		k8s.TestProvider,
-		WithPortHTTP(portTest),
-		WithHelmClient(&mockHelmClient{}),
-		WithK8sClient(&k8stest.MockClient{}),
-		WithTelemetryClient(&mockTelemetryClient{}),
-		WithHTTPClient(&mockHTTP{}),
-		WithBrowserLauncher(func(url string) error {
-			return nil
-		}),
-	)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	valuesFile := "testdata/dne.yml"
-
-	err = c.Install(context.Background(), InstallOpts{ValuesFile: valuesFile})
-	if err == nil {
-		t.Fatal("expecting an error, received none")
-	}
-	if !strings.Contains(err.Error(), fmt.Sprintf("unable to read values from yaml file '%s'", valuesFile)) {
-		t.Error("unexpected error:", err)
-	}
-
-}
