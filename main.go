@@ -27,7 +27,6 @@ func main() {
 
 func run(ctx context.Context) error {
 
-
 	var root cmd.Cmd
 	parser, err := kong.New(
 		&root,

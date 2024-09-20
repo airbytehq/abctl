@@ -749,7 +749,7 @@ func determineHelmChartAction(helm helm.Client, chart *chart.Chart, releaseName 
 // values provided were potentially overridden by the valuesYML file.
 func mergeValuesWithValuesYAML(values []string, userValues map[string]any) (string, error) {
 	a := maps.FromSlice(values)
-	
+
 	maps.Merge(a, userValues)
 
 	res, err := maps.ToYAML(a)
