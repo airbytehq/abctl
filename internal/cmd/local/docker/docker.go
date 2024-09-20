@@ -2,8 +2,10 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os/exec"
 	"runtime"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
@@ -16,6 +18,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pterm/pterm"
 )
 
 // Version contains al the version information that is being tracked.
@@ -95,6 +98,12 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 
 	dockerOpts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
 
+	if host := getDockerContext(); host != "" {
+		if cli, err := createAndPing(ctx, newPing, host, dockerOpts); err == nil {
+			return &Docker{Client: cli}, nil
+		}
+	}
+
 	switch goos {
 	case "darwin":
 		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
@@ -150,4 +159,43 @@ func (d *Docker) Version(ctx context.Context) (Version, error) {
 		Arch:     ver.Arch,
 		Platform: ver.Platform.Name,
 	}, nil
+}
+
+// getDockerContext attempts to get the current context from the docker CLI
+func getDockerContext() string {
+	// kind uses the docker CLI directly instead of using the golang docker client.
+	// the docker CLi has a concept of "contexts", which are different connection endpoints.
+	// if we don't check the current context in abctl, then we can potentially use a different
+	// context than kind, which means abctl will get confused and can't find the kind cluster.
+	//
+	// so, here we call out to the docker CLI to get the current context.
+	// there are probably some docker versions that don't support this command,
+	// so if it fails then return nothing, which means abctl will do its best to guess
+	// at the correct connection point.
+	raw, err := exec.Command("docker", "context", "inspect").Output()
+	if err != nil {
+		pterm.Debug.Printfln("error running docker context inspect: %s", err)
+		return ""
+	}
+	var out []struct {
+		Name string
+		Endpoints struct {
+			Docker struct {
+				Host string
+			} `json:"docker"`
+		}
+	}
+	err = json.Unmarshal(raw, &out)
+	if err != nil {
+		pterm.Debug.Printfln("error unmarshaling docker context: %s", err)
+		return ""
+	}
+	if len(out) != 1 {
+		pterm.Debug.Printfln("unexpected context count: %d", len(out))
+		return ""
+	}
+
+	host := out[0].Endpoints.Docker.Host
+	pterm.Debug.Printfln("found docker context %s with host %s", out[0].Name, host)
+	return host
 }
