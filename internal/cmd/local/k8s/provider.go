@@ -21,8 +21,6 @@ type Provider struct {
 	Context string
 	// Kubeconfig location
 	Kubeconfig string
-	// HelmNginx additional helm values to pass to the nginx chart
-	HelmNginx []string
 }
 
 // Cluster returns a kubernetes cluster for this provider.
@@ -91,11 +89,6 @@ var (
 		ClusterName: "airbyte-abctl",
 		Context:     "kind-airbyte-abctl",
 		Kubeconfig:  paths.Kubeconfig,
-		HelmNginx: []string{
-			"controller.hostPort.enabled=true",
-			"controller.service.httpsPort.enable=false",
-			"controller.service.type=NodePort",
-		},
 	}
 
 	// TestProvider represents a test provider, for testing purposes
@@ -104,6 +97,5 @@ var (
 		ClusterName: "test-airbyte-abctl",
 		Context:     "test-airbyte-abctl",
 		Kubeconfig:  filepath.Join(os.TempDir(), "abctl", paths.FileKubeconfig),
-		HelmNginx:   []string{},
 	}
 )

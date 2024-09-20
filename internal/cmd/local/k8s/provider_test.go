@@ -24,14 +24,6 @@ func TestProvider_Defaults(t *testing.T) {
 		if d := cmp.Diff(paths.Kubeconfig, DefaultProvider.Kubeconfig); d != "" {
 			t.Errorf("Kubeconfig mismatch (-want +got):\n%s", d)
 		}
-		expHelmNginx := []string{
-			"controller.hostPort.enabled=true",
-			"controller.service.httpsPort.enable=false",
-			"controller.service.type=NodePort",
-		}
-		if d := cmp.Diff(expHelmNginx, DefaultProvider.HelmNginx); d != "" {
-			t.Errorf("HelmNginx mismatch (-want +got):\n%s", d)
-		}
 	})
 
 	t.Run("test", func(t *testing.T) {
@@ -52,9 +44,6 @@ func TestProvider_Defaults(t *testing.T) {
 		}
 		if d := cmp.Diff(paths.Kubeconfig, TestProvider.Kubeconfig); d == "" {
 			t.Errorf("Kubeconfig should differ (%s)", paths.Kubeconfig)
-		}
-		if d := cmp.Diff([]string{}, TestProvider.HelmNginx); d != "" {
-			t.Errorf("HelmNginx mismatch (-want +got):\n%s", d)
 		}
 	})
 }
