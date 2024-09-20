@@ -214,6 +214,7 @@ func TestCommand_Install_HelmValues(t *testing.T) {
 	userID := uuid.New()
 
 	expChartCnt := 0
+	expNginxValues, _ := getNginxValuesYaml(9999)
 	expChart := []struct {
 		chart   helmclient.ChartSpec
 		release release.Release
@@ -254,7 +255,7 @@ func TestCommand_Install_HelmValues(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         30 * time.Minute,
-				ValuesOptions:   values.Options{Values: []string{fmt.Sprintf("controller.service.ports.http=%d", portTest)}},
+				ValuesYaml: expNginxValues,
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "4.3.2.1"}},
