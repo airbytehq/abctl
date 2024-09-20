@@ -1,11 +1,19 @@
 package local
 
 import (
+	"context"
+	"errors"
+
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -88,4 +96,57 @@ func TestCheckAirbyteDir(t *testing.T) {
 			t.Errorf("permissions mismatch (-want +got):\n%s", d)
 		}
 	})
+}
+
+func TestValues_FileDoesntExist(t *testing.T) {
+	cmd := InstallCmd{Values: "thisfiledoesnotexist"}
+	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	expect := "failed to read file thisfiledoesnotexist: open thisfiledoesnotexist: no such file or directory"
+	if err.Error() != expect {
+		t.Errorf("expected %q but got %q", expect, err)
+	}
+}
+
+func TestValues_BadYaml(t *testing.T) {
+	tmpdir := t.TempDir()
+	p := filepath.Join(tmpdir, "values.yaml")
+	content := `
+foo:
+  - bar: baz
+    - foo
+`
+
+	if err := os.WriteFile(p, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := InstallCmd{Values: p}
+	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	if !strings.HasPrefix(err.Error(), "failed to unmarshal file") {
+		t.Errorf("unexpected error: %v", err)
+
+	}
+}
+
+func TestInvalidHostFlag_IpAddr(t *testing.T) {
+	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4"}}
+	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+	if !errors.Is(err, localerr.ErrIpAddressForHostFlag) {
+		t.Errorf("expected ErrIpAddressForHostFlag but got %v", err)
+	}
+}
+
+func TestInvalidHostFlag_IpAddrWithPort(t *testing.T) {
+	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4:8000"}}
+	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+	if !errors.Is(err, localerr.ErrInvalidHostFlag) {
+		t.Errorf("expected ErrInvalidHostFlag but got %v", err)
+	}
 }

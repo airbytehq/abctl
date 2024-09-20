@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -201,7 +200,7 @@ func TestCommand_Install(t *testing.T) {
 	}
 }
 
-func TestCommand_Install_ValuesFile(t *testing.T) {
+func TestCommand_Install_HelmValues(t *testing.T) {
 	expChartRepoCnt := 0
 	expChartRepo := []struct {
 		name string
@@ -365,7 +364,12 @@ func TestCommand_Install_ValuesFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := c.Install(context.Background(), InstallOpts{ValuesFile: "testdata/values.yml"}); err != nil {
+	helmValues := map[string]any{
+		"global": map[string]any{
+			"edition": "test",
+		},
+	}
+	if err := c.Install(context.Background(), InstallOpts{HelmValues: helmValues}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -396,4 +400,5 @@ func TestCommand_Install_InvalidValuesFile(t *testing.T) {
 	if !strings.Contains(err.Error(), fmt.Sprintf("unable to read values from yaml file '%s'", valuesFile)) {
 		t.Error("unexpected error:", err)
 	}
+
 }

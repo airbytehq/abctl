@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"runtime"
 	"strconv"
 	"syscall"
@@ -46,6 +47,8 @@ func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Ve
 	if info, err := dockerClient.Client.Info(ctx); err == nil {
 		telClient.Attr("docker_ncpu", fmt.Sprintf("%d", info.NCPU))
 		telClient.Attr("docker_memtotal", fmt.Sprintf("%d", info.MemTotal))
+		telClient.Attr("docker_cgroup_driver", info.CgroupDriver)
+		telClient.Attr("docker_cgroup_version", info.CgroupVersion)
 	}
 
 	pterm.Success.Println(fmt.Sprintf("Found Docker installation: version %s", version.Version))
@@ -164,4 +167,14 @@ func (e InvalidPortError) Unwrap() error {
 }
 func (e InvalidPortError) Error() string {
 	return fmt.Sprintf("unable to convert host port %s to integer: %s", e.Port, e.Inner)
+}
+
+func validateHostFlag(host string) error {
+	if ip := net.ParseIP(host); ip != nil {
+		return localerr.ErrIpAddressForHostFlag
+	}
+	if !regexp.MustCompile(`^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9](?:[-a-z0-9]*[a-z0-9])?)*$`).MatchString(host) {
+		return localerr.ErrInvalidHostFlag
+	}
+	return nil
 }
