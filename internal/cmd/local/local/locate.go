@@ -40,8 +40,13 @@ var defaultNewChartRepo newChartRepo = func(cfg *repo.Entry, getters getter.Prov
 // This variable should only be modified for testing purposes.
 var defaultLoadIndexFile loadIndexFile = repo.LoadIndexFile
 
-func locateLatestAirbyteChart(chartName, chartVersion string) string {
+func locateLatestAirbyteChart(chartName, chartVersion, chartFlag string) string {
 	pterm.Debug.Printf("getting helm chart %q with version %q\n", chartName, chartVersion)
+
+	// If the --chart flag was given, use that.
+	if chartFlag != "" {
+		return chartFlag
+	}
 
 	// Helm will consider a local directory path named "airbyte/airbyte" to be a chart repo,
 	// but it might not be, which causes errors like "Chart.yaml file is missing".

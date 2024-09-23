@@ -21,17 +21,17 @@ import (
 
 const (
 	airbyteBootloaderPodName = "airbyte-abctl-airbyte-bootloader"
-	airbyteChartName    = "airbyte/airbyte"
-	airbyteChartRelease = "airbyte-abctl"
-	airbyteIngress      = "ingress-abctl"
-	airbyteNamespace    = "airbyte-abctl"
-	airbyteRepoName     = "airbyte"
-	airbyteRepoURL      = "https://airbytehq.github.io/helm-charts"
-	nginxChartName      = "nginx/ingress-nginx"
-	nginxChartRelease   = "ingress-nginx"
-	nginxNamespace      = "ingress-nginx"
-	nginxRepoName       = "nginx"
-	nginxRepoURL        = "https://kubernetes.github.io/ingress-nginx"
+	airbyteChartName         = "airbyte/airbyte"
+	airbyteChartRelease      = "airbyte-abctl"
+	airbyteIngress           = "ingress-abctl"
+	airbyteNamespace         = "airbyte-abctl"
+	airbyteRepoName          = "airbyte"
+	airbyteRepoURL           = "https://airbytehq.github.io/helm-charts"
+	nginxChartName           = "nginx/ingress-nginx"
+	nginxChartRelease        = "ingress-nginx"
+	nginxNamespace           = "ingress-nginx"
+	nginxRepoName            = "nginx"
+	nginxRepoURL             = "https://kubernetes.github.io/ingress-nginx"
 )
 
 // dockerAuthSecretName is the name of the secret which holds the docker authentication information.
@@ -45,7 +45,7 @@ type HTTPClient interface {
 type BrowserLauncher func(url string) error
 
 // ChartLocator primarily for testing purposes.
-type ChartLocator func(repoName, repoUrl string) string
+type ChartLocator func(repoName, repoUrl, chartFlag string) string
 
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {

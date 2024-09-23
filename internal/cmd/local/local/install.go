@@ -42,6 +42,7 @@ const (
 )
 
 type InstallOpts struct {
+	HelmChartFlag    string
 	HelmChartVersion string
 	HelmValues       map[string]any
 	Secrets          []string
@@ -252,6 +253,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		repoURL:      airbyteRepoURL,
 		chartName:    airbyteChartName,
 		chartRelease: airbyteChartRelease,
+		chartFlag:    opts.HelmChartFlag,
 		chartVersion: opts.HelmChartVersion,
 		namespace:    airbyteNamespace,
 		valuesYAML:   valuesYAML,
@@ -524,6 +526,7 @@ type chartRequest struct {
 	repoURL        string
 	chartName      string
 	chartRelease   string
+	chartFlag      string
 	chartVersion   string
 	namespace      string
 	values         []string
@@ -548,7 +551,7 @@ func (c *Command) handleChart(
 
 	c.spinner.UpdateText(fmt.Sprintf("Fetching %s Helm Chart with version", req.chartName))
 
-	chartLoc := c.locateChart(req.chartName, req.chartVersion)
+	chartLoc := c.locateChart(req.chartName, req.chartVersion, req.chartFlag)
 
 	helmChart, _, err := c.helm.GetChart(chartLoc, &action.ChartPathOptions{Version: req.chartVersion})
 	if err != nil {
@@ -746,7 +749,7 @@ func determineHelmChartAction(helm helm.Client, chart *chart.Chart, releaseName 
 // values provided were potentially overridden by the valuesYML file.
 func mergeValuesWithValuesYAML(values []string, userValues map[string]any) (string, error) {
 	a := maps.FromSlice(values)
-	
+
 	maps.Merge(a, userValues)
 
 	res, err := maps.ToYAML(a)

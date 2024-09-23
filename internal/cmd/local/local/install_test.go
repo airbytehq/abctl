@@ -25,7 +25,7 @@ import (
 const portTest = 9999
 const testAirbyteChartLoc = "https://airbytehq.github.io/helm-charts/airbyte-1.2.3.tgz"
 
-func testChartLocator(chartName, chartVersion string) string {
+func testChartLocator(chartName, chartVersion, chartFlag string) string {
 	if chartName == airbyteChartName && chartVersion == "" {
 		return testAirbyteChartLoc
 	}

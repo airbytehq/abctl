@@ -27,7 +27,7 @@ func TestJavaLogScanner(t *testing.T) {
 
 	expectLogLine := func(level, msg string) {
 		s.Scan()
-	
+
 		if s.line.level != level {
 			t.Errorf("expected level %q but got %q", level, s.line.level)
 		}
@@ -58,5 +58,3 @@ func TestLastErrorLog(t *testing.T) {
 		t.Errorf("expected %q but got %q", expect, l)
 	}
 }
-
-

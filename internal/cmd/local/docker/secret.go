@@ -23,8 +23,8 @@ import (
 func Secret(server, user, pass, email string) ([]byte, error) {
 	// map of the server to the credentials
 	return json.Marshal(map[string]any{
-		"auths": map[string]any {
-			server: map[string]any {
+		"auths": map[string]any{
+			server: map[string]any{
 				"username": user,
 				"password": pass,
 				"email":    email,

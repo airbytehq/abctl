@@ -36,7 +36,7 @@ type MockClient struct {
 	FnEventsWatch                 func(ctx context.Context, namespace string) (watch.Interface, error)
 	FnLogsGet                     func(ctx context.Context, namespace string, name string) (string, error)
 	FnStreamPodLogs               func(ctx context.Context, namespace, podName string, since time.Time) (io.ReadCloser, error)
-	FnPodList					  func(ctx context.Context, namespace string) (*corev1.PodList, error)
+	FnPodList                     func(ctx context.Context, namespace string) (*corev1.PodList, error)
 }
 
 func (m *MockClient) DeploymentList(ctx context.Context, namespace string) (*v1.DeploymentList, error) {
