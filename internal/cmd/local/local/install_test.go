@@ -3,7 +3,6 @@ package local
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	helmclient "github.com/mittwald/go-helm-client"
-	"github.com/mittwald/go-helm-client/values"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
@@ -33,6 +31,7 @@ func testChartLocator(chartName, chartVersion, chartFlag string) string {
 }
 
 func TestCommand_Install(t *testing.T) {
+	expNginxValues, _ := getNginxValuesYaml(9999)
 	expChartRepoCnt := 0
 	expChartRepo := []struct {
 		name string
@@ -85,7 +84,7 @@ func TestCommand_Install(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         30 * time.Minute,
-				ValuesOptions:   values.Options{Values: []string{fmt.Sprintf("controller.service.ports.http=%d", portTest)}},
+				ValuesYaml:      expNginxValues,
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "4.3.2.1"}},
@@ -214,6 +213,7 @@ func TestCommand_Install_HelmValues(t *testing.T) {
 	userID := uuid.New()
 
 	expChartCnt := 0
+	expNginxValues, _ := getNginxValuesYaml(9999)
 	expChart := []struct {
 		chart   helmclient.ChartSpec
 		release release.Release
@@ -254,7 +254,7 @@ func TestCommand_Install_HelmValues(t *testing.T) {
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         30 * time.Minute,
-				ValuesOptions:   values.Options{Values: []string{fmt.Sprintf("controller.service.ports.http=%d", portTest)}},
+				ValuesYaml:      expNginxValues,
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "4.3.2.1"}},

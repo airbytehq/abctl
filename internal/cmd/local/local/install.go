@@ -261,6 +261,12 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		return c.diagnoseAirbyteChartFailure(ctx, err)
 	}
 
+	nginxValues, err := getNginxValuesYaml(c.portHTTP)
+	if err != nil {
+		return err
+	}
+	pterm.Debug.Printfln("nginx values:\n%s", nginxValues)
+
 	if err := c.handleChart(ctx, chartRequest{
 		name:           "nginx",
 		uninstallFirst: true,
@@ -269,7 +275,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 		chartName:      nginxChartName,
 		chartRelease:   nginxChartRelease,
 		namespace:      nginxNamespace,
-		values:         append(c.provider.HelmNginx, fmt.Sprintf("controller.service.ports.http=%d", c.portHTTP)),
+		valuesYAML:     nginxValues,
 	}); err != nil {
 		// If we timed out, there is a good chance it's due to an unavailable port, check if this is the case.
 		// As the kubernetes client doesn't return usable error types, have to check for a specific string value.
