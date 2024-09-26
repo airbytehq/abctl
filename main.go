@@ -19,14 +19,15 @@ func main() {
 	// ensure the pterm info width matches the other printers
 	pterm.Info.Prefix.Text = " INFO  "
 
-	ctx := cliContext()
+	ctx := cliCtx()
 	printUpdateMsg := checkForNewerAbctlVersion(ctx)
-	handleErr(run(ctx))
+	exitCode := handleErr(run(ctx))
 	printUpdateMsg()
+
+	os.Exit(exitCode)
 }
 
 func run(ctx context.Context) error {
-
 	var root cmd.Cmd
 	parser, err := kong.New(
 		&root,
@@ -45,9 +46,9 @@ func run(ctx context.Context) error {
 	return parsed.Run()
 }
 
-func handleErr(err error) {
+func handleErr(err error) int {
 	if err == nil {
-		return
+		return 0
 	}
 
 	pterm.Error.Println(err)
@@ -63,11 +64,11 @@ func handleErr(err error) {
 		pterm.Info.Println(e.Help())
 	}
 
-	os.Exit(1)
+	return 1
 }
 
-// checks for a newer version of abctl.
-// returns a function that, when called, will print the message about the new version.
+// checkForNewerAbctlVersion checks for a newer version of abctl.
+// Returns a function that, when called, will display a message if a newer version is available.
 func checkForNewerAbctlVersion(ctx context.Context) func() {
 	c := make(chan string)
 	go func() {
@@ -89,8 +90,8 @@ func checkForNewerAbctlVersion(ctx context.Context) func() {
 	}
 }
 
-// get a context that listens for interrupt/shutdown signals.
-func cliContext() context.Context {
+// cliCtx configures and returns a context which listens for interrupt/shutdown signals.
+func cliCtx() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	// listen for shutdown signals
 	go func() {
