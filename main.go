@@ -16,34 +16,40 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+// run is essentially the main method returning the exitCode of the program.
+// Run is separated to ensure that deferred functions are called (os.Exit prevents this).
+func run() int {
 	// ensure the pterm info width matches the other printers
 	pterm.Info.Prefix.Text = " INFO  "
 
 	ctx := cliCtx()
 	printUpdateMsg := checkForNewerAbctlVersion(ctx)
-	exitCode := handleErr(run(ctx))
+
+	runCmd := func(ctx context.Context) error {
+		var root cmd.Cmd
+		parser, err := kong.New(
+			&root,
+			kong.Name("abctl"),
+			kong.Description("Airbyte's command line tool for managing a local Airbyte installation."),
+			kong.UsageOnError(),
+		)
+		if err != nil {
+			return err
+		}
+		parsed, err := parser.Parse(os.Args[1:])
+		if err != nil {
+			return err
+		}
+		parsed.BindToProvider(bindCtx(ctx))
+		return parsed.Run()
+	}
+
+	exitCode := handleErr(runCmd(ctx))
 	printUpdateMsg()
-
-	os.Exit(exitCode)
-}
-
-func run(ctx context.Context) error {
-	var root cmd.Cmd
-	parser, err := kong.New(
-		&root,
-		kong.Name("abctl"),
-		kong.Description("Airbyte's command line tool for managing a local Airbyte installation."),
-		kong.UsageOnError(),
-	)
-	if err != nil {
-		return err
-	}
-	parsed, err := parser.Parse(os.Args[1:])
-	if err != nil {
-		return err
-	}
-	parsed.BindToProvider(bindCtx(ctx))
-	return parsed.Run()
+	return exitCode
 }
 
 func handleErr(err error) int {
