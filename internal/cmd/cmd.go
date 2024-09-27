@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -28,13 +29,15 @@ type Cmd struct {
 	Verbose verbose     `short:"v" help:"Enable verbose output."`
 }
 
-func (c *Cmd) BeforeApply(ctx *kong.Context) error {
+func (c *Cmd) BeforeApply(ctx context.Context, kCtx *kong.Context) error {
 	if _, envVarDNT := os.LookupEnv("DO_NOT_TRACK"); envVarDNT {
 		pterm.Info.Println("Telemetry collection disabled (DO_NOT_TRACK)")
 	}
-	ctx.BindTo(k8s.DefaultProvider, (*k8s.Provider)(nil))
-	ctx.BindTo(telemetry.Get(), (*telemetry.Client)(nil))
-	if err := ctx.BindToProvider(bindK8sClient(&k8s.DefaultProvider)); err != nil {
+
+	kCtx.BindTo(k8s.DefaultProvider, (*k8s.Provider)(nil))
+	kCtx.BindTo(telemetry.Get(), (*telemetry.Client)(nil))
+
+	if err := kCtx.BindToProvider(bindK8sClient(ctx, &k8s.DefaultProvider)); err != nil {
 		pterm.Error.Println("Unable to configure k8s client")
 		return fmt.Errorf("unable to create k8s client: %w", err)
 	}
@@ -44,17 +47,17 @@ func (c *Cmd) BeforeApply(ctx *kong.Context) error {
 
 // bindK8sClient allows kong to make the k8s.Client injectable into a command's Run method.
 // If the cluster does exist, this will return ErrClusterNotFound.
-func bindK8sClient(provider *k8s.Provider) func() (k8s.Client, error) {
+func bindK8sClient(ctx context.Context, provider *k8s.Provider) func() (k8s.Client, error) {
 	return func() (k8s.Client, error) {
 		k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 			&clientcmd.ClientConfigLoadingRules{ExplicitPath: provider.Kubeconfig},
 			&clientcmd.ConfigOverrides{CurrentContext: provider.Context},
 		)
 
-		if cluster, err := provider.Cluster(); err != nil {
+		if cluster, err := provider.Cluster(ctx); err != nil {
 			pterm.Error.Println("Unable to determine cluster state")
 			return nil, fmt.Errorf("unable to determine cluster state: %w", err)
-		} else if !cluster.Exists() {
+		} else if !cluster.Exists(ctx) {
 			return nil, localerr.ErrClusterNotFound
 		}
 

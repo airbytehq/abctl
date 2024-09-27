@@ -1,11 +1,13 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
 	"sigs.k8s.io/kind/pkg/cluster"
 	"sigs.k8s.io/kind/pkg/log"
@@ -24,7 +26,9 @@ type Provider struct {
 }
 
 // Cluster returns a kubernetes cluster for this provider.
-func (p Provider) Cluster() (Cluster, error) {
+func (p Provider) Cluster(ctx context.Context) (Cluster, error) {
+	_, span := trace.NewSpan(ctx, "provider.Cluster")
+	defer span.End()
 	if err := os.MkdirAll(filepath.Dir(p.Kubeconfig), 0766); err != nil {
 		return nil, fmt.Errorf("unable to create directory %s: %v", p.Kubeconfig, err)
 	}

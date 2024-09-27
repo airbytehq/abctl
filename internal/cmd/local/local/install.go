@@ -21,6 +21,7 @@ import (
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
+	"go.opencensus.io/trace"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
@@ -139,6 +140,9 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
+	ctx, span := trace.StartSpan(ctx, "command.Install")
+	defer span.End()
+
 	go c.watchEvents(ctx)
 
 	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
@@ -321,9 +325,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 }
 
 func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr error) error {
-
 	if podList, err := c.k8s.PodList(ctx, airbyteNamespace); err == nil {
-
 		var errors []string
 		for _, pod := range podList.Items {
 			if pod.Status.Phase == corev1.PodFailed {
@@ -344,14 +346,18 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 				errors = append(errors, fmt.Sprintf("pod %s: %s", pod.Name, msg))
 			}
 		}
+
 		if errors != nil {
 			return fmt.Errorf("unable to install airbyte chart:\n%s", strings.Join(errors, "\n"))
 		}
 	}
+
 	return fmt.Errorf("unable to install airbyte chart: %w", chartErr)
 }
 
 func (c *Command) handleIngress(ctx context.Context, hosts []string) error {
+	ctx, span := trace.StartSpan(ctx, "command.handleIngress")
+	defer span.End()
 	c.spinner.UpdateText("Checking for existing Ingress")
 
 	if c.k8s.IngressExists(ctx, airbyteNamespace, airbyteIngress) {
@@ -545,6 +551,14 @@ func (c *Command) handleChart(
 	ctx context.Context,
 	req chartRequest,
 ) error {
+	ctx, span := trace.StartSpan(ctx, "command.handleChart")
+	defer span.End()
+
+	span.AddAttributes(
+		trace.StringAttribute("chartName", req.chartName),
+		trace.StringAttribute("chartVersion", req.chartVersion),
+	)
+
 	c.spinner.UpdateText(fmt.Sprintf("Configuring %s Helm repository", req.name))
 
 	if err := c.helm.AddOrUpdateChartRepo(repo.Entry{

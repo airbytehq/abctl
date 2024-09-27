@@ -14,6 +14,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
 )
 
@@ -26,6 +27,9 @@ var dockerClient *docker.Docker
 // Returns a nil error if docker was successfully detected, otherwise an error will be returned.  Any error returned
 // is guaranteed to include the ErrDocker error in the error chain.
 func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Version, error) {
+	ctx, span := trace.NewSpan(ctx, "dockerInstalled")
+	defer span.End()
+
 	var err error
 	if dockerClient == nil {
 		if dockerClient, err = docker.New(ctx); err != nil {

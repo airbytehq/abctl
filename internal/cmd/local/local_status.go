@@ -7,12 +7,16 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
 )
 
 type StatusCmd struct{}
 
 func (s *StatusCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
+	ctx, span := trace.NewSpan(ctx, "status")
+	defer span.End()
+
 	spinner := &pterm.DefaultSpinner
 	if err := checkDocker(ctx, telClient, spinner); err != nil {
 		return err
@@ -39,13 +43,13 @@ func checkDocker(ctx context.Context, telClient telemetry.Client, spinner *pterm
 func status(ctx context.Context, provider k8s.Provider, telClient telemetry.Client, spinner *pterm.SpinnerPrinter) error {
 	spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
-	cluster, err := provider.Cluster()
+	cluster, err := provider.Cluster(ctx)
 	if err != nil {
 		pterm.Error.Printfln("Unable to determine status of any existing '%s' cluster", provider.ClusterName)
 		return err
 	}
 
-	if !cluster.Exists() {
+	if !cluster.Exists(nil) {
 		pterm.Warning.Println("Airbyte does not appear to be installed locally")
 		return nil
 	}

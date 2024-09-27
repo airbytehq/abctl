@@ -29,14 +29,14 @@ func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient
 	return telClient.Wrap(ctx, telemetry.Uninstall, func() error {
 		spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
-		cluster, err := provider.Cluster()
+		cluster, err := provider.Cluster(ctx)
 		if err != nil {
 			pterm.Error.Printfln("Unable to determine if the cluster '%s' exists", provider.ClusterName)
 			return err
 		}
 
 		// if no cluster exists, there is nothing to do
-		if !cluster.Exists() {
+		if !cluster.Exists(nil) {
 			pterm.Success.Printfln("Cluster '%s' does not exist\nNo additional action required", provider.ClusterName)
 			return nil
 		}

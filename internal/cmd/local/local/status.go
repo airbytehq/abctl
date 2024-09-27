@@ -5,10 +5,14 @@ import (
 	"fmt"
 
 	"github.com/pterm/pterm"
+	"go.opencensus.io/trace"
 )
 
 // Status handles the status of local Airbyte.
-func (c *Command) Status(_ context.Context) error {
+func (c *Command) Status(ctx context.Context) error {
+	_, span := trace.StartSpan(ctx, "command.Status")
+	defer span.End()
+
 	charts := []string{airbyteChartRelease, nginxChartRelease}
 	for _, name := range charts {
 		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", name))

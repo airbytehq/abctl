@@ -10,6 +10,7 @@ import (
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/airbytehq/abctl/internal/cmd"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/airbytehq/abctl/internal/update"
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
@@ -25,8 +26,43 @@ func run() int {
 	// ensure the pterm info width matches the other printers
 	pterm.Info.Prefix.Text = " INFO  "
 
-	ctx := cliCtx()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	printUpdateMsg := checkForNewerAbctlVersion(ctx)
+
+	shutdowns, err := trace.Init(ctx)
+	if err != nil {
+		// tracing will not be initialed
+		// log message?
+	}
+	defer func() {
+		for _, shutdown := range shutdowns {
+			shutdown()
+		}
+	}()
+
+	//err := sentry.Init(sentry.ClientOptions{
+	//	Dsn:              "https://9e0748223d5bc43e873f811a849e982e@o1009025.ingest.us.sentry.io/4507177762357248",
+	//	EnableTracing:    true,
+	//	Debug:            true,
+	//	Environment:      "dev",
+	//	TracesSampleRate: 1.0,
+	//})
+	//if err != nil {
+	//	panic(fmt.Sprintf("sentry.Init: %s", err))
+	//}
+	//
+	//defer sentry.Flush(2 * time.Second)
+	//
+	//tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sentryotel.NewSentrySpanProcessor()))
+	//defer tp.Shutdown(ctx)
+	//
+	//otel.SetTracerProvider(tp)
+	//otel.SetTextMapPropagator(sentryotel.NewSentryPropagator())
+
+	//kong.Bind(ctx)
+	//kong.BindToProvider(bindCtx(ctx))
 
 	runCmd := func(ctx context.Context) error {
 		var root cmd.Cmd
@@ -35,6 +71,7 @@ func run() int {
 			kong.Name("abctl"),
 			kong.Description("Airbyte's command line tool for managing a local Airbyte installation."),
 			kong.UsageOnError(),
+			kong.BindToProvider(bindCtx(ctx)),
 		)
 		if err != nil {
 			return err
@@ -43,7 +80,7 @@ func run() int {
 		if err != nil {
 			return err
 		}
-		parsed.BindToProvider(bindCtx(ctx))
+		//parsed.BindToProvider(bindCtx(ctx))
 		return parsed.Run()
 	}
 
@@ -94,20 +131,6 @@ func checkForNewerAbctlVersion(ctx context.Context) func() {
 
 		}
 	}
-}
-
-// cliCtx configures and returns a context which listens for interrupt/shutdown signals.
-func cliCtx() context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
-	// listen for shutdown signals
-	go func() {
-		signalCh := make(chan os.Signal, 1)
-		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
-		<-signalCh
-
-		cancel()
-	}()
-	return ctx
 }
 
 // bindCtx exists to allow kong to correctly inject a context.Context into the Run methods on the commands.

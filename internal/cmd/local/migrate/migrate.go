@@ -18,6 +18,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/pterm/pterm"
+	"go.opencensus.io/trace"
 )
 
 const (
@@ -28,6 +29,9 @@ const (
 
 // FromDockerVolume handles migrating the existing docker compose database into the abctl managed k8s cluster.
 func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume string) error {
+	ctx, span := trace.StartSpan(ctx, "migrate.FromDockerVolume")
+	defer span.End()
+
 	if v := volumeExists(ctx, dockerCli, volume); v == "" {
 		return errors.New(fmt.Sprintf("volume %s does not exist", volume))
 	}
