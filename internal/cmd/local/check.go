@@ -66,6 +66,9 @@ func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Ve
 // If we can establish a tcp listener on the port, an additional check is made to see if Airbyte may already be
 // bound to that port. If something besides Airbyte is using it, treat this as an inaccessible port.
 func portAvailable(ctx context.Context, port int) error {
+	ctx, span := trace.NewSpan(ctx, "portAvailable")
+	defer span.End()
+
 	if port < 1024 {
 		pterm.Warning.Printfln(
 			"Availability of port %d cannot be determined, as this is a privileged port (less than 1024).\n"+
@@ -111,6 +114,8 @@ func isErrorAddressAlreadyInUse(err error) bool {
 }
 
 func getPort(ctx context.Context, clusterName string) (int, error) {
+	ctx, span := trace.NewSpan(ctx, "getPort")
+	defer span.End()
 	var err error
 
 	if dockerClient == nil {

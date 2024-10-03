@@ -27,7 +27,7 @@ type Cluster interface {
 	// Create a cluster with the provided name.
 	Create(ctx context.Context, portHTTP int, extraMounts []ExtraVolumeMount) error
 	// Delete a cluster with the provided name.
-	Delete() error
+	Delete(ctx context.Context) error
 	// Exists returns true if the cluster exists, false otherwise.
 	Exists(ctx context.Context) bool
 }
@@ -86,7 +86,9 @@ func (k *kindCluster) Create(ctx context.Context, port int, extraMounts []ExtraV
 	return nil
 }
 
-func (k *kindCluster) Delete() error {
+func (k *kindCluster) Delete(ctx context.Context) error {
+	_, span := trace.NewSpan(ctx, "kindCluster.Delete")
+	defer span.End()
 	if err := k.p.Delete(k.clusterName, k.kubeconfig); err != nil {
 		return fmt.Errorf("unable to delete kind cluster: %w", formatKindErr(err))
 	}
@@ -94,8 +96,8 @@ func (k *kindCluster) Delete() error {
 	return nil
 }
 
-func (k *kindCluster) Exists(context.Context) bool {
-	_, span := trace.NewSpan(context.Background(), "kindCluster.exists")
+func (k *kindCluster) Exists(ctx context.Context) bool {
+	_, span := trace.NewSpan(ctx, "kindCluster.exists")
 	defer span.End()
 
 	clusters, _ := k.p.List()

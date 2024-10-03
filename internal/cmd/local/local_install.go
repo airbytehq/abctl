@@ -8,9 +8,8 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/maps"
-	"github.com/airbytehq/abctl/internal/trace"
-
 	"github.com/airbytehq/abctl/internal/telemetry"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
 )
 

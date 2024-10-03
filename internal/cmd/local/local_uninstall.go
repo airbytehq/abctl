@@ -36,7 +36,7 @@ func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient
 		}
 
 		// if no cluster exists, there is nothing to do
-		if !cluster.Exists(nil) {
+		if !cluster.Exists(ctx) {
 			pterm.Success.Printfln("Cluster '%s' does not exist\nNo additional action required", provider.ClusterName)
 			return nil
 		}
@@ -55,7 +55,7 @@ func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient
 		}
 
 		spinner.UpdateText(fmt.Sprintf("Verifying uninstallation status of cluster '%s'", provider.ClusterName))
-		if err := cluster.Delete(); err != nil {
+		if err := cluster.Delete(ctx); err != nil {
 			pterm.Error.Printfln(fmt.Sprintf("Uninstallation of cluster '%s' failed", provider.ClusterName))
 			return fmt.Errorf("unable to uninstall cluster %s", provider.ClusterName)
 		}

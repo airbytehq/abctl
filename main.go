@@ -28,10 +28,11 @@ func run() int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
 	printUpdateMsg := checkForNewerAbctlVersion(ctx)
 
 	shutdowns, err := trace.Init(ctx)
+	//ctx, span := trace.NewSpan(ctx, "run")
+	//defer span.End()
 	if err != nil {
 		// tracing will not be initialed
 		// log message?
@@ -41,28 +42,6 @@ func run() int {
 			shutdown()
 		}
 	}()
-
-	//err := sentry.Init(sentry.ClientOptions{
-	//	Dsn:              "https://9e0748223d5bc43e873f811a849e982e@o1009025.ingest.us.sentry.io/4507177762357248",
-	//	EnableTracing:    true,
-	//	Debug:            true,
-	//	Environment:      "dev",
-	//	TracesSampleRate: 1.0,
-	//})
-	//if err != nil {
-	//	panic(fmt.Sprintf("sentry.Init: %s", err))
-	//}
-	//
-	//defer sentry.Flush(2 * time.Second)
-	//
-	//tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sentryotel.NewSentrySpanProcessor()))
-	//defer tp.Shutdown(ctx)
-	//
-	//otel.SetTracerProvider(tp)
-	//otel.SetTextMapPropagator(sentryotel.NewSentryPropagator())
-
-	//kong.Bind(ctx)
-	//kong.BindToProvider(bindCtx(ctx))
 
 	runCmd := func(ctx context.Context) error {
 		var root cmd.Cmd
@@ -84,15 +63,17 @@ func run() int {
 		return parsed.Run()
 	}
 
-	exitCode := handleErr(runCmd(ctx))
+	exitCode := handleErr(ctx, runCmd(ctx))
 	printUpdateMsg()
 	return exitCode
 }
 
-func handleErr(err error) int {
+func handleErr(ctx context.Context, err error) int {
 	if err == nil {
 		return 0
 	}
+
+	//trace.CaptureError(ctx, err)
 
 	pterm.Error.Println(err)
 

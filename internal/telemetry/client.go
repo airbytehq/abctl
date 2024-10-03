@@ -34,7 +34,7 @@ const (
 
 // Client interface for telemetry data.
 type Client interface {
-	// Start should be called as soon quickly as possible.
+	// Start should be called as quickly as possible.
 	Start(context.Context, EventType) error
 	// Success should be called only if the activity succeeded.
 	Success(context.Context, EventType) error

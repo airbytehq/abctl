@@ -17,11 +17,12 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/maps"
 	"github.com/airbytehq/abctl/internal/telemetry"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/google/uuid"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/mittwald/go-helm-client/values"
 	"github.com/pterm/pterm"
-	"go.opencensus.io/trace"
+	"go.opentelemetry.io/otel/attribute"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
@@ -70,6 +71,13 @@ func (i *InstallOpts) dockerAuth() bool {
 // if uid (user id) and gid (group id) are non-zero, the persistent directory on the host machine that holds the
 // persistent volume will be changed to be owned by
 func (c *Command) persistentVolume(ctx context.Context, namespace, name string) error {
+	ctx, span := trace.NewSpan(ctx, "command.persistentVolume")
+	span.SetAttributes(
+		attribute.String("namespace", namespace),
+		attribute.String("name", name),
+	)
+	defer span.End()
+
 	if !c.k8s.PersistentVolumeExists(ctx, namespace, name) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume '%s'", name))
 
@@ -124,6 +132,14 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 }
 
 func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, volumeName string) error {
+	ctx, span := trace.NewSpan(ctx, "command.persistentVolumeClaim")
+	span.SetAttributes(
+		attribute.String("namespace", namespace),
+		attribute.String("name", name),
+		attribute.String("volume", volumeName),
+	)
+	defer span.End()
+
 	if !c.k8s.PersistentVolumeClaimExists(ctx, namespace, name, volumeName) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume claim '%s'", name))
 		if err := c.k8s.PersistentVolumeClaimCreate(ctx, namespace, name, volumeName); err != nil {
@@ -138,12 +154,24 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 	return nil
 }
 
+type X struct {
+	name string
+}
+
+func (x X) Error() string {
+	return "error happened " + x.name + " <- here"
+}
+
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
-	ctx, span := trace.StartSpan(ctx, "command.Install")
+	ctx, span := trace.NewSpan(ctx, "command.Install")
 	defer span.End()
 
-	go c.watchEvents(ctx)
+	// Provide a child context to the watcher so that it can shut it down early
+	// to ensure the watcher cleanly shutdown.
+	ctxWatch, watchStop := context.WithCancel(ctx)
+	defer watchStop()
+	go c.watchEvents(ctxWatch)
 
 	if !c.k8s.NamespaceExists(ctx, airbyteNamespace) {
 		c.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", airbyteNamespace))
@@ -192,6 +220,8 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	if opts.LowResourceMode {
+		span.SetAttributes(attribute.Bool("lowResourceMode", true))
+
 		airbyteValues = append(airbyteValues,
 			"server.env_vars.JOB_RESOURCE_VARIANT_OVERRIDE=lowresource",
 			"global.jobs.resources.requests.cpu=0",
@@ -209,8 +239,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	}
 
 	if opts.InsecureCookies {
-		airbyteValues = append(airbyteValues,
-			"global.auth.cookieSecureSetting=false")
+		airbyteValues = append(airbyteValues, "global.auth.cookieSecureSetting=false")
 	}
 
 	if opts.dockerAuth() {
@@ -305,6 +334,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	if err := c.handleIngress(ctx, opts.Hosts); err != nil {
 		return err
 	}
+	watchStop()
 
 	// verify ingress using localhost
 	url := fmt.Sprintf("http://localhost:%d", c.portHTTP)
@@ -356,7 +386,7 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 }
 
 func (c *Command) handleIngress(ctx context.Context, hosts []string) error {
-	ctx, span := trace.StartSpan(ctx, "command.handleIngress")
+	ctx, span := trace.NewSpan(ctx, "command.handleIngress")
 	defer span.End()
 	c.spinner.UpdateText("Checking for existing Ingress")
 
@@ -380,28 +410,37 @@ func (c *Command) handleIngress(ctx context.Context, hosts []string) error {
 }
 
 func (c *Command) watchEvents(ctx context.Context) {
+	ctx, span := trace.NewSpan(ctx, "command.watchEvents")
+	defer span.End()
+	pterm.Debug.Println("Event watcher started.")
+
 	watcher, err := c.k8s.EventsWatch(ctx, airbyteNamespace)
 	if err != nil {
 		pterm.Warning.Printfln("Unable to watch airbyte events\n  %s", err)
 		return
 	}
-	defer watcher.Stop()
 
+	// when the ctx is complete, call stop on the watcher
+	go func() {
+		<-ctx.Done()
+		watcher.Stop()
+	}()
+
+	numEvents := 0
 	for {
 		select {
 		case event, ok := <-watcher.ResultChan():
 			if !ok {
 				pterm.Debug.Println("Event watcher completed.")
+				span.SetAttributes(attribute.Int("numEvents", numEvents))
 				return
 			}
+			numEvents++
 			if convertedEvent, ok := event.Object.(*eventsv1.Event); ok {
 				c.handleEvent(ctx, convertedEvent)
 			} else {
 				pterm.Debug.Printfln("Received unexpected event: %T", event.Object)
 			}
-		case <-ctx.Done():
-			pterm.Debug.Printfln("Event watcher context completed:\n  %s", ctx.Err())
-			return
 		}
 	}
 }
@@ -451,16 +490,35 @@ var now = func() *metav1.Time {
 	return &t
 }()
 
+// captureAttributes captures metrics attributes off of the k8s event stream.
+// Currently only captures the image pull time.
+func captureAttributes(ctx context.Context, msg string) {
+	if !strings.HasPrefix(msg, "Successfully pulled image") {
+		return
+	}
+	// e.g. Successfully pulled image "airbyte/mc" in 711ms (711ms including waiting)
+	// we want
+	parts := strings.Split(msg, " ")
+	if len(parts) <= 8 {
+		return
+	}
+
+	trace.SpanFromContext(ctx).SetAttributes(attribute.String(
+		"pulled "+strings.Trim(parts[3], `"`),
+		strings.Join(parts[5:], " "),
+	))
+}
+
 // handleEvent converts a kubernetes event into a console log message
 func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
-	// TODO: replace DeprecatedLastTimestamp,
-	// this is supposed to be replaced with series.lastObservedTime, however that field is always nil...
+	// This should be replaced with series.lastObservedTime, however that field is always nil...
 	if e.DeprecatedLastTimestamp.Before(now) {
 		return
 	}
 
 	switch {
 	case strings.EqualFold(e.Type, "normal"):
+		captureAttributes(ctx, e.Note)
 		if strings.EqualFold(e.Reason, "backoff") {
 			pterm.Warning.Println(e.Note)
 		} else if e.Reason == "Started" && e.Regarding.Name == "airbyte-abctl-airbyte-bootloader" {
@@ -473,9 +531,7 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 		logs := ""
 		level := pterm.Debug
 
-		// only show the warning if the count is higher than 5
-		// TODO: replace DeprecatedCount
-		// Similar issue to DeprecatedLastTimestamp, the series attribute is always nil
+		// This should be replaced with DeprecatedLastTimestamp, however that field is always nil...
 		if e.DeprecatedCount > 5 {
 			level = pterm.Warning
 		}
@@ -551,12 +607,12 @@ func (c *Command) handleChart(
 	ctx context.Context,
 	req chartRequest,
 ) error {
-	ctx, span := trace.StartSpan(ctx, "command.handleChart")
+	ctx, span := trace.NewSpan(ctx, "command.handleChart")
 	defer span.End()
 
-	span.AddAttributes(
-		trace.StringAttribute("chartName", req.chartName),
-		trace.StringAttribute("chartVersion", req.chartVersion),
+	span.SetAttributes(
+		attribute.String("chartName", req.chartName),
+		attribute.String("chartVersion", req.chartVersion),
 	)
 
 	c.spinner.UpdateText(fmt.Sprintf("Configuring %s Helm repository", req.name))

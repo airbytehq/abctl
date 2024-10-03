@@ -49,7 +49,7 @@ func status(ctx context.Context, provider k8s.Provider, telClient telemetry.Clie
 		return err
 	}
 
-	if !cluster.Exists(nil) {
+	if !cluster.Exists(ctx) {
 		pterm.Warning.Println("Airbyte does not appear to be installed locally")
 		return nil
 	}
