@@ -56,7 +56,7 @@ func TestCommand_Install(t *testing.T) {
 				Namespace:       airbyteNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         30 * time.Minute,
+				Timeout:         60 * time.Minute,
 				ValuesYaml: `global:
     auth:
         enabled: "true"
@@ -83,7 +83,7 @@ func TestCommand_Install(t *testing.T) {
 				Namespace:       nginxNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         30 * time.Minute,
+				Timeout:         60 * time.Minute,
 				ValuesYaml:      expNginxValues,
 			},
 			release: release.Release{
@@ -225,7 +225,7 @@ func TestCommand_Install_HelmValues(t *testing.T) {
 				Namespace:       airbyteNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         30 * time.Minute,
+				Timeout:         60 * time.Minute,
 				ValuesYaml: `global:
     auth:
         enabled: "true"
@@ -253,7 +253,7 @@ func TestCommand_Install_HelmValues(t *testing.T) {
 				Namespace:       nginxNamespace,
 				CreateNamespace: true,
 				Wait:            true,
-				Timeout:         30 * time.Minute,
+				Timeout:         60 * time.Minute,
 				ValuesYaml:      expNginxValues,
 			},
 			release: release.Release{
