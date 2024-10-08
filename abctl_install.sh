@@ -206,6 +206,8 @@ _get_os() {
 _get_arch() {
     if uname -m | grep -q "arm"; then
         echo arm64
+    elif uname -m | grep -q "aarch64"; then
+        echo arm64
     else
         echo amd64
     fi
