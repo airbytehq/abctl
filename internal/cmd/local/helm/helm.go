@@ -23,6 +23,7 @@ type Client interface {
 	GetRelease(name string) (*release.Release, error)
 	InstallOrUpgradeChart(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error)
 	UninstallReleaseByName(name string) error
+	TemplateChart(spec *helmclient.ChartSpec, options *helmclient.HelmTemplateOptions) ([]byte, error)
 }
 
 // New returns the default helm client

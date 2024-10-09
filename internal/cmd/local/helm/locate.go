@@ -1,10 +1,11 @@
-package local
+package helm
 
 import (
 	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/airbytehq/abctl/internal/common"
 	"github.com/pterm/pterm"
 	"golang.org/x/mod/semver"
 	"helm.sh/helm/v3/pkg/cli"
@@ -40,8 +41,8 @@ var defaultNewChartRepo newChartRepo = func(cfg *repo.Entry, getters getter.Prov
 // This variable should only be modified for testing purposes.
 var defaultLoadIndexFile loadIndexFile = repo.LoadIndexFile
 
-func locateLatestAirbyteChart(chartName, chartVersion, chartFlag string) string {
-	pterm.Debug.Printf("getting helm chart %q with version %q\n", chartName, chartVersion)
+func LocateLatestAirbyteChart(chartVersion, chartFlag string) string {
+	pterm.Debug.Printf("getting helm chart %q with version %q\n", common.AirbyteChartName, chartVersion)
 
 	// If the --chart flag was given, use that.
 	if chartFlag != "" {
@@ -55,8 +56,8 @@ func locateLatestAirbyteChart(chartName, chartVersion, chartFlag string) string 
 	// Here we avoid that problem by figuring out the full URL of the airbyte chart,
 	// which forces Helm to resolve the chart over HTTP and ignore local directories.
 	// If the locator fails, fall back to the original helm behavior.
-	if chartName == airbyteChartName && chartVersion == "" {
-		if url, err := getLatestAirbyteChartUrlFromRepoIndex(airbyteRepoName, airbyteRepoURL); err == nil {
+	if chartVersion == "" {
+		if url, err := getLatestAirbyteChartUrlFromRepoIndex(common.AirbyteRepoName, common.AirbyteRepoURL); err == nil {
 			pterm.Debug.Printf("determined latest airbyte chart url: %s\n", url)
 			return url
 		} else {
@@ -64,7 +65,7 @@ func locateLatestAirbyteChart(chartName, chartVersion, chartFlag string) string 
 		}
 	}
 
-	return chartName
+	return common.AirbyteChartName
 }
 
 func getLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, error) {
@@ -117,5 +118,5 @@ func getLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, er
 		return "", fmt.Errorf("unexpected number of URLs - %d", len(latest.URLs))
 	}
 
-	return airbyteRepoURL + "/" + latest.URLs[0], nil
+	return common.AirbyteRepoURL + "/" + latest.URLs[0], nil
 }

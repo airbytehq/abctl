@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/google/uuid"
 )
 
 func TestNoopClient(t *testing.T) {
@@ -25,7 +24,7 @@ func TestNoopClient(t *testing.T) {
 
 	cli.Attr("k", "v'")
 
-	if d := cmp.Diff(uuid.Nil, cli.User()); d != "" {
+	if d := cmp.Diff("", cli.User()); d != "" {
 		t.Errorf("user should be nil (-want +got): %s", d)
 	}
 }

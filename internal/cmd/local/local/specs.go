@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/airbytehq/abctl/internal/common"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -36,8 +37,8 @@ func ingress(hosts []string) *networkingv1.Ingress {
 	return &networkingv1.Ingress{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      airbyteIngress,
-			Namespace: airbyteNamespace,
+			Name:      common.AirbyteIngress,
+			Namespace: common.AirbyteNamespace,
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: &ingressClassName,
@@ -60,7 +61,7 @@ func ingressRule(host string) networkingv1.IngressRule {
 						PathType: &pathType,
 						Backend: networkingv1.IngressBackend{
 							Service: &networkingv1.IngressServiceBackend{
-								Name: fmt.Sprintf("%s-airbyte-webapp-svc", airbyteChartRelease),
+								Name: fmt.Sprintf("%s-airbyte-webapp-svc", common.AirbyteChartRelease),
 								Port: networkingv1.ServiceBackendPort{
 									Name: "http",
 								},
