@@ -1,0 +1,10 @@
+global:
+    auth:
+        enabled: "true"
+    env_vars:
+        AIRBYTE_INSTALLATION_ID: test-user
+    jobs:
+        resources:
+            limits:
+                cpu: "3"
+                memory: 4Gi

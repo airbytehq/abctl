@@ -1,0 +1,14 @@
+global:
+  airbyteUrl: "http://localhost:8000"
+  edition: "enterprise"
+
+  auth:
+    enabled: false
+    instanceAdmin:
+      firstName: "test"
+      lastName:  "user"
+
+keycloak:
+  auth:
+    adminUsername: airbyteAdmin
+    adminPassword: keycloak123

@@ -1,8 +1,9 @@
-package local
+package helm
 
 import (
 	"testing"
 
+	"github.com/airbytehq/abctl/internal/common"
 	"github.com/google/go-cmp/cmp"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/getter"
@@ -11,7 +12,7 @@ import (
 
 func TestLocateChartFlag(t *testing.T) {
 	expect := "chartFlagValue"
-	c := locateLatestAirbyteChart("airbyte", "", expect)
+	c := LocateLatestAirbyteChart("", expect)
 	if c != expect {
 		t.Errorf("expected %q but got %q", expect, c)
 	}
@@ -40,7 +41,7 @@ func TestLocate(t *testing.T) {
 					URLs:     []string{"example.test"},
 				}},
 			},
-			exp: airbyteRepoURL + "/example.test",
+			exp: common.AirbyteRepoURL + "/example.test",
 		},
 		{
 			name: "one non-release entry",
@@ -50,12 +51,12 @@ func TestLocate(t *testing.T) {
 					URLs:     []string{"example.test"},
 				}},
 			},
-			exp: airbyteChartName,
+			exp: common.AirbyteChartName,
 		},
 		{
 			name:    "no entries",
 			entries: map[string]repo.ChartVersions{},
-			exp:     airbyteChartName,
+			exp:     common.AirbyteChartName,
 		},
 		{
 			name: "one release entry with no URLs",
@@ -65,7 +66,7 @@ func TestLocate(t *testing.T) {
 					URLs:     []string{},
 				}},
 			},
-			exp: airbyteChartName,
+			exp: common.AirbyteChartName,
 		},
 		{
 			name: "one release entry with two URLs",
@@ -75,7 +76,7 @@ func TestLocate(t *testing.T) {
 					URLs:     []string{"one.test", "two.test"},
 				}},
 			},
-			exp: airbyteChartName,
+			exp: common.AirbyteChartName,
 		},
 		{
 			name: "one non-release entry followed by one release entry",
@@ -91,14 +92,14 @@ func TestLocate(t *testing.T) {
 					},
 				},
 			},
-			exp: airbyteRepoURL + "/good.test",
+			exp: common.AirbyteRepoURL + "/good.test",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defaultLoadIndexFile = mockLoadIndexFile(repo.IndexFile{Entries: tt.entries})
-			act := locateLatestAirbyteChart(airbyteChartName, "", "")
+			act := LocateLatestAirbyteChart("", "")
 			if d := cmp.Diff(tt.exp, act); d != "" {
 				t.Errorf("mismatch (-want +got):\n%s", d)
 			}

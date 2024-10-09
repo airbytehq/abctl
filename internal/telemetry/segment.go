@@ -82,8 +82,8 @@ func (s *SegmentClient) Attr(key, val string) {
 	s.attrs[key] = val
 }
 
-func (s *SegmentClient) User() uuid.UUID {
-	return s.cfg.AnalyticsID.toUUID()
+func (s *SegmentClient) User() string {
+	return s.cfg.AnalyticsID.toUUID().String()
 }
 
 func (s *SegmentClient) Wrap(ctx context.Context, et EventType, f func() error) error {

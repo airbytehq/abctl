@@ -17,7 +17,6 @@ import (
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/go-connections/nat"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/uuid"
 )
 
 func TestDockerInstalled(t *testing.T) {
@@ -40,9 +39,7 @@ func TestDockerInstalled(t *testing.T) {
 		},
 	}
 
-	tel := mockTelemetryClient{
-		attr: func(key, val string) {},
-	}
+	tel := telemetry.MockClient{}
 
 	version, err := dockerInstalled(context.Background(), &tel)
 	if err != nil {
@@ -73,7 +70,7 @@ func TestDockerInstalled_Error(t *testing.T) {
 		},
 	}
 
-	_, err := dockerInstalled(context.Background(), &mockTelemetryClient{})
+	_, err := dockerInstalled(context.Background(), &telemetry.MockClient{})
 	if err == nil {
 		t.Error("unexpected error:", err)
 	}
@@ -302,40 +299,4 @@ func port(s string) int {
 	vals := strings.Split(s, ":")
 	p, _ := strconv.Atoi(vals[len(vals)-1])
 	return p
-}
-
-// --- mocks
-var _ telemetry.Client = (*mockTelemetryClient)(nil)
-
-type mockTelemetryClient struct {
-	start   func(ctx context.Context, eventType telemetry.EventType) error
-	success func(ctx context.Context, eventType telemetry.EventType) error
-	failure func(ctx context.Context, eventType telemetry.EventType, err error) error
-	attr    func(key, val string)
-	user    func() uuid.UUID
-	wrap    func(context.Context, telemetry.EventType, func() error) error
-}
-
-func (m *mockTelemetryClient) Start(ctx context.Context, eventType telemetry.EventType) error {
-	return m.start(ctx, eventType)
-}
-
-func (m *mockTelemetryClient) Success(ctx context.Context, eventType telemetry.EventType) error {
-	return m.success(ctx, eventType)
-}
-
-func (m *mockTelemetryClient) Failure(ctx context.Context, eventType telemetry.EventType, err error) error {
-	return m.failure(ctx, eventType, err)
-}
-
-func (m *mockTelemetryClient) Attr(key, val string) {
-	m.attr(key, val)
-}
-
-func (m *mockTelemetryClient) User() uuid.UUID {
-	return m.user()
-}
-
-func (m *mockTelemetryClient) Wrap(ctx context.Context, et telemetry.EventType, f func() error) error {
-	return m.wrap(ctx, et, f)
 }

@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/airbytehq/abctl/internal/cmd/images"
 	"github.com/airbytehq/abctl/internal/cmd/local"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
@@ -24,14 +24,12 @@ func (v verbose) BeforeApply() error {
 
 type Cmd struct {
 	Local   local.Cmd   `cmd:"" help:"Manage the local Airbyte installation."`
+	Images  images.Cmd  `cmd:"" help:"Manage images used by Airbyte and abctl."`
 	Version version.Cmd `cmd:"" help:"Display version information."`
 	Verbose verbose     `short:"v" help:"Enable verbose output."`
 }
 
 func (c *Cmd) BeforeApply(ctx *kong.Context) error {
-	if _, envVarDNT := os.LookupEnv("DO_NOT_TRACK"); envVarDNT {
-		pterm.Info.Println("Telemetry collection disabled (DO_NOT_TRACK)")
-	}
 	ctx.BindTo(k8s.DefaultProvider, (*k8s.Provider)(nil))
 	ctx.BindTo(telemetry.Get(), (*telemetry.Client)(nil))
 	if err := ctx.BindToProvider(bindK8sClient(&k8s.DefaultProvider)); err != nil {

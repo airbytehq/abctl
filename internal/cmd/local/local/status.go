@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/airbytehq/abctl/internal/common"
 	"github.com/pterm/pterm"
 )
 
 // Status handles the status of local Airbyte.
 func (c *Command) Status(_ context.Context) error {
-	charts := []string{airbyteChartRelease, nginxChartRelease}
+	charts := []string{common.AirbyteChartRelease, common.NginxChartRelease}
 	for _, name := range charts {
 		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", name))
 

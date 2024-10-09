@@ -5,8 +5,6 @@ import (
 	"net/http"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
-	"github.com/airbytehq/abctl/internal/telemetry"
-	"github.com/google/uuid"
 	helmclient "github.com/mittwald/go-helm-client"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
@@ -47,44 +45,8 @@ func (m *mockHelmClient) UninstallReleaseByName(s string) error {
 	return m.uninstallReleaseByName(s)
 }
 
-var _ telemetry.Client = (*mockTelemetryClient)(nil)
-
-type mockTelemetryClient struct {
-	start   func(context.Context, telemetry.EventType) error
-	success func(context.Context, telemetry.EventType) error
-	failure func(context.Context, telemetry.EventType, error) error
-	attr    func(key, val string)
-	user    func() uuid.UUID
-	wrap    func(context.Context, telemetry.EventType, func() error) error
-}
-
-func (m *mockTelemetryClient) Start(ctx context.Context, eventType telemetry.EventType) error {
-	return m.start(ctx, eventType)
-}
-
-func (m *mockTelemetryClient) Success(ctx context.Context, eventType telemetry.EventType) error {
-	return m.success(ctx, eventType)
-}
-
-func (m *mockTelemetryClient) Failure(ctx context.Context, eventType telemetry.EventType, err error) error {
-	return m.failure(ctx, eventType, err)
-}
-
-func (m *mockTelemetryClient) Attr(key, val string) {
-	if m.attr != nil {
-		m.attr(key, val)
-	}
-}
-
-func (m *mockTelemetryClient) User() uuid.UUID {
-	if m.user == nil {
-		return uuid.Nil
-	}
-	return m.user()
-}
-
-func (m *mockTelemetryClient) Wrap(ctx context.Context, et telemetry.EventType, f func() error) error {
-	return m.wrap(ctx, et, f)
+func (m *mockHelmClient) TemplateChart(spec *helmclient.ChartSpec, options *helmclient.HelmTemplateOptions) ([]byte, error) {
+	return nil, nil
 }
 
 var _ HTTPClient = (*mockHTTP)(nil)

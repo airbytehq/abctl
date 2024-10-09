@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/common"
 	"k8s.io/client-go/rest"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
@@ -19,24 +21,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-const (
-	airbyteBootloaderPodName = "airbyte-abctl-airbyte-bootloader"
-	airbyteChartName         = "airbyte/airbyte"
-	airbyteChartRelease      = "airbyte-abctl"
-	airbyteIngress           = "ingress-abctl"
-	airbyteNamespace         = "airbyte-abctl"
-	airbyteRepoName          = "airbyte"
-	airbyteRepoURL           = "https://airbytehq.github.io/helm-charts"
-	nginxChartName           = "nginx/ingress-nginx"
-	nginxChartRelease        = "ingress-nginx"
-	nginxNamespace           = "ingress-nginx"
-	nginxRepoName            = "nginx"
-	nginxRepoURL             = "https://kubernetes.github.io/ingress-nginx"
-)
-
-// dockerAuthSecretName is the name of the secret which holds the docker authentication information.
-const dockerAuthSecretName = "docker-auth"
-
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -44,25 +28,29 @@ type HTTPClient interface {
 // BrowserLauncher primarily for testing purposes.
 type BrowserLauncher func(url string) error
 
-// ChartLocator primarily for testing purposes.
-type ChartLocator func(repoName, repoUrl, chartFlag string) string
-
 // Command is the local command, responsible for installing, uninstalling, or other local actions.
 type Command struct {
-	provider    k8s.Provider
-	http        HTTPClient
-	helm        helm.Client
-	k8s         k8s.Client
-	portHTTP    int
-	spinner     *pterm.SpinnerPrinter
-	tel         telemetry.Client
-	launcher    BrowserLauncher
-	locateChart ChartLocator
-	userHome    string
+	provider k8s.Provider
+	docker   *docker.Docker
+
+	http     HTTPClient
+	helm     helm.Client
+	k8s      k8s.Client
+	portHTTP int
+	spinner  *pterm.SpinnerPrinter
+	tel      telemetry.Client
+	launcher BrowserLauncher
+	userHome string
 }
 
 // Option for configuring the Command, primarily exists for testing
 type Option func(*Command)
+
+func WithDockerClient(client *docker.Docker) Option {
+	return func(c *Command) {
+		c.docker = client
+	}
+}
 
 // WithTelemetryClient define the telemetry client for this command.
 func WithTelemetryClient(client telemetry.Client) Option {
@@ -99,12 +87,6 @@ func WithBrowserLauncher(launcher BrowserLauncher) Option {
 	}
 }
 
-func WithChartLocator(locator ChartLocator) Option {
-	return func(c *Command) {
-		c.locateChart = locator
-	}
-}
-
 // WithUserHome define the user's home directory.
 func WithUserHome(home string) Option {
 	return func(c *Command) {
@@ -129,10 +111,6 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	c := &Command{provider: provider}
 	for _, opt := range opts {
 		opt(c)
-	}
-
-	if c.locateChart == nil {
-		c.locateChart = locateLatestAirbyteChart
 	}
 
 	// determine userhome if not defined
@@ -160,7 +138,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	// set the helm client, if not defined
 	if c.helm == nil {
 		var err error
-		if c.helm, err = helm.New(provider.Kubeconfig, provider.Context, airbyteNamespace); err != nil {
+		if c.helm, err = helm.New(provider.Kubeconfig, provider.Context, common.AirbyteNamespace); err != nil {
 			return nil, err
 		}
 	}
