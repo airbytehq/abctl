@@ -152,10 +152,10 @@ func TestInstallOpts(t *testing.T) {
 	b, _ := os.ReadFile("local/testdata/expected-default.values.yaml")
 	cmd := InstallCmd{
 		// Don't let the code dynamically resolve the latest chart version.
-		Chart: "/test/path/to/chart", 
+		Chart: "/test/path/to/chart",
 	}
 	expect := &local.InstallOpts{
-		HelmValuesYaml: string(b),
+		HelmValuesYaml:  string(b),
 		AirbyteChartLoc: "/test/path/to/chart",
 	}
 	opts, err := cmd.InstallOpts("test-user")

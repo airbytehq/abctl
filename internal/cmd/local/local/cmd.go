@@ -33,14 +33,14 @@ type Command struct {
 	provider k8s.Provider
 	docker   *docker.Docker
 
-	http        HTTPClient
-	helm        helm.Client
-	k8s         k8s.Client
-	portHTTP    int
-	spinner     *pterm.SpinnerPrinter
-	tel         telemetry.Client
-	launcher    BrowserLauncher
-	userHome    string
+	http     HTTPClient
+	helm     helm.Client
+	k8s      k8s.Client
+	portHTTP int
+	spinner  *pterm.SpinnerPrinter
+	tel      telemetry.Client
+	launcher BrowserLauncher
+	userHome string
 }
 
 // Option for configuring the Command, primarily exists for testing
