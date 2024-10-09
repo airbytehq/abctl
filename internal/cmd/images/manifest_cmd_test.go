@@ -3,15 +3,14 @@ package images
 import (
 	"testing"
 
+	helmlib "github.com/mittwald/go-helm-client"
+
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
-	"github.com/airbytehq/abctl/internal/common"
 	"github.com/stretchr/testify/assert"
 )
 
 func getHelmTestClient(t *testing.T) helm.Client {
-	provider := k8s.DefaultProvider
-	client, err := helm.New(provider.Kubeconfig, provider.Context, common.AirbyteNamespace)
+	client, err := helmlib.New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +78,6 @@ func TestManifestCmd_Enterprise(t *testing.T) {
 	assert.Equal(t, expect, actual)
 }
 
-
 func TestManifestCmd_Nightly(t *testing.T) {
 	client := getHelmTestClient(t)
 	cmd := ManifestCmd{
@@ -92,27 +90,27 @@ func TestManifestCmd_Nightly(t *testing.T) {
 		t.Fatal(err)
 	}
 	expect := []string{
-		"airbyte/bootloader:nightly-1728428783-9025e1a46e", 
-		"airbyte/connector-builder-server:nightly-1728428783-9025e1a46e", 
-		"airbyte/connector-sidecar:nightly-1728428783-9025e1a46e", 
-		"airbyte/container-orchestrator:nightly-1728428783-9025e1a46e", 
-		"airbyte/cron:nightly-1728428783-9025e1a46e", 
-		"airbyte/db:nightly-1728428783-9025e1a46e", 
-		"airbyte/keycloak-setup:nightly-1728428783-9025e1a46e", 
-		"airbyte/keycloak:nightly-1728428783-9025e1a46e", 
-		"airbyte/mc:latest", 
-		"airbyte/server:nightly-1728428783-9025e1a46e", 
-		"airbyte/webapp:nightly-1728428783-9025e1a46e", 
-		"airbyte/worker:nightly-1728428783-9025e1a46e", 
-		"airbyte/workload-api-server:nightly-1728428783-9025e1a46e", 
-		"airbyte/workload-init-container:nightly-1728428783-9025e1a46e", 
-		"airbyte/workload-launcher:nightly-1728428783-9025e1a46e", 
-		"bitnami/kubectl:1.28.9", 
-		"busybox:1.35", 
-		"busybox:latest", 
-		"curlimages/curl:8.1.1", 
-		"minio/minio:RELEASE.2023-11-20T22-40-07Z", 
-		"postgres:13-alpine", 
+		"airbyte/bootloader:nightly-1728428783-9025e1a46e",
+		"airbyte/connector-builder-server:nightly-1728428783-9025e1a46e",
+		"airbyte/connector-sidecar:nightly-1728428783-9025e1a46e",
+		"airbyte/container-orchestrator:nightly-1728428783-9025e1a46e",
+		"airbyte/cron:nightly-1728428783-9025e1a46e",
+		"airbyte/db:nightly-1728428783-9025e1a46e",
+		"airbyte/keycloak-setup:nightly-1728428783-9025e1a46e",
+		"airbyte/keycloak:nightly-1728428783-9025e1a46e",
+		"airbyte/mc:latest",
+		"airbyte/server:nightly-1728428783-9025e1a46e",
+		"airbyte/webapp:nightly-1728428783-9025e1a46e",
+		"airbyte/worker:nightly-1728428783-9025e1a46e",
+		"airbyte/workload-api-server:nightly-1728428783-9025e1a46e",
+		"airbyte/workload-init-container:nightly-1728428783-9025e1a46e",
+		"airbyte/workload-launcher:nightly-1728428783-9025e1a46e",
+		"bitnami/kubectl:1.28.9",
+		"busybox:1.35",
+		"busybox:latest",
+		"curlimages/curl:8.1.1",
+		"minio/minio:RELEASE.2023-11-20T22-40-07Z",
+		"postgres:13-alpine",
 		"temporalio/auto-setup:1.23.0",
 	}
 	assert.Equal(t, expect, actual)
