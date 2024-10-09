@@ -24,13 +24,6 @@ import (
 const portTest = 9999
 const testAirbyteChartLoc = "https://airbytehq.github.io/helm-charts/airbyte-1.2.3.tgz"
 
-func testChartLocator(chartName, chartVersion, chartFlag string) string {
-	if chartName == common.AirbyteChartName && chartVersion == "" {
-		return testAirbyteChartLoc
-	}
-	return chartName
-}
-
 func TestCommand_Install(t *testing.T) {
 	valuesYaml := mustReadFile(t, "testdata/test-edition.values.yaml")
 	expChartRepoCnt := 0
@@ -164,14 +157,16 @@ func TestCommand_Install(t *testing.T) {
 		WithBrowserLauncher(func(url string) error {
 			return nil
 		}),
-		WithChartLocator(testChartLocator),
 	)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	installOpts := &InstallOpts{HelmValuesYaml: valuesYaml}
+	installOpts := &InstallOpts{
+		HelmValuesYaml: valuesYaml,
+		AirbyteChartLoc: testAirbyteChartLoc,
+	}
 	if err := c.Install(context.Background(), installOpts); err != nil {
 		t.Fatal(err)
 	}
