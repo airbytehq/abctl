@@ -674,7 +674,7 @@ func (c *Command) handleChart(
 		CreateNamespace: true,
 		Namespace:       req.namespace,
 		Wait:            true,
-		Timeout:         30 * time.Minute,
+		Timeout:         60 * time.Minute,
 		ValuesOptions:   values.Options{Values: req.values},
 		ValuesYaml:      req.valuesYAML,
 		Version:         req.chartVersion,
