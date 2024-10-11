@@ -21,7 +21,7 @@ import (
 
 type ManifestCmd struct {
 	Chart        string `help:"Path to chart." xor:"chartver"`
-	ChartVersion string `help:"Version to install." xor:"chartver"`
+	ChartVersion string `help:"Version of the chart." xor:"chartver"`
 	Values       string `type:"existingfile" help:"An Airbyte helm chart values file to configure helm."`
 }
 

@@ -1,12 +1,13 @@
 package images
 
 import (
+	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	helmlib "github.com/mittwald/go-helm-client"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
-	"github.com/stretchr/testify/assert"
 )
 
 func getHelmTestClient(t *testing.T) helm.Client {
@@ -42,7 +43,7 @@ func TestManifestCmd(t *testing.T) {
 		"minio/minio:RELEASE.2023-11-20T22-40-07Z",
 		"temporalio/auto-setup:1.23.0",
 	}
-	assert.Equal(t, expect, actual)
+	compareList(t, expect, actual)
 }
 
 func TestManifestCmd_Enterprise(t *testing.T) {
@@ -75,7 +76,7 @@ func TestManifestCmd_Enterprise(t *testing.T) {
 		"postgres:13-alpine",
 		"temporalio/auto-setup:1.23.0",
 	}
-	assert.Equal(t, expect, actual)
+	compareList(t, expect, actual)
 }
 
 func TestManifestCmd_Nightly(t *testing.T) {
@@ -113,5 +114,14 @@ func TestManifestCmd_Nightly(t *testing.T) {
 		"postgres:13-alpine",
 		"temporalio/auto-setup:1.23.0",
 	}
-	assert.Equal(t, expect, actual)
+	compareList(t, expect, actual)
+}
+
+func compareList(t *testing.T, expect, actual []string) {
+	t.Helper()
+	sort.Strings(expect)
+	sort.Strings(actual)
+	if d := cmp.Diff(expect, actual); d != "" {
+		t.Error(d)
+	}
 }
