@@ -354,6 +354,7 @@ func (c *Command) Install(ctx context.Context, opts InstallOpts) error {
 	return nil
 }
 
+// TODO make chart-failure error type?
 func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr error) error {
 	if podList, err := c.k8s.PodList(ctx, airbyteNamespace); err == nil {
 		var errors []string

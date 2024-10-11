@@ -61,7 +61,7 @@ func (j *logScanner) Err() error {
 }
 
 func getLastLogError(r io.Reader) (string, error) {
-	lines := []logLine{}
+	var lines []logLine
 	s := newLogScanner(r)
 	for s.Scan() {
 		lines = append(lines, s.line)

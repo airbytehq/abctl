@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -31,12 +32,11 @@ func run() int {
 	printUpdateMsg := checkForNewerAbctlVersion(ctx)
 
 	shutdowns, err := trace.Init(ctx)
+	if err != nil {
+		pterm.Debug.Printf(fmt.Sprintf("Trace disabled: %s", err))
+	}
 	//ctx, span := trace.NewSpan(ctx, "run")
 	//defer span.End()
-	if err != nil {
-		// tracing will not be initialed
-		// log message?
-	}
 	defer func() {
 		for _, shutdown := range shutdowns {
 			shutdown()
@@ -59,7 +59,9 @@ func run() int {
 		if err != nil {
 			return err
 		}
-		//parsed.BindToProvider(bindCtx(ctx))
+		ctx, span := trace.NewSpan(ctx, "run")
+		defer span.End()
+		parsed.BindToProvider(bindCtx(ctx))
 		return parsed.Run()
 	}
 
@@ -73,7 +75,7 @@ func handleErr(ctx context.Context, err error) int {
 		return 0
 	}
 
-	//trace.CaptureError(ctx, err)
+	trace.CaptureError(ctx, err)
 
 	pterm.Error.Println(err)
 
