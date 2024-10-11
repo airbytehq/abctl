@@ -84,7 +84,7 @@ func findImagesFromChart(client helm.Client, valuesYaml, chartName, chartVersion
 // It returns a unique, sorted list of images found.
 func findAllImages(chartYaml string) []string {
 	objs := decodeK8sResources(chartYaml)
-	imageSet := map[string]bool{}
+	imageSet := set[string]{}
 
 	for _, obj := range objs {
 
@@ -94,7 +94,7 @@ func findAllImages(chartYaml string) []string {
 			if strings.HasSuffix(z.Name, "airbyte-env") {
 				for k, v := range z.Data {
 					if strings.HasSuffix(k, "_IMAGE") {
-						imageSet[v] = true
+						imageSet.add(v)
 					}
 				}
 			}
@@ -112,15 +112,15 @@ func findAllImages(chartYaml string) []string {
 		}
 
 		for _, c := range podSpec.InitContainers {
-			imageSet[c.Image] = true
+			imageSet.add(c.Image)
 		}
 		for _, c := range podSpec.Containers {
-			imageSet[c.Image] = true
+			imageSet.add(c.Image)
 		}
 	}
 
 	var out []string
-	for k := range imageSet {
+	for _, k := range imageSet.items() {
 		if k != "" {
 			out = append(out, k)
 		}
@@ -142,6 +142,25 @@ func decodeK8sResources(renderedYaml string) []runtime.Object {
 			continue
 		}
 		out = append(out, obj)
+	}
+	return out
+}
+
+type set[T comparable] struct {
+	vals map[T]struct{}
+}
+
+func (s *set[T]) add(v T) {
+	if s.vals == nil {
+		s.vals = map[T]struct{}{}
+	}
+	s.vals[v] = struct{}{}
+}
+
+func (s *set[T]) items() []T {
+	out := make([]T, len(s.vals))
+	for k := range s.vals {
+		out = append(out, k)
 	}
 	return out
 }
