@@ -314,23 +314,27 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 	if podList, err := c.k8s.PodList(ctx, common.AirbyteNamespace); err == nil {
 		var errors []string
 		for _, pod := range podList.Items {
-			if pod.Status.Phase == corev1.PodFailed {
-				msg := "unknown"
-
-				logs, err := c.k8s.LogsGet(ctx, common.AirbyteNamespace, pod.Name)
-				if err != nil {
-					msg = "unknown: failed to get pod logs."
-				}
-				m, err := getLastLogError(strings.NewReader(logs))
-				if err != nil {
-					msg = "unknown: failed to find error log."
-				}
-				if m != "" {
-					msg = m
-				}
-
-				errors = append(errors, fmt.Sprintf("pod %s: %s", pod.Name, msg))
+			if pod.Status.Phase != corev1.PodFailed {
+				continue
 			}
+
+			msg := "unknown"
+
+			logs, err := c.k8s.LogsGet(ctx, common.AirbyteNamespace, pod.Name)
+			if err != nil {
+				msg = "unknown: failed to get pod logs."
+			}
+			//sentry.ConfigureScope(func(scope *sentry.Scope) {})
+			m, err := getLastLogError(strings.NewReader(logs))
+			if err != nil {
+				msg = "unknown: failed to find error log."
+			}
+			if m != "" {
+				msg = m
+			}
+
+			errors = append(errors, fmt.Sprintf("pod %s: %s", pod.Name, msg))
+
 		}
 
 		if errors != nil {
