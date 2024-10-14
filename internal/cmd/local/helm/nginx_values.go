@@ -1,4 +1,4 @@
-package local
+package helm
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ controller:
     proxy-send-timeout: "600"
 `))
 
-func getNginxValuesYaml(port int) (string, error) {
+func BuildNginxValues(port int) (string, error) {
 	var buf bytes.Buffer
 	err := nginxValuesTpl.Execute(&buf, map[string]any{"Port": port})
 	if err != nil {

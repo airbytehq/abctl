@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
-	"github.com/airbytehq/abctl/internal/maps"
+	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
@@ -31,6 +32,56 @@ type InstallCmd struct {
 	Volume          []string `help:"Additional volume mounts. Must be in the format <HOST_PATH>:<GUEST_PATH>."`
 }
 
+func (i *InstallCmd) InstallOpts(user string) (*local.InstallOpts, error) {
+	extraVolumeMounts, err := parseVolumeMounts(i.Volume)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, host := range i.Host {
+		if err := validateHostFlag(host); err != nil {
+			return nil, err
+		}
+	}
+
+	opts := &local.InstallOpts{
+		HelmChartVersion:  i.ChartVersion,
+		AirbyteChartLoc:   helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
+		Secrets:           i.Secret,
+		Migrate:           i.Migrate,
+		Hosts:             i.Host,
+		ExtraVolumeMounts: extraVolumeMounts,
+		DockerServer:      i.DockerServer,
+		DockerUser:        i.DockerUsername,
+		DockerPass:        i.DockerPassword,
+		DockerEmail:       i.DockerEmail,
+		NoBrowser:         i.NoBrowser,
+	}
+
+	valuesOpts := helm.ValuesOpts{
+		ValuesFile:      i.Values,
+		InsecureCookies: i.InsecureCookies,
+		LowResourceMode: i.LowResourceMode,
+	}
+
+	if opts.DockerAuth() {
+		valuesOpts.ImagePullSecret = common.DockerAuthSecretName
+	}
+
+	// only override the empty telUser if the tel.User returns a non-nil (uuid.Nil) value.
+	if user != "" {
+		valuesOpts.TelemetryUser = user
+	}
+
+	valuesYAML, err := helm.BuildAirbyteValues(valuesOpts)
+	if err != nil {
+		return nil, err
+	}
+	opts.HelmValuesYaml = valuesYAML
+
+	return opts, nil
+}
+
 func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
 	ctx, span := trace.NewSpan(ctx, "install")
 	defer span.End()
@@ -45,20 +96,9 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
 
-	helmValues, err := maps.FromYAMLFile(i.Values)
+	opts, err := i.InstallOpts(telClient.User())
 	if err != nil {
 		return err
-	}
-
-	extraVolumeMounts, err := parseVolumeMounts(i.Volume)
-	if err != nil {
-		return err
-	}
-
-	for _, host := range i.Host {
-		if err := validateHostFlag(host); err != nil {
-			return err
-		}
 	}
 
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
@@ -100,7 +140,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			pterm.Success.Printfln("Port %d appears to be available", i.Port)
 			spinner.UpdateText(fmt.Sprintf("Creating cluster '%s'", provider.ClusterName))
 
-			if err := cluster.Create(ctx, i.Port, extraVolumeMounts); err != nil {
+			if err := cluster.Create(ctx, i.Port, opts.ExtraVolumeMounts); err != nil {
 				pterm.Error.Printfln("Cluster '%s' could not be created", provider.ClusterName)
 				return err
 			}
@@ -111,29 +151,11 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			local.WithPortHTTP(i.Port),
 			local.WithTelemetryClient(telClient),
 			local.WithSpinner(spinner),
+			local.WithDockerClient(dockerClient),
 		)
 		if err != nil {
 			pterm.Error.Printfln("Failed to initialize 'local' command")
 			return fmt.Errorf("unable to initialize local command: %w", err)
-		}
-
-		opts := local.InstallOpts{
-			HelmChartFlag:    i.Chart,
-			HelmChartVersion: i.ChartVersion,
-			HelmValues:       helmValues,
-			Secrets:          i.Secret,
-			Migrate:          i.Migrate,
-			Docker:           dockerClient,
-			Hosts:            i.Host,
-
-			DockerServer: i.DockerServer,
-			DockerUser:   i.DockerUsername,
-			DockerPass:   i.DockerPassword,
-			DockerEmail:  i.DockerEmail,
-
-			NoBrowser:       i.NoBrowser,
-			LowResourceMode: i.LowResourceMode,
-			InsecureCookies: i.InsecureCookies,
 		}
 
 		if err := lc.Install(ctx, opts); err != nil {
@@ -151,6 +173,10 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 }
 
 func parseVolumeMounts(specs []string) ([]k8s.ExtraVolumeMount, error) {
+	if len(specs) == 0 {
+		return nil, nil
+	}
+
 	mounts := make([]k8s.ExtraVolumeMount, len(specs))
 
 	for i, spec := range specs {

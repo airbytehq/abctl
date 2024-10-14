@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/pterm/pterm"
 )
 
@@ -43,7 +42,7 @@ type Client interface {
 	// Attr should be called to add additional attributes to this activity.
 	Attr(key, val string)
 	// User returns the user identifier being used by this client
-	User() uuid.UUID
+	User() string
 	// Wrap wraps the func() error with the EventType,
 	// calling the Start, Failure or Success methods correctly based on
 	// the behavior of the func() error

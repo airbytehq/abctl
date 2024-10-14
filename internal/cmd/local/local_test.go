@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/alecthomas/kong"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/telemetry"
@@ -99,31 +101,27 @@ func TestCheckAirbyteDir(t *testing.T) {
 }
 
 func TestValues_FileDoesntExist(t *testing.T) {
-	cmd := InstallCmd{Values: "thisfiledoesnotexist"}
-	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+
+	var root InstallCmd
+	k, _ := kong.New(
+		&root,
+		kong.Name("abctl"),
+		kong.Description("Airbyte's command line tool for managing a local Airbyte installation."),
+		kong.UsageOnError(),
+	)
+	_, err := k.Parse([]string{"--values", "/testdata/thisfiledoesnotexist"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	expect := "failed to read file thisfiledoesnotexist: open thisfiledoesnotexist: no such file or directory"
+	expect := "--values: stat /testdata/thisfiledoesnotexist: no such file or directory"
 	if err.Error() != expect {
 		t.Errorf("expected %q but got %q", expect, err)
 	}
 }
 
 func TestValues_BadYaml(t *testing.T) {
-	tmpdir := t.TempDir()
-	p := filepath.Join(tmpdir, "values.yaml")
-	content := `
-foo:
-  - bar: baz
-    - foo
-`
 
-	if err := os.WriteFile(p, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cmd := InstallCmd{Values: p}
+	cmd := InstallCmd{Values: "./local/testdata/invalid.values.yaml"}
 	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
 	if err == nil {
 		t.Fatal("expected error")
@@ -131,7 +129,6 @@ foo:
 
 	if !strings.HasPrefix(err.Error(), "failed to unmarshal file") {
 		t.Errorf("unexpected error: %v", err)
-
 	}
 }
 
@@ -148,5 +145,24 @@ func TestInvalidHostFlag_IpAddrWithPort(t *testing.T) {
 	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
 	if !errors.Is(err, localerr.ErrInvalidHostFlag) {
 		t.Errorf("expected ErrInvalidHostFlag but got %v", err)
+	}
+}
+
+func TestInstallOpts(t *testing.T) {
+	b, _ := os.ReadFile("local/testdata/expected-default.values.yaml")
+	cmd := InstallCmd{
+		// Don't let the code dynamically resolve the latest chart version.
+		Chart: "/test/path/to/chart",
+	}
+	expect := &local.InstallOpts{
+		HelmValuesYaml:  string(b),
+		AirbyteChartLoc: "/test/path/to/chart",
+	}
+	opts, err := cmd.InstallOpts("test-user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := cmp.Diff(expect, opts); d != "" {
+		t.Errorf("unexpected error diff (-want +got):\n%s", d)
 	}
 }

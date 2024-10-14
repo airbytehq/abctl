@@ -21,6 +21,11 @@ type Cmd struct {
 }
 
 func (c *Cmd) BeforeApply() error {
+
+	if _, envVarDNT := os.LookupEnv("DO_NOT_TRACK"); envVarDNT {
+		pterm.Info.Println("Telemetry collection disabled (DO_NOT_TRACK)")
+	}
+
 	if err := checkAirbyteDir(); err != nil {
 		return fmt.Errorf("%w: %w", localerr.ErrAirbyteDir, err)
 	}

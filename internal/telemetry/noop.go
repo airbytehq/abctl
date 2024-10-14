@@ -2,8 +2,6 @@ package telemetry
 
 import (
 	"context"
-
-	"github.com/google/uuid"
 )
 
 var _ Client = (*NoopClient)(nil)
@@ -26,8 +24,8 @@ func (n NoopClient) Failure(context.Context, EventType, error) error {
 
 func (n NoopClient) Attr(_, _ string) {}
 
-func (n NoopClient) User() uuid.UUID {
-	return uuid.Nil
+func (n NoopClient) User() string {
+	return ""
 }
 
 func (n NoopClient) Wrap(ctx context.Context, et EventType, f func() error) error {

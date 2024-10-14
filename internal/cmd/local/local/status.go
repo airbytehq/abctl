@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/airbytehq/abctl/internal/common"
 	"github.com/pterm/pterm"
 	"go.opencensus.io/trace"
 )
@@ -13,7 +14,7 @@ func (c *Command) Status(ctx context.Context) error {
 	_, span := trace.StartSpan(ctx, "command.Status")
 	defer span.End()
 
-	charts := []string{airbyteChartRelease, nginxChartRelease}
+	charts := []string{common.AirbyteChartRelease, common.NginxChartRelease}
 	for _, name := range charts {
 		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", name))
 

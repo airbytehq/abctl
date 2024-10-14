@@ -4,83 +4,65 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/k8stest"
+	"github.com/airbytehq/abctl/internal/common"
+	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/uuid"
 	helmclient "github.com/mittwald/go-helm-client"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
-	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 )
 
 const portTest = 9999
 const testAirbyteChartLoc = "https://airbytehq.github.io/helm-charts/airbyte-1.2.3.tgz"
 
-func testChartLocator(chartName, chartVersion, chartFlag string) string {
-	if chartName == airbyteChartName && chartVersion == "" {
-		return testAirbyteChartLoc
-	}
-	return chartName
-}
-
 func TestCommand_Install(t *testing.T) {
-	expNginxValues, _ := getNginxValuesYaml(9999)
+	valuesYaml := mustReadFile(t, "testdata/test-edition.values.yaml")
 	expChartRepoCnt := 0
 	expChartRepo := []struct {
 		name string
 		url  string
 	}{
-		{name: airbyteRepoName, url: airbyteRepoURL},
-		{name: nginxRepoName, url: nginxRepoURL},
+		{name: common.AirbyteRepoName, url: common.AirbyteRepoURL},
+		{name: common.NginxRepoName, url: common.NginxRepoURL},
 	}
 
-	// userID is for telemetry tracking purposes
-	userID := uuid.New()
-
 	expChartCnt := 0
+	expNginxValues, _ := helm.BuildNginxValues(9999)
 	expChart := []struct {
 		chart   helmclient.ChartSpec
 		release release.Release
 	}{
 		{
 			chart: helmclient.ChartSpec{
-				ReleaseName:     airbyteChartRelease,
+				ReleaseName:     common.AirbyteChartRelease,
 				ChartName:       testAirbyteChartLoc,
-				Namespace:       airbyteNamespace,
+				Namespace:       common.AirbyteNamespace,
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         60 * time.Minute,
-				ValuesYaml: `global:
-    auth:
-        enabled: "true"
-    env_vars:
-        AIRBYTE_INSTALLATION_ID: ` + userID.String() + `
-    jobs:
-        resources:
-            limits:
-                cpu: "3"
-                memory: 4Gi
-`,
+				ValuesYaml:      valuesYaml,
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
-				Name:      airbyteChartRelease,
-				Namespace: airbyteNamespace,
+				Name:      common.AirbyteChartRelease,
+				Namespace: common.AirbyteNamespace,
 				Version:   0,
 			},
 		},
 		{
 			chart: helmclient.ChartSpec{
-				ReleaseName:     nginxChartRelease,
-				ChartName:       nginxChartName,
-				Namespace:       nginxNamespace,
+				ReleaseName:     common.NginxChartRelease,
+				ChartName:       common.NginxChartName,
+				Namespace:       common.NginxNamespace,
 				CreateNamespace: true,
 				Wait:            true,
 				Timeout:         60 * time.Minute,
@@ -88,12 +70,13 @@ func TestCommand_Install(t *testing.T) {
 			},
 			release: release.Release{
 				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "4.3.2.1"}},
-				Name:      nginxChartRelease,
-				Namespace: nginxNamespace,
+				Name:      common.NginxChartRelease,
+				Namespace: common.NginxNamespace,
 				Version:   0,
 			},
 		},
 	}
+
 	helm := mockHelmClient{
 		addOrUpdateChartRepo: func(entry repo.Entry) error {
 			if d := cmp.Diff(expChartRepo[expChartRepoCnt].name, entry.Name); d != "" {
@@ -112,7 +95,7 @@ func TestCommand_Install(t *testing.T) {
 			switch {
 			case name == testAirbyteChartLoc:
 				return &chart.Chart{Metadata: &chart.Metadata{Version: "test.airbyte.version"}}, "", nil
-			case name == nginxChartName:
+			case name == common.NginxChartName:
 				return &chart.Chart{Metadata: &chart.Metadata{Version: "test.nginx.version"}}, "", nil
 			default:
 				t.Error("unsupported chart name", name)
@@ -122,10 +105,10 @@ func TestCommand_Install(t *testing.T) {
 
 		getRelease: func(name string) (*release.Release, error) {
 			switch {
-			case name == airbyteChartRelease:
+			case name == common.AirbyteChartRelease:
 				t.Error("should not have been called", name)
 				return nil, errors.New("should not have been called")
-			case name == nginxChartRelease:
+			case name == common.NginxChartRelease:
 				return nil, errors.New("not found")
 			default:
 				t.Error("unsupported chart name", name)
@@ -153,25 +136,12 @@ func TestCommand_Install(t *testing.T) {
 	}
 
 	k8sClient := k8stest.MockClient{
-		FnServerVersionGet: func() (string, error) {
-			return "test", nil
-		},
-		FnSecretCreateOrUpdate: func(ctx context.Context, secret corev1.Secret) error {
-			return nil
-		},
 		FnIngressExists: func(ctx context.Context, namespace string, ingress string) bool {
 			return false
 		},
-		FnIngressCreate: func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
-			return nil
-		},
 	}
 
-	attrs := map[string]string{}
-	tel := mockTelemetryClient{
-		attr: func(key, val string) { attrs[key] = val },
-		user: func() uuid.UUID { return userID },
-	}
+	tel := telemetry.MockClient{}
 
 	httpClient := mockHTTP{do: func(req *http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: 200}, nil
@@ -187,189 +157,25 @@ func TestCommand_Install(t *testing.T) {
 		WithBrowserLauncher(func(url string) error {
 			return nil
 		}),
-		WithChartLocator(testChartLocator),
 	)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := c.Install(context.Background(), InstallOpts{}); err != nil {
+	installOpts := &InstallOpts{
+		HelmValuesYaml: valuesYaml,
+		AirbyteChartLoc: testAirbyteChartLoc,
+	}
+	if err := c.Install(context.Background(), installOpts); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestCommand_Install_HelmValues(t *testing.T) {
-	expChartRepoCnt := 0
-	expChartRepo := []struct {
-		name string
-		url  string
-	}{
-		{name: airbyteRepoName, url: airbyteRepoURL},
-		{name: nginxRepoName, url: nginxRepoURL},
-	}
-
-	// userID is for telemetry tracking purposes
-	userID := uuid.New()
-
-	expChartCnt := 0
-	expNginxValues, _ := getNginxValuesYaml(9999)
-	expChart := []struct {
-		chart   helmclient.ChartSpec
-		release release.Release
-	}{
-		{
-			chart: helmclient.ChartSpec{
-				ReleaseName:     airbyteChartRelease,
-				ChartName:       testAirbyteChartLoc,
-				Namespace:       airbyteNamespace,
-				CreateNamespace: true,
-				Wait:            true,
-				Timeout:         60 * time.Minute,
-				ValuesYaml: `global:
-    auth:
-        enabled: "true"
-    edition: test
-    env_vars:
-        AIRBYTE_INSTALLATION_ID: ` + userID.String() + `
-    jobs:
-        resources:
-            limits:
-                cpu: "3"
-                memory: 4Gi
-`,
-			},
-			release: release.Release{
-				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
-				Name:      airbyteChartRelease,
-				Namespace: airbyteNamespace,
-				Version:   0,
-			},
-		},
-		{
-			chart: helmclient.ChartSpec{
-				ReleaseName:     nginxChartRelease,
-				ChartName:       nginxChartName,
-				Namespace:       nginxNamespace,
-				CreateNamespace: true,
-				Wait:            true,
-				Timeout:         60 * time.Minute,
-				ValuesYaml:      expNginxValues,
-			},
-			release: release.Release{
-				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "4.3.2.1"}},
-				Name:      nginxChartRelease,
-				Namespace: nginxNamespace,
-				Version:   0,
-			},
-		},
-	}
-	helm := mockHelmClient{
-		addOrUpdateChartRepo: func(entry repo.Entry) error {
-			if d := cmp.Diff(expChartRepo[expChartRepoCnt].name, entry.Name); d != "" {
-				t.Error("chart name mismatch", d)
-			}
-			if d := cmp.Diff(expChartRepo[expChartRepoCnt].url, entry.URL); d != "" {
-				t.Error("chart url mismatch", d)
-			}
-
-			expChartRepoCnt++
-
-			return nil
-		},
-
-		getChart: func(name string, _ *action.ChartPathOptions) (*chart.Chart, string, error) {
-			switch {
-			case name == testAirbyteChartLoc:
-				return &chart.Chart{Metadata: &chart.Metadata{Version: "test.airbyte.version"}}, "", nil
-			case name == nginxChartName:
-				return &chart.Chart{Metadata: &chart.Metadata{Version: "test.nginx.version"}}, "", nil
-			default:
-				t.Error("unsupported chart name", name)
-				return nil, "", errors.New("unexpected chart name")
-			}
-		},
-
-		getRelease: func(name string) (*release.Release, error) {
-			switch {
-			case name == airbyteChartRelease:
-				t.Error("should not have been called", name)
-				return nil, errors.New("should not have been called")
-			case name == nginxChartRelease:
-				return nil, errors.New("not found")
-			default:
-				t.Error("unsupported chart name", name)
-				return nil, errors.New("unexpected chart name")
-			}
-		},
-
-		installOrUpgradeChart: func(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error) {
-			if d := cmp.Diff(&expChart[expChartCnt].chart, spec); d != "" {
-				t.Error("chart mismatch", d)
-			}
-
-			defer func() { expChartCnt++ }()
-
-			return &expChart[expChartCnt].release, nil
-		},
-
-		uninstallReleaseByName: func(s string) error {
-			if d := cmp.Diff(expChart[expChartCnt].release.Name, s); d != "" {
-				t.Error("release mismatch", d)
-			}
-
-			return nil
-		},
-	}
-
-	k8sClient := k8stest.MockClient{
-		FnServerVersionGet: func() (string, error) {
-			return "test", nil
-		},
-		FnSecretCreateOrUpdate: func(ctx context.Context, secret corev1.Secret) error {
-			return nil
-		},
-		FnIngressExists: func(ctx context.Context, namespace string, ingress string) bool {
-			return false
-		},
-		FnIngressCreate: func(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error {
-			return nil
-		},
-	}
-
-	attrs := map[string]string{}
-	tel := mockTelemetryClient{
-		attr: func(key, val string) { attrs[key] = val },
-		user: func() uuid.UUID { return userID },
-	}
-
-	httpClient := mockHTTP{do: func(req *http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: 200}, nil
-	}}
-
-	c, err := New(
-		k8s.TestProvider,
-		WithPortHTTP(portTest),
-		WithHelmClient(&helm),
-		WithK8sClient(&k8sClient),
-		WithTelemetryClient(&tel),
-		WithHTTPClient(&httpClient),
-		WithBrowserLauncher(func(url string) error {
-			return nil
-		}),
-		WithChartLocator(testChartLocator),
-	)
-
+func mustReadFile(t *testing.T, name string) string {
+	b, err := os.ReadFile(name)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	helmValues := map[string]any{
-		"global": map[string]any{
-			"edition": "test",
-		},
-	}
-	if err := c.Install(context.Background(), InstallOpts{HelmValues: helmValues}); err != nil {
-		t.Fatal(err)
-	}
+	return string(b)
 }
