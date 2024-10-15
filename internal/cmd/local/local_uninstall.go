@@ -7,7 +7,9 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type UninstallCmd struct {
@@ -15,8 +17,12 @@ type UninstallCmd struct {
 }
 
 func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
-	spinner := &pterm.DefaultSpinner
+	ctx, span := trace.NewSpan(ctx, "local uninstall")
+	defer span.End()
 
+	span.SetAttributes(attribute.Bool("persisted", u.Persisted))
+
+	spinner := &pterm.DefaultSpinner
 	spinner, _ = spinner.Start("Starting uninstallation")
 	spinner.UpdateText("Checking for Docker installation")
 
@@ -29,14 +35,14 @@ func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient
 	return telClient.Wrap(ctx, telemetry.Uninstall, func() error {
 		spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
-		cluster, err := provider.Cluster()
+		cluster, err := provider.Cluster(ctx)
 		if err != nil {
 			pterm.Error.Printfln("Unable to determine if the cluster '%s' exists", provider.ClusterName)
 			return err
 		}
 
 		// if no cluster exists, there is nothing to do
-		if !cluster.Exists() {
+		if !cluster.Exists(ctx) {
 			pterm.Success.Printfln("Cluster '%s' does not exist\nNo additional action required", provider.ClusterName)
 			return nil
 		}
@@ -55,7 +61,7 @@ func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient
 		}
 
 		spinner.UpdateText(fmt.Sprintf("Verifying uninstallation status of cluster '%s'", provider.ClusterName))
-		if err := cluster.Delete(); err != nil {
+		if err := cluster.Delete(ctx); err != nil {
 			pterm.Error.Printfln(fmt.Sprintf("Uninstallation of cluster '%s' failed", provider.ClusterName))
 			return fmt.Errorf("unable to uninstall cluster %s", provider.ClusterName)
 		}

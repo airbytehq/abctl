@@ -7,6 +7,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
+	"go.opencensus.io/trace"
 )
 
 type DeploymentsCmd struct {
@@ -14,6 +15,9 @@ type DeploymentsCmd struct {
 }
 
 func (d *DeploymentsCmd) Run(ctx context.Context, telClient telemetry.Client, k8sClient k8s.Client) error {
+	ctx, span := trace.StartSpan(ctx, "local deployments")
+	defer span.End()
+
 	spinner := &pterm.DefaultSpinner
 	if err := checkDocker(ctx, telClient, spinner); err != nil {
 		return err

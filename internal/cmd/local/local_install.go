@@ -9,9 +9,10 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/common"
-
 	"github.com/airbytehq/abctl/internal/telemetry"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type InstallCmd struct {
@@ -32,11 +33,16 @@ type InstallCmd struct {
 	Volume          []string `help:"Additional volume mounts. Must be in the format <HOST_PATH>:<GUEST_PATH>."`
 }
 
-func (i *InstallCmd) InstallOpts(user string) (*local.InstallOpts, error) {
+func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.InstallOpts, error) {
+	ctx, span := trace.NewSpan(ctx, "InstallCmd.InstallOpts")
+	defer span.End()
+
 	extraVolumeMounts, err := parseVolumeMounts(i.Volume)
 	if err != nil {
 		return nil, err
 	}
+
+	span.SetAttributes(attribute.Bool("host", len(i.Host) > 0))
 
 	for _, host := range i.Host {
 		if err := validateHostFlag(host); err != nil {
@@ -73,7 +79,7 @@ func (i *InstallCmd) InstallOpts(user string) (*local.InstallOpts, error) {
 		valuesOpts.TelemetryUser = user
 	}
 
-	valuesYAML, err := helm.BuildAirbyteValues(valuesOpts)
+	valuesYAML, err := helm.BuildAirbyteValues(ctx, valuesOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +89,9 @@ func (i *InstallCmd) InstallOpts(user string) (*local.InstallOpts, error) {
 }
 
 func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
+	ctx, span := trace.NewSpan(ctx, "local install")
+	defer span.End()
+
 	spinner := &pterm.DefaultSpinner
 	spinner, _ = spinner.Start("Starting installation")
 	spinner.UpdateText("Checking for Docker installation")
@@ -93,7 +102,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
 
-	opts, err := i.InstallOpts(telClient.User())
+	opts, err := i.InstallOpts(ctx, telClient.User())
 	if err != nil {
 		return err
 	}
@@ -101,13 +110,13 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
 		spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
-		cluster, err := provider.Cluster()
+		cluster, err := provider.Cluster(ctx)
 		if err != nil {
 			pterm.Error.Printfln("Unable to determine status of any existing '%s' cluster", provider.ClusterName)
 			return err
 		}
 
-		if cluster.Exists() {
+		if cluster.Exists(ctx) {
 			// existing cluster, validate it
 			pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
 			spinner.UpdateText(fmt.Sprintf("Validating existing cluster '%s'", provider.ClusterName))
@@ -137,7 +146,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			pterm.Success.Printfln("Port %d appears to be available", i.Port)
 			spinner.UpdateText(fmt.Sprintf("Creating cluster '%s'", provider.ClusterName))
 
-			if err := cluster.Create(i.Port, opts.ExtraVolumeMounts); err != nil {
+			if err := cluster.Create(ctx, i.Port, opts.ExtraVolumeMounts); err != nil {
 				pterm.Error.Printfln("Cluster '%s' could not be created", provider.ClusterName)
 				return err
 			}

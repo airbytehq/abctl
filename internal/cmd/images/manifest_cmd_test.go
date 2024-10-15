@@ -1,6 +1,7 @@
 package images
 
 import (
+	"context"
 	"sort"
 	"testing"
 
@@ -23,7 +24,7 @@ func TestManifestCmd(t *testing.T) {
 	cmd := ManifestCmd{
 		ChartVersion: "1.1.0",
 	}
-	actual, err := cmd.findAirbyteImages(client)
+	actual, err := cmd.findAirbyteImages(context.Background(), client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +53,7 @@ func TestManifestCmd_Enterprise(t *testing.T) {
 		ChartVersion: "1.1.0",
 		Values:       "testdata/enterprise.values.yaml",
 	}
-	actual, err := cmd.findAirbyteImages(client)
+	actual, err := cmd.findAirbyteImages(context.Background(), client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +87,7 @@ func TestManifestCmd_Nightly(t *testing.T) {
 		ChartVersion: "1.1.0-nightly-1728428783-9025e1a46e",
 		Values:       "testdata/enterprise.values.yaml",
 	}
-	actual, err := cmd.findAirbyteImages(client)
+	actual, err := cmd.findAirbyteImages(context.Background(), client)
 	if err != nil {
 		t.Fatal(err)
 	}

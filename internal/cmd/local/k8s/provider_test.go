@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -58,7 +59,7 @@ func TestProvider_Cluster(t *testing.T) {
 		t.Fatal("Kubeconfig should not exist")
 	}
 
-	cluster, err := TestProvider.Cluster()
+	cluster, err := TestProvider.Cluster(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

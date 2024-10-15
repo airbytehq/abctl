@@ -7,10 +7,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -18,6 +20,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/pterm/pterm"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -28,6 +31,9 @@ const (
 
 // FromDockerVolume handles migrating the existing docker compose database into the abctl managed k8s cluster.
 func FromDockerVolume(ctx context.Context, dockerCli docker.Client, volume string) error {
+	ctx, span := trace.NewSpan(ctx, "migrate.FromDockerVolume")
+	defer span.End()
+
 	if v := volumeExists(ctx, dockerCli, volume); v == "" {
 		return errors.New(fmt.Sprintf("volume %s does not exist", volume))
 	}
@@ -160,6 +166,10 @@ func volumeExists(ctx context.Context, d docker.Client, volumeID string) string 
 }
 
 func ensureImage(ctx context.Context, d docker.Client, img string) error {
+	ctx, span := trace.NewSpan(ctx, "migrate.ensureImage")
+	defer span.End()
+	span.SetAttributes(attribute.String("image", img))
+
 	// check if an image already exists on the host
 	pterm.Debug.Println(fmt.Sprintf("Checking if the image '%s' already exists", img))
 	filter := filters.NewArgs()
@@ -185,6 +195,7 @@ func ensureImage(ctx context.Context, d docker.Client, img string) error {
 	}
 	pterm.Debug.Println(fmt.Sprintf("Successfully pulled the docker image '%s'", img))
 	defer reader.Close()
+
 	if _, err := io.Copy(io.Discard, reader); err != nil {
 		return fmt.Errorf("error fetching output: %w", err)
 	}
@@ -195,6 +206,9 @@ func ensureImage(ctx context.Context, d docker.Client, img string) error {
 // copyFromContainer emulates the `docker cp` command.
 // The dst will be treated as a directory.
 func copyFromContainer(ctx context.Context, d docker.Client, container, src, dst string) error {
+	ctx, span := trace.NewSpan(ctx, "migrate.copyFromContainer")
+	defer span.End()
+
 	reader, stat, err := d.CopyFromContainer(ctx, container, src)
 	if err != nil {
 		return fmt.Errorf("unable to copy from container '%s': %w", container, err)
@@ -216,6 +230,9 @@ func copyFromContainer(ctx context.Context, d docker.Client, container, src, dst
 
 // stopAndRemoveContainer will stop and ultimately remove the containerID
 func stopAndRemoveContainer(ctx context.Context, d docker.Client, containerID string) {
+	ctx, span := trace.NewSpan(ctx, "migrate.stopAndRemoveContainer")
+	defer span.End()
+
 	pterm.Debug.Println(fmt.Sprintf("Stopping container '%s'", containerID))
 	if err := d.ContainerStop(ctx, containerID, container.StopOptions{}); err != nil {
 		pterm.Debug.Println(fmt.Sprintf("Unable to stop docker container %s: %s", containerID, err))
@@ -229,6 +246,10 @@ func stopAndRemoveContainer(ctx context.Context, d docker.Client, containerID st
 // Exec executes an exec cmd against the container.
 // Largely inspired by the official docker client - https://github.com/docker/cli/blob/d69d501f699efb0cc1f16274e368e09ef8927840/cli/command/container/exec.go#L93
 func exec(ctx context.Context, d docker.Client, container string, cmd []string) error {
+	ctx, span := trace.NewSpan(ctx, "migrate.exec")
+	defer span.End()
+	span.SetAttributes(attribute.String("command", strings.Join(cmd, " ")))
+
 	if _, err := d.ContainerInspect(ctx, container); err != nil {
 		return fmt.Errorf("unable to inspect container '%s': %w", container, err)
 	}

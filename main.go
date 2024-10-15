@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,45 +11,73 @@ import (
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/airbytehq/abctl/internal/cmd"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/airbytehq/abctl/internal/update"
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 )
 
 func main() {
+	os.Exit(run())
+}
+
+// run is essentially the main method returning the exitCode of the program.
+// Run is separated to ensure that deferred functions are called (os.Exit prevents this).
+func run() int {
 	// ensure the pterm info width matches the other printers
 	pterm.Info.Prefix.Text = " INFO  "
 
-	ctx := cliContext()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	printUpdateMsg := checkForNewerAbctlVersion(ctx)
-	handleErr(run(ctx))
+
+	shutdowns, err := trace.Init(ctx)
+	if err != nil {
+		pterm.Debug.Printf(fmt.Sprintf("Trace disabled: %s", err))
+	}
+	//ctx, span := trace.NewSpan(ctx, "run")
+	//defer span.End()
+	defer func() {
+		for _, shutdown := range shutdowns {
+			shutdown()
+		}
+	}()
+
+	runCmd := func(ctx context.Context) error {
+		var root cmd.Cmd
+		parser, err := kong.New(
+			&root,
+			kong.Name("abctl"),
+			kong.Description("Airbyte's command line tool for managing a local Airbyte installation."),
+			kong.UsageOnError(),
+			kong.BindToProvider(bindCtx(ctx)),
+		)
+		if err != nil {
+			return err
+		}
+		parsed, err := parser.Parse(os.Args[1:])
+		if err != nil {
+			return err
+		}
+
+		ctx, span := trace.NewSpan(ctx, fmt.Sprintf("abctl %s", parsed.Command()))
+		defer span.End()
+
+		parsed.BindToProvider(bindCtx(ctx))
+		return parsed.Run()
+	}
+
+	exitCode := handleErr(ctx, runCmd(ctx))
 	printUpdateMsg()
+	return exitCode
 }
 
-func run(ctx context.Context) error {
-
-	var root cmd.Cmd
-	parser, err := kong.New(
-		&root,
-		kong.Name("abctl"),
-		kong.Description("Airbyte's command line tool for managing a local Airbyte installation."),
-		kong.UsageOnError(),
-	)
-	if err != nil {
-		return err
-	}
-	parsed, err := parser.Parse(os.Args[1:])
-	if err != nil {
-		return err
-	}
-	parsed.BindToProvider(bindCtx(ctx))
-	return parsed.Run()
-}
-
-func handleErr(err error) {
+func handleErr(ctx context.Context, err error) int {
 	if err == nil {
-		return
+		return 0
 	}
+
+	trace.CaptureError(ctx, err)
 
 	pterm.Error.Println(err)
 
@@ -63,11 +92,11 @@ func handleErr(err error) {
 		pterm.Info.Println(e.Help())
 	}
 
-	os.Exit(1)
+	return 1
 }
 
-// checks for a newer version of abctl.
-// returns a function that, when called, will print the message about the new version.
+// checkForNewerAbctlVersion checks for a newer version of abctl.
+// Returns a function that, when called, will display a message if a newer version is available.
 func checkForNewerAbctlVersion(ctx context.Context) func() {
 	c := make(chan string)
 	go func() {
@@ -87,20 +116,6 @@ func checkForNewerAbctlVersion(ctx context.Context) func() {
 
 		}
 	}
-}
-
-// get a context that listens for interrupt/shutdown signals.
-func cliContext() context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
-	// listen for shutdown signals
-	go func() {
-		signalCh := make(chan os.Signal, 1)
-		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
-		<-signalCh
-
-		cancel()
-	}()
-	return ctx
 }
 
 // bindCtx exists to allow kong to correctly inject a context.Context into the Run methods on the commands.

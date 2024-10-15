@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
 	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/kind/pkg/cluster"
@@ -23,11 +25,11 @@ type ExtraVolumeMount struct {
 // Cluster is an interface representing all the actions taken at the cluster level.
 type Cluster interface {
 	// Create a cluster with the provided name.
-	Create(portHTTP int, extraMounts []ExtraVolumeMount) error
+	Create(ctx context.Context, portHTTP int, extraMounts []ExtraVolumeMount) error
 	// Delete a cluster with the provided name.
-	Delete() error
+	Delete(ctx context.Context) error
 	// Exists returns true if the cluster exists, false otherwise.
-	Exists() bool
+	Exists(ctx context.Context) bool
 }
 
 // interface sanity check
@@ -47,7 +49,9 @@ type kindCluster struct {
 // that we're currently using (e.g. https://github.com/kubernetes-sigs/kind/releases/tag/v0.24.0)
 const k8sVersion = "v1.29.8@sha256:d46b7aa29567e93b27f7531d258c372e829d7224b25e3fc6ffdefed12476d3aa"
 
-func (k *kindCluster) Create(port int, extraMounts []ExtraVolumeMount) error {
+func (k *kindCluster) Create(ctx context.Context, port int, extraMounts []ExtraVolumeMount) error {
+	ctx, span := trace.NewSpan(ctx, "kindCluster.Create")
+	defer span.End()
 	// Create the data directory before the cluster does to ensure that it's owned by the correct user.
 	// If the cluster creates it and docker is running as root, it's possible that root will own this directory
 	// which will cause minio and postgres to break.
@@ -82,7 +86,9 @@ func (k *kindCluster) Create(port int, extraMounts []ExtraVolumeMount) error {
 	return nil
 }
 
-func (k *kindCluster) Delete() error {
+func (k *kindCluster) Delete(ctx context.Context) error {
+	_, span := trace.NewSpan(ctx, "kindCluster.Delete")
+	defer span.End()
 	if err := k.p.Delete(k.clusterName, k.kubeconfig); err != nil {
 		return fmt.Errorf("unable to delete kind cluster: %w", formatKindErr(err))
 	}
@@ -90,7 +96,10 @@ func (k *kindCluster) Delete() error {
 	return nil
 }
 
-func (k *kindCluster) Exists() bool {
+func (k *kindCluster) Exists(ctx context.Context) bool {
+	_, span := trace.NewSpan(ctx, "kindCluster.exists")
+	defer span.End()
+
 	clusters, _ := k.p.List()
 	for _, c := range clusters {
 		if c == k.clusterName {

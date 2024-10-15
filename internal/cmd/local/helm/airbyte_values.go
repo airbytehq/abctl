@@ -1,9 +1,12 @@
 package helm
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/airbytehq/abctl/internal/maps"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type ValuesOpts struct {
@@ -14,7 +17,8 @@ type ValuesOpts struct {
 	ImagePullSecret string
 }
 
-func BuildAirbyteValues(opts ValuesOpts) (string, error) {
+func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
+	span := trace.SpanFromContext(ctx)
 
 	vals := []string{
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + opts.TelemetryUser,
@@ -22,6 +26,12 @@ func BuildAirbyteValues(opts ValuesOpts) (string, error) {
 		"global.jobs.resources.limits.cpu=3",
 		"global.jobs.resources.limits.memory=4Gi",
 	}
+
+	span.SetAttributes(
+		attribute.Bool("low-resource-mode", opts.LowResourceMode),
+		attribute.Bool("insecure-cookies", opts.InsecureCookies),
+		attribute.Bool("image-pull-secret", opts.ImagePullSecret != ""),
+	)
 
 	if opts.LowResourceMode {
 		vals = append(vals,
