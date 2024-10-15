@@ -59,8 +59,10 @@ func run() int {
 		if err != nil {
 			return err
 		}
-		ctx, span := trace.NewSpan(ctx, "run")
+
+		ctx, span := trace.NewSpan(ctx, fmt.Sprintf("abctl %s", parsed.Command()))
 		defer span.End()
+
 		parsed.BindToProvider(bindCtx(ctx))
 		return parsed.Run()
 	}

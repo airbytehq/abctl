@@ -27,7 +27,7 @@ type Provider struct {
 
 // Cluster returns a kubernetes cluster for this provider.
 func (p Provider) Cluster(ctx context.Context) (Cluster, error) {
-	_, span := trace.NewSpan(ctx, "provider.Cluster")
+	_, span := trace.NewSpan(ctx, "Provider.Cluster")
 	defer span.End()
 	if err := os.MkdirAll(filepath.Dir(p.Kubeconfig), 0766); err != nil {
 		return nil, fmt.Errorf("unable to create directory %s: %v", p.Kubeconfig, err)

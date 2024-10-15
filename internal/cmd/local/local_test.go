@@ -158,7 +158,7 @@ func TestInstallOpts(t *testing.T) {
 		HelmValuesYaml:  string(b),
 		AirbyteChartLoc: "/test/path/to/chart",
 	}
-	opts, err := cmd.InstallOpts("test-user")
+	opts, err := cmd.InstallOpts(context.Background(), "test-user")
 	if err != nil {
 		t.Fatal(err)
 	}

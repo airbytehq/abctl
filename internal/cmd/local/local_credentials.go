@@ -9,6 +9,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
+	"go.opencensus.io/trace"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -28,6 +29,9 @@ type CredentialsCmd struct {
 }
 
 func (cc *CredentialsCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
+	ctx, span := trace.StartSpan(ctx, "local credentials")
+	defer span.End()
+
 	spinner := &pterm.DefaultSpinner
 
 	return telClient.Wrap(ctx, telemetry.Credentials, func() error {

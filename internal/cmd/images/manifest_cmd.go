@@ -1,12 +1,14 @@
 package images
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/trace"
 	helmlib "github.com/mittwald/go-helm-client"
 	"helm.sh/helm/v3/pkg/repo"
 
@@ -25,14 +27,16 @@ type ManifestCmd struct {
 	Values       string `type:"existingfile" help:"An Airbyte helm chart values file to configure helm."`
 }
 
-func (c *ManifestCmd) Run(provider k8s.Provider) error {
+func (c *ManifestCmd) Run(ctx context.Context, provider k8s.Provider) error {
+	ctx, span := trace.NewSpan(ctx, "images manifest")
+	defer span.End()
 
 	client, err := helm.New(provider.Kubeconfig, provider.Context, common.AirbyteNamespace)
 	if err != nil {
 		return err
 	}
 
-	images, err := c.findAirbyteImages(client)
+	images, err := c.findAirbyteImages(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -44,8 +48,8 @@ func (c *ManifestCmd) Run(provider k8s.Provider) error {
 	return nil
 }
 
-func (c *ManifestCmd) findAirbyteImages(client helm.Client) ([]string, error) {
-	valuesYaml, err := helm.BuildAirbyteValues(helm.ValuesOpts{
+func (c *ManifestCmd) findAirbyteImages(ctx context.Context, client helm.Client) ([]string, error) {
+	valuesYaml, err := helm.BuildAirbyteValues(ctx, helm.ValuesOpts{
 		ValuesFile: c.Values,
 	})
 	if err != nil {

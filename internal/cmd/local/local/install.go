@@ -150,21 +150,12 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 	return nil
 }
 
-type X struct {
-	name string
-}
-
-func (x X) Error() string {
-	return "error happened " + x.name + " <- here"
-}
-
 // Install handles the installation of Airbyte
 func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 	ctx, span := trace.NewSpan(ctx, "command.Install")
 	defer span.End()
 
-	// Provide a child context to the watcher so that it can shut it down early
-	// to ensure the watcher cleanly shutdown.
+	// Provide a child context to the watcher so that it can shut it down early to ensure the watcher cleanly shutdown.
 	ctxWatch, watchStop := context.WithCancel(ctx)
 	defer watchStop()
 	go c.watchEvents(ctxWatch)
@@ -187,6 +178,7 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 		return err
 	}
 
+	span.SetAttributes(attribute.Bool("migrate", opts.Migrate))
 	if opts.Migrate {
 		c.spinner.UpdateText("Migrating airbyte data")
 		if err := c.tel.Wrap(ctx, telemetry.Migrate, func() error { return migrate.FromDockerVolume(ctx, c.docker.Client, "airbyte_db") }); err != nil {
@@ -245,7 +237,9 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 		namespace:    common.AirbyteNamespace,
 		valuesYAML:   opts.HelmValuesYaml,
 	}); err != nil {
-		return c.diagnoseAirbyteChartFailure(ctx, err)
+		// if trace.SpanError isn't called here, the logs attached
+		// in the diagnoseAirbyteChartFailure method are lost
+		return trace.SpanError(span, c.diagnoseAirbyteChartFailure(ctx, err))
 	}
 
 	nginxValues, err := helm.BuildNginxValues(c.portHTTP)
@@ -309,11 +303,11 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 	return nil
 }
 
-// TODO make chart-failure error type?
 func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr error) error {
 	if podList, err := c.k8s.PodList(ctx, common.AirbyteNamespace); err == nil {
 		var errors []string
 		for _, pod := range podList.Items {
+			pterm.Debug.Println(fmt.Sprintf("looking at %s\n  %s(%s)", pod.Name, pod.Status.Phase, pod.Status.Reason))
 			if pod.Status.Phase != corev1.PodFailed {
 				continue
 			}
@@ -324,7 +318,10 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 			if err != nil {
 				msg = "unknown: failed to get pod logs."
 			}
-			//sentry.ConfigureScope(func(scope *sentry.Scope) {})
+			pterm.Debug.Println("found logs: ", logs[0:50])
+
+			trace.AttachLog(fmt.Sprintf("%s.log", pod.Name), logs)
+
 			m, err := getLastLogError(strings.NewReader(logs))
 			if err != nil {
 				msg = "unknown: failed to find error log."
@@ -334,7 +331,6 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 			}
 
 			errors = append(errors, fmt.Sprintf("pod %s: %s", pod.Name, msg))
-
 		}
 
 		if errors != nil {
@@ -594,6 +590,7 @@ func (c *Command) handleChart(
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
+	span.SetAttributes(attribute.String(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version))
 
 	if req.uninstallFirst {
 		chartAction := determineHelmChartAction(c.helm, helmChart, req.chartRelease)
@@ -645,6 +642,7 @@ func (c *Command) handleChart(
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
+	span.SetAttributes(attribute.String(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version)))
 
 	pterm.Success.Println(fmt.Sprintf(
 		"Installed Helm Chart %s:\n  Name: %s\n  Namespace: %s\n  Version: %s\n  AppVersion: %s\n  Release: %d",

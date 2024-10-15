@@ -14,7 +14,7 @@ import (
 type StatusCmd struct{}
 
 func (s *StatusCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
-	ctx, span := trace.NewSpan(ctx, "status")
+	ctx, span := trace.NewSpan(ctx, "local status")
 	defer span.End()
 
 	spinner := &pterm.DefaultSpinner

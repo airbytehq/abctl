@@ -16,6 +16,7 @@ import (
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // dockerClient is exposed here primarily for testing purposes.
@@ -27,7 +28,7 @@ var dockerClient *docker.Docker
 // Returns a nil error if docker was successfully detected, otherwise an error will be returned.  Any error returned
 // is guaranteed to include the ErrDocker error in the error chain.
 func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Version, error) {
-	ctx, span := trace.NewSpan(ctx, "dockerInstalled")
+	ctx, span := trace.NewSpan(ctx, "check.dockerInstalled")
 	defer span.End()
 
 	var err error
@@ -44,6 +45,11 @@ func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Ve
 		return docker.Version{}, fmt.Errorf("%w: %w", localerr.ErrDocker, err)
 	}
 
+	span.SetAttributes(
+		attribute.String("docker_version", version.Version),
+		attribute.String("docker_arch", version.Arch),
+		attribute.String("docker_platform", version.Platform),
+	)
 	telClient.Attr("docker_version", version.Version)
 	telClient.Attr("docker_arch", version.Arch)
 	telClient.Attr("docker_platform", version.Platform)
@@ -53,6 +59,13 @@ func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Ve
 		telClient.Attr("docker_memtotal", fmt.Sprintf("%d", info.MemTotal))
 		telClient.Attr("docker_cgroup_driver", info.CgroupDriver)
 		telClient.Attr("docker_cgroup_version", info.CgroupVersion)
+
+		span.SetAttributes(
+			attribute.Int("docker_ncpu", info.NCPU),
+			attribute.Int64("docker_memtotal", info.MemTotal),
+			attribute.String("docker_cgroup_driver", info.CgroupDriver),
+			attribute.String("docker_cgroup_version", info.CgroupVersion),
+		)
 	}
 
 	pterm.Success.Println(fmt.Sprintf("Found Docker installation: version %s", version.Version))
@@ -114,7 +127,7 @@ func isErrorAddressAlreadyInUse(err error) bool {
 }
 
 func getPort(ctx context.Context, clusterName string) (int, error) {
-	ctx, span := trace.NewSpan(ctx, "getPort")
+	ctx, span := trace.NewSpan(ctx, "check.getPort")
 	defer span.End()
 	var err error
 
