@@ -82,7 +82,7 @@ The following commands are supported:
 ```abctl local --help```
 
 The local sub-commands are focused on managing the local Airbyte installation.
-The following sub-commands are supports:
+The following sub-commands are available:
 - [credentials](#credentials)
 - [deployments](#deployments)
 - [install](#install)
@@ -208,6 +208,28 @@ Uninstalls a local Airbyte instance.
 | Name        | Default | Description                                                                    |
 |-------------|---------|--------------------------------------------------------------------------------|
 | --persisted | -       | Will remove all data for the Airbyte installation.<br />This cannot be undone. |
+
+## images
+
+```abctl images```
+
+Manage images used by Airbyte and abctl.
+
+The following sub-commands are available:
+- [manifest](#manifest)
+
+### manifest
+
+```abctl images manifest```
+
+Display a manifest of images used by Airbyte and abctl.
+
+| Name                | Default | Description  |
+|---------------------|---------|--------------|
+| --chart             | ""      | Path to chart. |
+| --chart-version     | latest  | Which Airbyte helm-chart version to install.    |
+| --values            | ""      | Helm values file to further customize the Airbyte installation. |
+
 
 
 ## version
