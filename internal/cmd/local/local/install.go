@@ -454,7 +454,7 @@ func captureAttributes(ctx context.Context, msg string) {
 		return
 	}
 	// e.g. Successfully pulled image "airbyte/mc" in 711ms (711ms including waiting)
-	// we want
+	// we want to pull out the image name and the total time spent.
 	parts := strings.Split(msg, " ")
 	if len(parts) <= 8 {
 		return
