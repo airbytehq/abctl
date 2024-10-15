@@ -79,7 +79,7 @@ func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Ve
 // If we can establish a tcp listener on the port, an additional check is made to see if Airbyte may already be
 // bound to that port. If something besides Airbyte is using it, treat this as an inaccessible port.
 func portAvailable(ctx context.Context, port int) error {
-	ctx, span := trace.NewSpan(ctx, "portAvailable")
+	ctx, span := trace.NewSpan(ctx, "check.portAvailable")
 	defer span.End()
 
 	if port < 1024 {
