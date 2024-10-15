@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/airbytehq/abctl/internal/maps"
-	"github.com/airbytehq/abctl/internal/trace"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type ValuesOpts struct {

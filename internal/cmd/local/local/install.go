@@ -22,6 +22,7 @@ import (
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
 	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
@@ -459,7 +460,7 @@ func captureAttributes(ctx context.Context, msg string) {
 		return
 	}
 
-	trace.SpanFromContext(ctx).SetAttributes(attribute.String(
+	oteltrace.SpanFromContext(ctx).SetAttributes(attribute.String(
 		"pulled "+strings.Trim(parts[3], `"`),
 		strings.Join(parts[5:], " "),
 	))

@@ -22,14 +22,21 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const tracerName = "github.com/airbytehq/abctl/trace"
+const (
+	// traceName is the name of the otel tracer
+	tracerName = "github.com/airbytehq/abctl/trace"
+	// redactedUserHome is the redacted user home directory
+	redactedUserHome = "[USER_HOME]"
+)
 
 var (
-	// may not be required
+	// May not be required, it is unclear if a tracer should be instantiated more than once.
 	once   sync.Once
 	tracer trace.Tracer
 )
 
+// NewSpan initializes the otel tracer, if necessary, and starts a new span with
+// the provided name.  The returned span will be added to the returned context.
 func NewSpan(ctx context.Context, name string) (context.Context, trace.Span) {
 	once.Do(func() {
 		tracer = otel.Tracer(tracerName)
@@ -48,17 +55,20 @@ func AttachLog(name, body string) {
 	})
 }
 
-func SpanFromContext(ctx context.Context) trace.Span {
-	return trace.SpanFromContext(ctx)
-}
-
+// SpanError marks the span with the provided err.
+// Returns the same error provided.
 func SpanError(span trace.Span, err error) error {
+	if err == nil {
+		return nil
+	}
 	span.RecordError(err)
-	span.SetStatus(codes.Error, strings.ReplaceAll(err.Error(), paths.UserHome, userHome))
+	span.SetStatus(codes.Error, strings.ReplaceAll(err.Error(), paths.UserHome, redactedUserHome))
 	sentry.CaptureException(err)
 	return err
 }
 
+// CaptureError retrieves the span from the ctx and marks it with the provided err.
+// Returns the same error provided.
 func CaptureError(ctx context.Context, err error) error {
 	span := trace.SpanFromContext(ctx)
 	return SpanError(span, err)
@@ -66,6 +76,7 @@ func CaptureError(ctx context.Context, err error) error {
 
 type Shutdown func()
 
+// Init initializes the otel framework.
 func Init(ctx context.Context) ([]Shutdown, error) {
 	dsn := "https://9e0748223d5bc43e873f811a849e982e@o1009025.ingest.us.sentry.io/4507177762357248"
 	// TODO: combine telemetry and trace packages?
@@ -77,7 +88,6 @@ func Init(ctx context.Context) ([]Shutdown, error) {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:                dsn,
 		EnableTracing:      true,
-		Environment:        "dev",
 		Release:            build.Version,
 		TracesSampleRate:   1.0,
 		ProfilesSampleRate: 1.0,
@@ -113,23 +123,20 @@ func Init(ctx context.Context) ([]Shutdown, error) {
 	return cleanups, nil
 }
 
-// userHome is the redacted user home directory
-const userHome = "[USER_HOME]"
-
 // removePII removes potentially PII information that may be contained within the trace data.
 func removePII(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
 	// message
-	event.Message = strings.ReplaceAll(event.Message, paths.UserHome, userHome)
+	event.Message = strings.ReplaceAll(event.Message, paths.UserHome, redactedUserHome)
 
 	// errors
 	for _, ex := range event.Exception {
-		ex.Value = strings.ReplaceAll(ex.Value, paths.UserHome, userHome)
+		ex.Value = strings.ReplaceAll(ex.Value, paths.UserHome, redactedUserHome)
 	}
 
 	// spans
 	for _, span := range event.Spans {
-		span.Name = strings.ReplaceAll(span.Name, paths.UserHome, userHome)
-		span.Description = strings.ReplaceAll(span.Description, paths.UserHome, userHome)
+		span.Name = strings.ReplaceAll(span.Name, paths.UserHome, redactedUserHome)
+		span.Description = strings.ReplaceAll(span.Description, paths.UserHome, redactedUserHome)
 	}
 
 	return event
