@@ -88,6 +88,7 @@ func Init(ctx context.Context) ([]Shutdown, error) {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:                dsn,
 		EnableTracing:      true,
+		Environment:        "public",
 		Release:            build.Version,
 		TracesSampleRate:   1.0,
 		ProfilesSampleRate: 1.0,
