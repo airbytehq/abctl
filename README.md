@@ -10,13 +10,9 @@ Airbyte's command line tool for local Airbyte deployments.
 > If you are looking for Airbyte's official quickstart documentation, that can be found on [docs.airbyte.com](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
 
 ```mermaid
-mermaid.initialize({securityLevel: 'antiscript'});
 flowchart TD
-  subgraph s4["Airbyte Platform"]
-    DIR("<img src='imgs/airbyte.png' width='200' height='200' />")
-   end
   subgraph s3["Kubernetes"]
-   s4
+   PLATFORM("Airbyte Platform")
   end
   subgraph s2["Kind"]
     s3
