@@ -5,23 +5,9 @@ Airbyte's command line tool for local Airbyte deployments.
 
 
 > [!NOTE]
-> This README is focused on the `abctl` tool itself, and not the Airbyte platform.
+> This README primarily focuses on the `abctl` tool itself.
 >
-> If you are looking for Airbyte's official quickstart documentation, that can be found on [docs.airbyte.com](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
-
-```mermaid
-flowchart LR
-  subgraph s3["Kubernetes"]
-   PLATFORM("Airbyte Platform")
-  end
-  subgraph s2["Kind"]
-    s3
-  end
-  subgraph s1["Docker"]
-    s2
-  end
-  A("abctl") --> s1
-```
+> Airbyte's official quickstart documentation can be found on [docs.airbyte.com](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
 
 ---
 
