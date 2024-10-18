@@ -2,7 +2,7 @@
 <h1 align="left">abctl</h1>
 Airbyte's command line tool for local Airbyte deployments.
 <br clear="left"/>
-
+<br />
 
 > [!NOTE]
 > This README primarily focuses on the `abctl` tool itself.
