@@ -34,7 +34,7 @@ func WithHTTPClient(d Doer) Option {
 	}
 }
 
-// WithSessionID overrides the default ulid session, primarily for testing purposes.
+// WithSessionID overrides the default uuid session, primarily for testing purposes.
 func WithSessionID(sessionID uuid.UUID) Option {
 	return func(client *SegmentClient) {
 		client.sessionID = sessionID
