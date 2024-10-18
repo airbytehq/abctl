@@ -11,10 +11,8 @@ Airbyte's command line tool for local Airbyte deployments.
 
 ```mermaid
 flowchart TD
-  subgraph s4[<img src='images/airbyte.svg' width='25' height='25' />Airbyte Platform]
-    n3["Services"]
-    n4[("Storage")]
-    n5["Jobs"]
+  subgraph s4["Airbyte Platform"]
+    n3[<img src="imgs/airbyte.svg" />]
    end
   subgraph s3["Kubernetes"]
    s4
