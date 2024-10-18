@@ -10,20 +10,19 @@ Airbyte's command line tool for local Airbyte deployments.
 
 ```mermaid
 flowchart TD
- subgraph s4["Airbyte Platform"]
-        n3["Services"]
-        n4["Storage"]
-        n4@{ shape: cyl}
-        n5["Jobs"]
+  subgraph s4["Airbyte Platform"]
+    n3["Services"]
+    n4[("Storage")]
+    n5["Jobs"]
+   end
+  subgraph s3["Kubernetes"]
+   s4
   end
- subgraph s3["Kubernetes"]
-        s4
+  subgraph s2["Kind"]
+    s3
   end
- subgraph s2["Kind"]
-        s3
-  end
- subgraph s1["Docker"]
-        s2
+  subgraph s1["Docker"]
+    s2
   end
   A("abctl") --> s1
 ```
