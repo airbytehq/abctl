@@ -3,21 +3,43 @@
 Airbyte's command line tool for local Airbyte deployments.
 <br clear="left"/>
 
+> [!NOTE]
+> This README is focused on the `abctl` tool itself, and not the Airbyte platform.
+>
+> If you are looking for Airbyte's official quickstart documentation, that can be found on [docs.airbyte.com](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
+
+```mermaid
+flowchart TD
+ subgraph s4["Airbyte Platform"]
+        n3["Services"]
+        n4["Storage"]
+        n4@{ shape: cyl}
+        n5["Jobs"]
+  end
+ subgraph s3["Kubernetes"]
+        s4
+  end
+ subgraph s2["Kind"]
+        s3
+  end
+ subgraph s1["Docker"]
+        s2
+  end
+  A("abctl") --> s1
+```
+
 ---
 
 - [Quickstart](#quickstart)
 - [Commands](#commands)
 - [Contributing](#contributing) 
 
-# Quickstart
-
-> [!TIP]
-> Additional documentation can be found in the [Airbyte Documentation](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
+# Abctl Quickstart
 
 > [!IMPORTANT]
-> Credentials are randomly generated as part of the installation process.
+> Authentication credentials are randomly generated as part of the installation process.
 >
-> After installation is complete, to find your credentials run `abctl local credentials`.
+> After installation is complete, to find your authentication credentials run `abctl local credentials`.
 
 1. Install `Docker`
    - [Linux](https://docs.docker.com/desktop/install/linux-install/)
@@ -241,7 +263,7 @@ Displays version information about the `abctl` tool.
 For example:
 ```
 $ abctl version
-version: v0.12.0
+version: v0.19.0
 ```
 
 # Contributing
