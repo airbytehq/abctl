@@ -11,7 +11,7 @@ Airbyte's command line tool for local Airbyte deployments.
 
 ```mermaid
 flowchart TD
-  subgraph s4[<img src='https://cdn.prod.website-files.com/605e01bc25f7e19a82e74788/624d9c4a092d197522e0ef75_Airbyte_icon_color.svg' width='25' height='25' />Airbyte Platform]
+  subgraph s4[<img src='images/airbyte.svg' width='25' height='25' />Airbyte Platform]
     n3["Services"]
     n4[("Storage")]
     n5["Jobs"]
