@@ -12,7 +12,7 @@ Airbyte's command line tool for local Airbyte deployments.
 ```mermaid
 flowchart TD
   subgraph s4["Airbyte Platform"]
-    n3["<img src='./imgs/airbyte.png'; width='200' height='200' /> Stuff"]
+    DIR("<img src='./imgs/airbyte.png'; width='200' height='200' />")
    end
   subgraph s3["Kubernetes"]
    s4
