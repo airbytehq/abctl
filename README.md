@@ -7,7 +7,7 @@ Airbyte's command line tool for local Airbyte deployments.
 > [!NOTE]
 > This README primarily focuses on the `abctl` tool itself, not the Airbyte platform.
 > 
-> If you're looking for Airbyte's official quick start documentation, that can be found [here](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
+> If you're looking for Airbyte's official quickstart documentation, that can be found [here](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
 
 ---
 
