@@ -10,7 +10,7 @@ Airbyte's command line tool for local Airbyte deployments.
 > If you are looking for Airbyte's official quickstart documentation, that can be found on [docs.airbyte.com](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
 
 ```mermaid
-flowchart TD
+flowchart LR
   subgraph s3["Kubernetes"]
    PLATFORM("Airbyte Platform")
   end
