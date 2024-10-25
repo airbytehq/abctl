@@ -32,7 +32,7 @@ func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
 
-	return telClient.Wrap(ctx, telemetry.Uninstall, func() error {
+	return telClient.Wrap(telemetry.Uninstall, func() error {
 		spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
 		cluster, err := provider.Cluster(ctx)

@@ -1,7 +1,6 @@
 package telemetry
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -56,9 +55,7 @@ func TestSegmentClient_Start(t *testing.T) {
 
 	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
-	ctx := context.Background()
-
-	if err := cli.Start(ctx, Install); err != nil {
+	if err := cli.Start(Install); err != nil {
 		t.Error("start call failed", err)
 	}
 
@@ -160,9 +157,7 @@ func TestSegmentClient_StartWithAttr(t *testing.T) {
 	cli.Attr("key1", "val1")
 	cli.Attr("key2", "val2")
 
-	ctx := context.Background()
-
-	if err := cli.Start(ctx, Install); err != nil {
+	if err := cli.Start(Install); err != nil {
 		t.Error("start call failed", err)
 	}
 
@@ -267,9 +262,7 @@ func TestSegmentClient_StartErr(t *testing.T) {
 
 	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
-	ctx := context.Background()
-
-	if err := cli.Start(ctx, Install); err == nil {
+	if err := cli.Start(Install); err == nil {
 		t.Error("start call should have failed")
 	} else if !errors.Is(err, httpErr) {
 		t.Error("start call error should contain http error", err)
@@ -292,9 +285,7 @@ func TestSegmentClient_Success(t *testing.T) {
 
 	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
-	ctx := context.Background()
-
-	if err := cli.Success(ctx, Install); err != nil {
+	if err := cli.Success(Install); err != nil {
 		t.Error("start call failed", err)
 	}
 
@@ -396,9 +387,7 @@ func TestSegmentClient_SuccessWithAttr(t *testing.T) {
 	cli.Attr("key1", "val1")
 	cli.Attr("key2", "val2")
 
-	ctx := context.Background()
-
-	if err := cli.Success(ctx, Install); err != nil {
+	if err := cli.Success(Install); err != nil {
 		t.Error("start call failed", err)
 	}
 
@@ -503,9 +492,7 @@ func TestSegmentClient_SuccessErr(t *testing.T) {
 
 	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
-	ctx := context.Background()
-
-	if err := cli.Success(ctx, Install); err == nil {
+	if err := cli.Success(Install); err == nil {
 		t.Error("start call should have failed")
 	} else if !errors.Is(err, httpErr) {
 		t.Error("start call error should contain http error", err)
@@ -528,10 +515,9 @@ func TestSegmentClient_Failure(t *testing.T) {
 
 	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
-	ctx := context.Background()
 	failure := errors.New("failure reason")
 
-	if err := cli.Failure(ctx, Install, failure); err != nil {
+	if err := cli.Failure(Install, failure); err != nil {
 		t.Error("start call failed", err)
 	}
 
@@ -633,10 +619,9 @@ func TestSegmentClient_FailureWithAttr(t *testing.T) {
 	cli.Attr("key1", "val1")
 	cli.Attr("key2", "val2")
 
-	ctx := context.Background()
 	failure := errors.New("failure reason")
 
-	if err := cli.Failure(ctx, Install, failure); err != nil {
+	if err := cli.Failure(Install, failure); err != nil {
 		t.Error("start call failed", err)
 	}
 
@@ -741,10 +726,9 @@ func TestSegmentClient_FailureErr(t *testing.T) {
 
 	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
-	ctx := context.Background()
 	failure := errors.New("failure reason")
 
-	if err := cli.Failure(ctx, Install, failure); err == nil {
+	if err := cli.Failure(Install, failure); err == nil {
 		t.Error("start call should have failed")
 	} else if !errors.Is(err, httpErr) {
 		t.Error("start call error should contain http error", err)
@@ -784,11 +768,9 @@ func TestSegmentClient_Wrap(t *testing.T) {
 
 	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
-	ctx := context.Background()
-
 	// a Wrap call where the func() error doesn't return an error
 	// should call Start and Success
-	if err := cli.Wrap(ctx, Install, func() error { return nil }); err != nil {
+	if err := cli.Wrap(Install, func() error { return nil }); err != nil {
 		t.Error("Wrap call failed")
 	}
 
@@ -839,13 +821,11 @@ func TestSegmentClient_WrapErr(t *testing.T) {
 
 	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
 
-	ctx := context.Background()
-
 	actualErr := errors.New("test failure")
 
 	// a Wrap call where the func() error returns asn error
 	// should call Start and Failure
-	err := cli.Wrap(ctx, Uninstall, func() error { return actualErr })
+	err := cli.Wrap(Uninstall, func() error { return actualErr })
 	if d := cmp.Diff(actualErr, err, cmpopts.EquateErrors()); d != "" {
 		t.Errorf("error mismatch (-want +got): %s", err)
 	}

@@ -182,7 +182,7 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 	span.SetAttributes(attribute.Bool("migrate", opts.Migrate))
 	if opts.Migrate {
 		c.spinner.UpdateText("Migrating airbyte data")
-		if err := c.tel.Wrap(ctx, telemetry.Migrate, func() error { return migrate.FromDockerVolume(ctx, c.docker.Client, "airbyte_db") }); err != nil {
+		if err := c.tel.Wrap(telemetry.Migrate, func() error { return migrate.FromDockerVolume(ctx, c.docker.Client, "airbyte_db") }); err != nil {
 			pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
 			return fmt.Errorf("unable to migrate data from previous airbyte installation: %w", err)
 		}

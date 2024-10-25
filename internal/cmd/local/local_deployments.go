@@ -23,7 +23,7 @@ func (d *DeploymentsCmd) Run(ctx context.Context, telClient telemetry.Client, k8
 		return err
 	}
 
-	return telClient.Wrap(ctx, telemetry.Deployments, func() error {
+	return telClient.Wrap(telemetry.Deployments, func() error {
 		return d.deployments(ctx, k8sClient, spinner)
 	})
 }

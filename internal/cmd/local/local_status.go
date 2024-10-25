@@ -22,7 +22,7 @@ func (s *StatusCmd) Run(ctx context.Context, provider k8s.Provider, telClient te
 		return err
 	}
 
-	return telClient.Wrap(ctx, telemetry.Status, func() error {
+	return telClient.Wrap(telemetry.Status, func() error {
 		return status(ctx, provider, telClient, spinner)
 	})
 }

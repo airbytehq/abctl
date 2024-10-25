@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"maps"
 	"net/http"
@@ -66,16 +65,16 @@ func NewSegmentClient(cfg Config, opts ...Option) *SegmentClient {
 	return cli
 }
 
-func (s *SegmentClient) Start(ctx context.Context, et EventType) error {
-	return s.send(ctx, Start, et, nil)
+func (s *SegmentClient) Start(et EventType) error {
+	return s.send(Start, et, nil)
 }
 
-func (s *SegmentClient) Success(ctx context.Context, et EventType) error {
-	return s.send(ctx, Success, et, nil)
+func (s *SegmentClient) Success(et EventType) error {
+	return s.send(Success, et, nil)
 }
 
-func (s *SegmentClient) Failure(ctx context.Context, et EventType, err error) error {
-	return s.send(ctx, Failed, et, err)
+func (s *SegmentClient) Failure(et EventType, err error) error {
+	return s.send(Failed, et, err)
 }
 
 func (s *SegmentClient) Attr(key, val string) {
@@ -86,17 +85,17 @@ func (s *SegmentClient) User() string {
 	return s.cfg.AnalyticsID.toUUID().String()
 }
 
-func (s *SegmentClient) Wrap(ctx context.Context, et EventType, f func() error) error {
+func (s *SegmentClient) Wrap(et EventType, f func() error) error {
 	attemptSuccessFailure := true
 
-	if err := s.Start(ctx, et); err != nil {
+	if err := s.Start(et); err != nil {
 		pterm.Debug.Printfln("Unable to send telemetry start data: %s", err)
 		attemptSuccessFailure = false
 	}
 
 	if err := f(); err != nil {
 		if attemptSuccessFailure {
-			if errTel := s.Failure(ctx, et, err); errTel != nil {
+			if errTel := s.Failure(et, err); errTel != nil {
 				pterm.Debug.Printfln("Unable to send telemetry failure data: %s", errTel)
 			}
 		}
@@ -105,7 +104,7 @@ func (s *SegmentClient) Wrap(ctx context.Context, et EventType, f func() error) 
 	}
 
 	if attemptSuccessFailure {
-		if err := s.Success(ctx, et); err != nil {
+		if err := s.Success(et); err != nil {
 			pterm.Debug.Printfln("Unable to send telemetry success data: %s", err)
 		}
 	}
@@ -118,7 +117,7 @@ const (
 	url         = "https://api.segment.io/v1/track"
 )
 
-func (s *SegmentClient) send(ctx context.Context, es EventState, et EventType, ee error) error {
+func (s *SegmentClient) send(es EventState, et EventType, ee error) error {
 	properties := map[string]string{
 		"deployment_method": "abctl",
 		"session_id":        s.sessionID.String(),
@@ -150,7 +149,7 @@ func (s *SegmentClient) send(ctx context.Context, es EventState, et EventType, e
 		return fmt.Errorf("unable to create request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 	if err != nil {
 		return fmt.Errorf("unable to create request: %w", err)
 	}

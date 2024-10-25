@@ -34,7 +34,7 @@ func (cc *CredentialsCmd) Run(ctx context.Context, provider k8s.Provider, telCli
 
 	spinner := &pterm.DefaultSpinner
 
-	return telClient.Wrap(ctx, telemetry.Credentials, func() error {
+	return telClient.Wrap(telemetry.Credentials, func() error {
 		k8sClient, err := defaultK8s(provider.Kubeconfig, provider.Context)
 		if err != nil {
 			pterm.Error.Println("No existing cluster found")

@@ -1,7 +1,6 @@
 package telemetry
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -34,11 +33,11 @@ const (
 // Client interface for telemetry data.
 type Client interface {
 	// Start should be called as quickly as possible.
-	Start(context.Context, EventType) error
+	Start(EventType) error
 	// Success should be called only if the activity succeeded.
-	Success(context.Context, EventType) error
+	Success(EventType) error
 	// Failure should be called only if the activity failed.
-	Failure(context.Context, EventType, error) error
+	Failure(EventType, error) error
 	// Attr should be called to add additional attributes to this activity.
 	Attr(key, val string)
 	// User returns the user identifier being used by this client
@@ -46,7 +45,7 @@ type Client interface {
 	// Wrap wraps the func() error with the EventType,
 	// calling the Start, Failure or Success methods correctly based on
 	// the behavior of the func() error
-	Wrap(context.Context, EventType, func() error) error
+	Wrap(EventType, func() error) error
 }
 
 type getConfig struct {
