@@ -150,6 +150,8 @@ func (s *SegmentClient) send(ctx context.Context, es EventState, et EventType, e
 		return fmt.Errorf("unable to create request body: %w", err)
 	}
 
+	// We don't include the parent context in the http request,
+	// because we want to send telemetry even if the parent context is canceled.
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 	if err != nil {
 		return fmt.Errorf("unable to create request: %w", err)
