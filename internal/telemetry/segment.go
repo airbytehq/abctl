@@ -150,7 +150,7 @@ func (s *SegmentClient) send(ctx context.Context, es EventState, et EventType, e
 		return fmt.Errorf("unable to create request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 	if err != nil {
 		return fmt.Errorf("unable to create request: %w", err)
 	}
