@@ -12,10 +12,11 @@ Airbyte's command line tool for local Airbyte deployments.
 ---
 
 - [Quickstart](#quickstart)
+- [Overview](#overview)
 - [Commands](#commands)
 - [Contributing](#contributing) 
 
-# Abctl Quickstart
+# Quickstart
 
 > [!IMPORTANT]
 > Authentication credentials are randomly generated as part of the installation process.
@@ -60,6 +61,16 @@ Airbyte's command line tool for local Airbyte deployments.
    installed you will be asked to provide an email and organization name.  To retrieve your password
    to login, run `abctl local credentials`.
 
+# Overview
+
+![arch.png](imgs/arch.png)
+
+As mentioned in the [quickstart](#quickstart), the only prerequisite `abctl` has is that [Docker](https://www.docker.com/) 
+must be installed, running, and accessible. However, the Airbyte platform requires a [Kubernetes](https://kubernetes.io/) 
+cluster, which `abctl` creates by utilizing [kind](https://kind.sigs.k8s.io/) (kind runs a Kubernetes cluster within a 
+Docker container). With kind's Kubernetes cluster, `abctl` uses [helm](https://helm.sh/) to install (or update to) the 
+latest (by default) Airbyte helm chart and the latest [NGINX Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/) 
+helm chart.
 
 # Commands
 
