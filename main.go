@@ -11,6 +11,7 @@ import (
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/airbytehq/abctl/internal/cmd"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/airbytehq/abctl/internal/update"
 	"github.com/alecthomas/kong"
@@ -31,12 +32,12 @@ func run() int {
 	defer stop()
 	printUpdateMsg := checkForNewerAbctlVersion(ctx)
 
-	shutdowns, err := trace.Init(ctx)
+	telClient := telemetry.Get()
+
+	shutdowns, err := trace.Init(ctx, telClient.User())
 	if err != nil {
 		pterm.Debug.Printf(fmt.Sprintf("Trace disabled: %s", err))
 	}
-	//ctx, span := trace.NewSpan(ctx, "run")
-	//defer span.End()
 	defer func() {
 		for _, shutdown := range shutdowns {
 			shutdown()
@@ -51,6 +52,7 @@ func run() int {
 			kong.Description("Airbyte's command line tool for managing a local Airbyte installation."),
 			kong.UsageOnError(),
 			kong.BindToProvider(bindCtx(ctx)),
+			kong.BindTo(telClient, (*telemetry.Client)(nil)),
 		)
 		if err != nil {
 			return err

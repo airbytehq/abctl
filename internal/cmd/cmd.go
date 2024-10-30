@@ -7,7 +7,6 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/version"
-	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 )
@@ -28,6 +27,5 @@ type Cmd struct {
 
 func (c *Cmd) BeforeApply(ctx context.Context, kCtx *kong.Context) error {
 	kCtx.BindTo(k8s.DefaultProvider, (*k8s.Provider)(nil))
-	kCtx.BindTo(telemetry.Get(), (*telemetry.Client)(nil))
 	return nil
 }
