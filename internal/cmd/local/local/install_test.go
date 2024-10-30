@@ -164,7 +164,7 @@ func TestCommand_Install(t *testing.T) {
 	}
 
 	installOpts := &InstallOpts{
-		HelmValuesYaml: valuesYaml,
+		HelmValuesYaml:  valuesYaml,
 		AirbyteChartLoc: testAirbyteChartLoc,
 	}
 	if err := c.Install(context.Background(), installOpts); err != nil {

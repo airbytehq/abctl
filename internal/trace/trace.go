@@ -77,7 +77,7 @@ func CaptureError(ctx context.Context, err error) error {
 type Shutdown func()
 
 // Init initializes the otel framework.
-func Init(ctx context.Context) ([]Shutdown, error) {
+func Init(ctx context.Context, userId string) ([]Shutdown, error) {
 	dsn := "https://9e0748223d5bc43e873f811a849e982e@o1009025.ingest.us.sentry.io/4507177762357248"
 	// TODO: combine telemetry and trace packages?
 	if telemetry.DNT() {
@@ -111,6 +111,10 @@ func Init(ctx context.Context) ([]Shutdown, error) {
 			attribute.String("version", build.Version),
 		),
 	)
+
+	sentry.ConfigureScope(func(scope *sentry.Scope) {
+		scope.SetUser(sentry.User{ID: userId})
+	})
 
 	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSpanProcessor(sentryotel.NewSentrySpanProcessor()),
