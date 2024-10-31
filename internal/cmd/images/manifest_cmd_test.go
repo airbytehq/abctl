@@ -20,11 +20,10 @@ func getHelmTestClient(t *testing.T) helm.Client {
 }
 
 func TestManifestCmd(t *testing.T) {
-	client := getHelmTestClient(t)
 	cmd := ManifestCmd{
 		ChartVersion: "1.1.0",
 	}
-	actual, err := cmd.findAirbyteImages(context.Background(), client)
+	actual, err := cmd.findAirbyteImages(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,12 +47,11 @@ func TestManifestCmd(t *testing.T) {
 }
 
 func TestManifestCmd_Enterprise(t *testing.T) {
-	client := getHelmTestClient(t)
 	cmd := ManifestCmd{
 		ChartVersion: "1.1.0",
 		Values:       "testdata/enterprise.values.yaml",
 	}
-	actual, err := cmd.findAirbyteImages(context.Background(), client)
+	actual, err := cmd.findAirbyteImages(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,13 +79,12 @@ func TestManifestCmd_Enterprise(t *testing.T) {
 }
 
 func TestManifestCmd_Nightly(t *testing.T) {
-	client := getHelmTestClient(t)
 	cmd := ManifestCmd{
 		// This version includes chart fixes that expose images more consistently and completely.
 		ChartVersion: "1.1.0-nightly-1728428783-9025e1a46e",
 		Values:       "testdata/enterprise.values.yaml",
 	}
-	actual, err := cmd.findAirbyteImages(context.Background(), client)
+	actual, err := cmd.findAirbyteImages(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
