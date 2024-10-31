@@ -117,8 +117,8 @@ func (k *kindCluster) Exists(ctx context.Context) bool {
 }
 
 // LoadImages pulls images from Docker Hub, and loads them into the kind cluster.
-// This is a best-effort optimization, which is why it doesn't an error;
-// it's possible that only some images will be loaded.
+// This is a best-effort optimization, which is why it doesn't return an error.
+// It's possible that only some images will be loaded.
 func (k *kindCluster) LoadImages(ctx context.Context, images []string) {
 	err := k.loadImages(ctx, images)
 	pterm.Debug.Printfln("failed to load images: %s", err)
