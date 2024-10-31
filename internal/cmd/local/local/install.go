@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/airbytehq/abctl/internal/cmd/images"
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
@@ -149,6 +150,18 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 	}
 
 	return nil
+}
+
+// PrepImages determines the docker images needed by the chart, pulls them, and loads them into the cluster.
+// This is best effort, so errors are dropped here.
+func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *InstallOpts) {
+	manifest, err := images.FindImagesFromChart(opts.HelmValuesYaml, opts.AirbyteChartLoc, opts.HelmChartVersion)
+	if err != nil {
+		pterm.Debug.Printfln("error building image manifest: %s", err)
+		return
+	}
+
+	cluster.LoadImages(ctx, manifest)
 }
 
 // Install handles the installation of Airbyte

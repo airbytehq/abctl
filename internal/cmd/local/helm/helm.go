@@ -26,6 +26,18 @@ type Client interface {
 	TemplateChart(spec *helmclient.ChartSpec, options *helmclient.HelmTemplateOptions) ([]byte, error)
 }
 
+func ClientOptions(namespace string) *helmclient.Options {
+	logger := helmLogger{}
+	return &helmclient.Options{
+		Namespace:        namespace,
+		Output:           logger,
+		DebugLog:         logger.Debug,
+		Debug:            true,
+		RepositoryCache:  paths.HelmRepoCache,
+		RepositoryConfig: paths.HelmRepoConfig,
+	}
+}
+
 // New returns the default helm client
 func New(kubecfg, kubectx, namespace string) (Client, error) {
 	k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -38,16 +50,8 @@ func New(kubecfg, kubectx, namespace string) (Client, error) {
 		return nil, fmt.Errorf("%w: unable to create rest config: %w", localerr.ErrKubernetes, err)
 	}
 
-	logger := helmLogger{}
 	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
-		Options: &helmclient.Options{
-			Namespace:        namespace,
-			Output:           logger,
-			DebugLog:         logger.Debug,
-			Debug:            true,
-			RepositoryCache:  paths.HelmRepoCache,
-			RepositoryConfig: paths.HelmRepoConfig,
-		},
+		Options:    ClientOptions(namespace),
 		RestConfig: restCfg,
 	})
 	if err != nil {
