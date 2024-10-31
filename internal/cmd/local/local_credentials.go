@@ -6,12 +6,9 @@ import (
 
 	"github.com/airbytehq/abctl/internal/cmd/local/airbyte"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"go.opencensus.io/trace"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
@@ -105,22 +102,4 @@ func (cc *CredentialsCmd) Run(ctx context.Context, provider k8s.Provider, telCli
   Client-Secret: %s`, orgEmail, secret.Data[secretPassword], clientId, clientSecret))
 		return nil
 	})
-}
-
-func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
-	k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
-		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
-	)
-
-	restCfg, err := k8sCfg.ClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
-	}
-	k8sClient, err := kubernetes.NewForConfig(restCfg)
-	if err != nil {
-		return nil, fmt.Errorf("%w: could not create clientset: %w", localerr.ErrKubernetes, err)
-	}
-
-	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
 }
