@@ -161,6 +161,7 @@ func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *Ins
 		return
 	}
 
+	pterm.Info.Println("pulling airbyte images")
 	cluster.LoadImages(ctx, manifest)
 }
 
