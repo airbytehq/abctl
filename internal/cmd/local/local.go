@@ -10,6 +10,8 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/pterm/pterm"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type Cmd struct {
@@ -71,4 +73,23 @@ func checkAirbyteDir() error {
 	}
 
 	return nil
+}
+
+// defaultK8s returns the default k8s client for the provided kubecfg and kubectx.
+func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
+	k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
+		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
+	)
+
+	restCfg, err := k8sCfg.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
+	}
+	k8sClient, err := kubernetes.NewForConfig(restCfg)
+	if err != nil {
+		return nil, fmt.Errorf("%w: could not create clientset: %w", localerr.ErrKubernetes, err)
+	}
+
+	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
 }
