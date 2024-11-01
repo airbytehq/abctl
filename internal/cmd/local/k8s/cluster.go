@@ -4,15 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/trace"
+	"github.com/docker/docker/api/types/image"
 	"github.com/pterm/pterm"
 	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/kind/pkg/cluster"
@@ -35,7 +37,7 @@ type Cluster interface {
 	Delete(ctx context.Context) error
 	// Exists returns true if the cluster exists, false otherwise.
 	Exists(ctx context.Context) bool
-	LoadImages(ctx context.Context, images []string)
+	LoadImages(ctx context.Context, dockerClient docker.Client, images []string)
 }
 
 // interface sanity check
@@ -119,24 +121,17 @@ func (k *kindCluster) Exists(ctx context.Context) bool {
 // LoadImages pulls images from Docker Hub, and loads them into the kind cluster.
 // This is a best-effort optimization, which is why it doesn't return an error.
 // It's possible that only some images will be loaded.
-func (k *kindCluster) LoadImages(ctx context.Context, images []string) {
-	err := k.loadImages(ctx, images)
+func (k *kindCluster) LoadImages(ctx context.Context, dockerClient docker.Client, images []string) {
+	err := k.loadImages(ctx, dockerClient, images)
 	pterm.Debug.Printfln("failed to load images: %s", err)
 }
 
-func (k *kindCluster) loadImages(ctx context.Context, images []string) error {
+func (k *kindCluster) loadImages(ctx context.Context, dockerClient docker.Client, images []string) error {
 	// Get a list of Kind nodes.
 	nodes, err := k.p.ListNodes(k.clusterName)
 	if err != nil {
 		return fmt.Errorf("listing nodes: %w", err)
 	}
-
-	// Setup the tar path where the images will be saved.
-	dir, err := fs.TempDir("", "images-tar-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dir)
 
 	// Pull all the images via "docker pull", in parallel.
 	var wg sync.WaitGroup
@@ -146,11 +141,13 @@ func (k *kindCluster) loadImages(ctx context.Context, images []string) error {
 
 		go func(img string) {
 			defer wg.Done()
-			out, err := exec.CommandContext(ctx, "docker", "pull", img).CombinedOutput()
+			r, err := dockerClient.ImagePull(ctx, img, image.PullOptions{})
 			if err != nil {
-				pterm.Debug.Printfln("error pulling image %s", out)
-				// don't return the error here, because other image pulls might succeed.
+				pterm.Debug.Printfln("error pulling image %s", err)
+				// image pull errors are intentionally dropped because we're in a goroutine,
+				// and because we don't want to interrupt other image pulls.
 			}
+			defer r.Close()
 		}(img)
 	}
 	wg.Wait()
@@ -161,14 +158,11 @@ func (k *kindCluster) loadImages(ctx context.Context, images []string) error {
 	}
 
 	// Save all the images to an archive, images.tar
-	imagesTarPath := filepath.Join(dir, "images.tar")
-	pterm.Debug.Printfln("saving image archive to %s", imagesTarPath)
-
-	out, err := exec.CommandContext(ctx, "docker", append([]string{"save", "-o", imagesTarPath}, images...)...).CombinedOutput()
+	imagesTarPath, err := saveImageArchive(ctx, dockerClient, images)
 	if err != nil {
-		return fmt.Errorf("failed to run 'docker save': %s", out)
+		return fmt.Errorf("failed to save image archive: %w", err)
 	}
-	
+
 	// Load the image archive into the Kind nodes.
 	f, err := os.Open(imagesTarPath)
 	if err != nil {
@@ -181,6 +175,35 @@ func (k *kindCluster) loadImages(ctx context.Context, images []string) error {
 		nodeutils.LoadImageArchive(n, f)
 	}
 	return nil
+}
+
+func saveImageArchive(ctx context.Context, dockerClient docker.Client, images []string) (string, error) {
+
+	// Setup the tar path where the images will be saved.
+	dir, err := fs.TempDir("", "images-tar-")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(dir)
+	imagesTarPath := filepath.Join(dir, "images.tar")
+	pterm.Debug.Printfln("saving image archive to %s", imagesTarPath)
+
+	wf, err := os.Create(imagesTarPath)
+	if err != nil {
+		return "", err
+	}
+	defer wf.Close()
+
+	r, err := dockerClient.ImageSave(ctx, images)
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := io.Copy(wf, r); err != nil {
+		return "", err
+	}
+
+	return imagesTarPath, nil
 }
 
 func formatKindErr(err error) error {

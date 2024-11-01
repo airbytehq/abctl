@@ -162,7 +162,7 @@ func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *Ins
 	}
 
 	pterm.Info.Println("pulling airbyte images")
-	cluster.LoadImages(ctx, manifest)
+	cluster.LoadImages(ctx, c.docker.Client, manifest)
 }
 
 // Install handles the installation of Airbyte

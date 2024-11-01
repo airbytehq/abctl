@@ -43,6 +43,7 @@ type Client interface {
 
 	ImageList(ctx context.Context, options image.ListOptions) ([]image.Summary, error)
 	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
+	ImageSave(ctx context.Context, imageIDs []string) (io.ReadCloser, error)
 
 	ServerVersion(ctx context.Context) (types.Version, error)
 	VolumeInspect(ctx context.Context, volumeID string) (volume.Volume, error)
