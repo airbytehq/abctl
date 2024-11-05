@@ -164,8 +164,9 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			return fmt.Errorf("unable to initialize local command: %w", err)
 		}
 
+		spinner.UpdateText("Pulling images")		
 		lc.PrepImages(ctx, cluster, opts)
-
+		
 		if err := lc.Install(ctx, opts); err != nil {
 			spinner.Fail("Unable to install Airbyte locally")
 			return err
