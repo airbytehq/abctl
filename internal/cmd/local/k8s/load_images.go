@@ -56,32 +56,12 @@ func loadImages(ctx context.Context, dockerClient docker.Client, nodes []nodesli
 		return nil
 	}
 
-	// for _, node := range nodes {
-	// 	for _, img := range needed {
-
-	// 		pterm.Debug.Printfln("saving image %s into node %s", img, node)
-
-	// 		r, err := dockerClient.ImageSave(ctx, images)
-	// 		if err != nil {
-	// 			pterm.Debug.Printfln("error loading image %s into node %s: %s", img, node, err)
-	// 			continue
-	// 		}
-
-	// 		pterm.Debug.Printfln("loading image %s into node %s", img, node)
-
-	// 		err = nodeutils.LoadImageArchive(node, r)
-	// 		if err != nil {
-	// 			pterm.Debug.Printfln("error loading image %s into node %s: %s", img, node, err)
-	// 		}
-	// 	}
-	// }
-
 	// Save all the images to an archive, images.tar
 	imagesTarPath, err := saveImageArchive(ctx, dockerClient, needed)
 	if err != nil {
 		return fmt.Errorf("failed to save image archive: %w", err)
 	}
-	// defer os.RemoveAll(imagesTarPath)
+	defer os.RemoveAll(imagesTarPath)
 
 	// Load the image archive into the Kind nodes.
 	f, err := os.Open(imagesTarPath)
@@ -125,7 +105,11 @@ func getExistingImageDigests(ctx context.Context, nodes []nodeslib.Node) common.
 
 		// skip the first line, which is a header.
 		for _, l := range out[1:] {
-			ref := strings.Fields(l)[0]
+			fields := strings.Fields(l)
+			if len(fields) < 1 {
+				continue
+			}
+			ref := fields[0]
 			pterm.Debug.Printfln("found existing image with ref %s", ref)
 			existingByNode[ref] += 1
 		}
