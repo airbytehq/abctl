@@ -26,6 +26,7 @@ type MockClient struct {
 	FnContainerExecStart   func(ctx context.Context, execID string, config container.ExecStartOptions) error
 	FnImageList            func(ctx context.Context, options image.ListOptions) ([]image.Summary, error)
 	FnImagePull            func(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
+	FnImageSave            func(ctx context.Context, imageIDs []string) (io.ReadCloser, error)
 	FnServerVersion        func(ctx context.Context) (types.Version, error)
 	FnVolumeInspect        func(ctx context.Context, volumeID string) (volume.Volume, error)
 	FnInfo                 func(ctx context.Context) (system.Info, error)
@@ -80,6 +81,10 @@ func (m MockClient) ImageList(ctx context.Context, options image.ListOptions) ([
 
 func (m MockClient) ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error) {
 	return m.FnImagePull(ctx, refStr, options)
+}
+
+func (m MockClient) ImageSave(ctx context.Context, imageIDs []string) (io.ReadCloser, error) {
+	return m.ImageSave(ctx, imageIDs)
 }
 
 func (m MockClient) ServerVersion(ctx context.Context) (types.Version, error) {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/trace"
@@ -30,6 +31,7 @@ type Cluster interface {
 	Delete(ctx context.Context) error
 	// Exists returns true if the cluster exists, false otherwise.
 	Exists(ctx context.Context) bool
+	LoadImages(ctx context.Context, dockerClient docker.Client, images []string)
 }
 
 // interface sanity check
@@ -108,6 +110,23 @@ func (k *kindCluster) Exists(ctx context.Context) bool {
 	}
 
 	return false
+}
+
+// LoadImages pulls images from Docker Hub, and loads them into the kind cluster.
+// This is a best-effort optimization, which is why it doesn't return an error.
+// It's possible that only some images will be loaded.
+func (k *kindCluster) LoadImages(ctx context.Context, dockerClient docker.Client, images []string) {
+	// Get a list of Kind nodes.
+	nodes, err := k.p.ListNodes(k.clusterName)
+	if err != nil {
+		pterm.Debug.Printfln("failed to load images: %s", err)
+		return
+	}
+
+	err = loadImages(ctx, dockerClient, nodes, images)
+	if err != nil {
+		pterm.Debug.Printfln("failed to load images: %s", err)
+	}
 }
 
 func formatKindErr(err error) error {

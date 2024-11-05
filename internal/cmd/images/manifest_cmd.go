@@ -7,12 +7,11 @@ import (
 	"strings"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/trace"
 	helmlib "github.com/mittwald/go-helm-client"
 	"helm.sh/helm/v3/pkg/repo"
 
-	"github.com/airbytehq/abctl/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,16 +26,11 @@ type ManifestCmd struct {
 	Values       string `type:"existingfile" help:"An Airbyte helm chart values file to configure helm."`
 }
 
-func (c *ManifestCmd) Run(ctx context.Context, provider k8s.Provider) error {
+func (c *ManifestCmd) Run(ctx context.Context) error {
 	ctx, span := trace.NewSpan(ctx, "images manifest")
 	defer span.End()
 
-	client, err := helm.New(provider.Kubeconfig, provider.Context, common.AirbyteNamespace)
-	if err != nil {
-		return err
-	}
-
-	images, err := c.findAirbyteImages(ctx, client)
+	images, err := c.findAirbyteImages(ctx)
 	if err != nil {
 		return err
 	}
@@ -48,7 +42,7 @@ func (c *ManifestCmd) Run(ctx context.Context, provider k8s.Provider) error {
 	return nil
 }
 
-func (c *ManifestCmd) findAirbyteImages(ctx context.Context, client helm.Client) ([]string, error) {
+func (c *ManifestCmd) findAirbyteImages(ctx context.Context) ([]string, error) {
 	valuesYaml, err := helm.BuildAirbyteValues(ctx, helm.ValuesOpts{
 		ValuesFile: c.Values,
 	})
@@ -57,11 +51,20 @@ func (c *ManifestCmd) findAirbyteImages(ctx context.Context, client helm.Client)
 	}
 
 	airbyteChartLoc := helm.LocateLatestAirbyteChart(c.ChartVersion, c.Chart)
-	return findImagesFromChart(client, valuesYaml, airbyteChartLoc, c.ChartVersion)
+	return FindImagesFromChart(valuesYaml, airbyteChartLoc, c.ChartVersion)
 }
 
-func findImagesFromChart(client helm.Client, valuesYaml, chartName, chartVersion string) ([]string, error) {
-	err := client.AddOrUpdateChartRepo(repo.Entry{
+func FindImagesFromChart(valuesYaml, chartName, chartVersion string) ([]string, error) {
+
+	// sharing a helm client with the install code causes some weird issues,
+	// and templating the chart doesn't need details about the k8s provider,
+	// we create a throwaway helm client here.
+	client, err := helmlib.New(helm.ClientOptions(common.AirbyteNamespace))
+	if err != nil {
+		return nil, err
+	}
+
+	err = client.AddOrUpdateChartRepo(repo.Entry{
 		Name: common.AirbyteRepoName,
 		URL:  common.AirbyteRepoURL,
 	})
@@ -88,7 +91,7 @@ func findImagesFromChart(client helm.Client, valuesYaml, chartName, chartVersion
 // It returns a unique, sorted list of images found.
 func findAllImages(chartYaml string) []string {
 	objs := decodeK8sResources(chartYaml)
-	imageSet := set[string]{}
+	imageSet := common.Set[string]{}
 
 	for _, obj := range objs {
 
@@ -98,7 +101,7 @@ func findAllImages(chartYaml string) []string {
 			if strings.HasSuffix(z.Name, "airbyte-env") {
 				for k, v := range z.Data {
 					if strings.HasSuffix(k, "_IMAGE") {
-						imageSet.add(v)
+						imageSet.Add(v)
 					}
 				}
 			}
@@ -116,15 +119,15 @@ func findAllImages(chartYaml string) []string {
 		}
 
 		for _, c := range podSpec.InitContainers {
-			imageSet.add(c.Image)
+			imageSet.Add(c.Image)
 		}
 		for _, c := range podSpec.Containers {
-			imageSet.add(c.Image)
+			imageSet.Add(c.Image)
 		}
 	}
 
 	var out []string
-	for _, k := range imageSet.items() {
+	for _, k := range imageSet.Items() {
 		if k != "" {
 			out = append(out, k)
 		}
@@ -146,25 +149,6 @@ func decodeK8sResources(renderedYaml string) []runtime.Object {
 			continue
 		}
 		out = append(out, obj)
-	}
-	return out
-}
-
-type set[T comparable] struct {
-	vals map[T]struct{}
-}
-
-func (s *set[T]) add(v T) {
-	if s.vals == nil {
-		s.vals = map[T]struct{}{}
-	}
-	s.vals[v] = struct{}{}
-}
-
-func (s *set[T]) items() []T {
-	out := make([]T, len(s.vals))
-	for k := range s.vals {
-		out = append(out, k)
 	}
 	return out
 }
