@@ -35,7 +35,9 @@ func (p Provider) Cluster(ctx context.Context) (Cluster, error) {
 	}
 
 	kindProvider := cluster.NewProvider(cluster.ProviderWithLogger(&kindLogger{pterm: pterm.Debug}))
-	kindProvider.ExportKubeConfig(p.ClusterName, p.Kubeconfig, false)
+	if err := kindProvider.ExportKubeConfig(p.ClusterName, p.Kubeconfig, false); err != nil {
+		pterm.Debug.Printfln("failed to export kube config: %s", err)
+	}
 
 	return &kindCluster{
 		p:          kindProvider,
