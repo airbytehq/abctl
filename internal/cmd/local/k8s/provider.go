@@ -29,12 +29,16 @@ type Provider struct {
 func (p Provider) Cluster(ctx context.Context) (Cluster, error) {
 	_, span := trace.NewSpan(ctx, "Provider.Cluster")
 	defer span.End()
+
 	if err := os.MkdirAll(filepath.Dir(p.Kubeconfig), 0766); err != nil {
 		return nil, fmt.Errorf("unable to create directory %s: %v", p.Kubeconfig, err)
 	}
 
+	kindProvider := cluster.NewProvider(cluster.ProviderWithLogger(&kindLogger{pterm: pterm.Debug}))
+	kindProvider.ExportKubeConfig(p.ClusterName, p.Kubeconfig, false)
+
 	return &kindCluster{
-		p:           cluster.NewProvider(cluster.ProviderWithLogger(&kindLogger{pterm: pterm.Debug})),
+		p:          kindProvider,
 		kubeconfig:  p.Kubeconfig,
 		clusterName: p.ClusterName,
 	}, nil
