@@ -120,6 +120,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			// existing cluster, validate it
 			pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
 			spinner.UpdateText(fmt.Sprintf("Validating existing cluster '%s'", provider.ClusterName))
+			span.SetAttributes(attribute.Bool("cluster_exists", true))
 
 			// only for kind do we need to check the existing port
 			if provider.Name == k8s.Kind {
@@ -138,6 +139,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		} else {
 			// no existing cluster, need to create one
 			pterm.Info.Println(fmt.Sprintf("No existing cluster found, cluster '%s' will be created", provider.ClusterName))
+			span.SetAttributes(attribute.Bool("cluster_exists", false))
 
 			spinner.UpdateText(fmt.Sprintf("Checking if port %d is available", i.Port))
 			if err := portAvailable(ctx, i.Port); err != nil {
