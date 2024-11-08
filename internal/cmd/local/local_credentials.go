@@ -6,6 +6,7 @@ import (
 
 	"github.com/airbytehq/abctl/internal/cmd/local/airbyte"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"go.opencensus.io/trace"
@@ -32,7 +33,7 @@ func (cc *CredentialsCmd) Run(ctx context.Context, provider k8s.Provider, telCli
 	spinner := &pterm.DefaultSpinner
 
 	return telClient.Wrap(ctx, telemetry.Credentials, func() error {
-		k8sClient, err := defaultK8s(provider.Kubeconfig, provider.Context)
+		k8sClient, err := local.DefaultK8s(provider.Kubeconfig, provider.Context)
 		if err != nil {
 			pterm.Error.Println("No existing cluster found")
 			return nil
