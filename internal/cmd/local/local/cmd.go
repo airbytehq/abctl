@@ -130,7 +130,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	// set k8s client, if not defined
 	if c.k8s == nil {
 		var err error
-		if c.k8s, err = defaultK8s(provider.Kubeconfig, provider.Context); err != nil {
+		if c.k8s, err = DefaultK8s(provider.Kubeconfig, provider.Context); err != nil {
 			return nil, err
 		}
 	}
@@ -173,13 +173,13 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	return c, nil
 }
 
-// defaultK8s returns the default k8s client
-func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
+// DefaultK8s returns the default k8s client
+func DefaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	rest.SetDefaultWarningHandler(k8s.Logger{})
-	k8sCfg, err := k8sClientConfig(kubecfg, kubectx)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", localerr.ErrKubernetes, err)
-	}
+	k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
+		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
+	)
 
 	restCfg, err := k8sCfg.ClientConfig()
 	if err != nil {
@@ -191,12 +191,4 @@ func defaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	}
 
 	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
-}
-
-// k8sClientConfig returns a k8s client config using the ~/.kube/config file and the k8sContext context.
-func k8sClientConfig(kubecfg, kubectx string) (clientcmd.ClientConfig, error) {
-	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
-		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
-	), nil
 }
