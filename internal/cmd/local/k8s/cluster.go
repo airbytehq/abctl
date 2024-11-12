@@ -48,8 +48,8 @@ type kindCluster struct {
 
 // k8sVersion is the kind node version being used.
 // Note that the sha256 must match the version listed on the release for the specific version of kind
-// that we're currently using (e.g. https://github.com/kubernetes-sigs/kind/releases/tag/v0.24.0)
-const k8sVersion = "v1.29.8@sha256:d46b7aa29567e93b27f7531d258c372e829d7224b25e3fc6ffdefed12476d3aa"
+// that we're currently using (e.g. https://github.com/kubernetes-sigs/kind/releases/tag/v0.25.0)
+const k8sVersion = "v1.29.10@sha256:3b2d8c31753e6c8069d4fc4517264cd20e86fd36220671fb7d0a5855103aa84b"
 
 func (k *kindCluster) Create(ctx context.Context, port int, extraMounts []ExtraVolumeMount) error {
 	ctx, span := trace.NewSpan(ctx, "kindCluster.Create")
