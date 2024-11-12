@@ -26,6 +26,9 @@ type mockHelmClient struct {
 }
 
 func (m *mockHelmClient) AddOrUpdateChartRepo(entry repo.Entry) error {
+	if m.addOrUpdateChartRepo == nil {
+		return nil
+	}
 	return m.addOrUpdateChartRepo(entry)
 }
 

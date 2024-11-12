@@ -19,6 +19,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const portTest = 9999
@@ -158,7 +159,6 @@ func TestCommand_Install(t *testing.T) {
 			return nil
 		}),
 	)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,6 +169,67 @@ func TestCommand_Install(t *testing.T) {
 	}
 	if err := c.Install(context.Background(), installOpts); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCommand_InstallError(t *testing.T) {
+	testErr := errors.New("test error")
+	valuesYaml := mustReadFile(t, "testdata/test-edition.values.yaml")
+
+	helm := mockHelmClient{
+		installOrUpgradeChart: func(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error) {
+			return nil, testErr
+		},
+		getChart: func(name string, _ *action.ChartPathOptions) (*chart.Chart, string, error) {
+			return &chart.Chart{Metadata: &chart.Metadata{Version: "test.airbyte.version"}}, "", nil
+		},
+	}
+
+	k8sClient := k8stest.MockClient{
+		FnIngressExists: func(ctx context.Context, namespace string, ingress string) bool {
+			return false
+		},
+		FnLogsGet: func(ctx context.Context, namespace, name string) (string, error) {
+			return "short", nil
+		},
+		FnPodList: func(ctx context.Context, namespace string) (*corev1.PodList, error) {
+			// embedded structs make it easier to set fields this way
+			pod := corev1.Pod{}
+			pod.Name = "test-pod-1"
+			pod.Status.Phase = corev1.PodFailed
+			pod.Status.Reason = "test-reason"
+			return &corev1.PodList{Items: []corev1.Pod{pod}}, nil
+		},
+	}
+
+	tel := telemetry.MockClient{}
+
+	httpClient := mockHTTP{do: func(req *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200}, nil
+	}}
+	installOpts := &InstallOpts{
+		HelmValuesYaml:  valuesYaml,
+		AirbyteChartLoc: testAirbyteChartLoc,
+	}
+
+	c, err := New(
+		k8s.TestProvider,
+		WithPortHTTP(portTest),
+		WithHelmClient(&helm),
+		WithK8sClient(&k8sClient),
+		WithTelemetryClient(&tel),
+		WithHTTPClient(&httpClient),
+		WithBrowserLauncher(func(url string) error {
+			return nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.Install(context.Background(), installOpts)
+	expect := "unable to install airbyte chart:\npod test-pod-1: unknown"
+	if expect != err.Error() {
+		t.Errorf("expected %q but got %q", expect, err)
 	}
 }
 

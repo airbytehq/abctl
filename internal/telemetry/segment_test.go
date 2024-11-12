@@ -864,6 +864,36 @@ func TestSegmentClient_WrapErr(t *testing.T) {
 	}
 }
 
+func TestSegmentClient_WrapPanic(t *testing.T) {
+	mDoer := &mockDoer{
+		do: func(r *http.Request) (*http.Response, error) {
+			return &http.Response{Body: io.NopCloser(&strings.Reader{})}, nil
+		},
+	}
+	opts := []Option{
+		WithSessionID(sessionID),
+		WithHTTPClient(mDoer),
+	}
+	ctx := context.Background()
+	cli := NewSegmentClient(Config{AnalyticsID: UUID(userID)}, opts...)
+	expect := errors.New("test panic err")
+
+	err := cli.Wrap(ctx, Install, func() error {
+		panic(expect)
+	})
+	if !errors.Is(err, expect) {
+		t.Errorf("expected %q but got %q", expect, err)
+	}
+
+	expectStr := "panic: test str"
+	err = cli.Wrap(ctx, Install, func() error {
+		panic("test str")
+	})
+	if err == nil || err.Error() != expectStr {
+		t.Errorf("expected %q but got %q", expectStr, err)
+	}
+}
+
 // --- mocks
 var _ Doer = (*mockDoer)(nil)
 
