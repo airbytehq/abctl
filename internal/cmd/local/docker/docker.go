@@ -2,8 +2,10 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os/exec"
 	"runtime"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
@@ -16,6 +18,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pterm/pterm"
 )
 
 // Version contains al the version information that is being tracked.
@@ -89,38 +92,56 @@ var _ pinger = (*client.Client)(nil)
 
 // newWithOptions allows for the docker client to be injected for testing purposes.
 func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker, error) {
-	var (
-		dockerCli Client
-		err       error
-	)
+
+	var potentialHosts []string
+
+	// The best guess at the docker host comes from the "docker context inspect" command,
+	// which describes the current context in detail.
+	if out, err := exec.Command("docker", "context", "inspect").Output(); err == nil {
+		var data []struct {
+			Endpoints struct {
+				Docker struct {
+					Host string
+				} `json:"docker"`
+			}
+		}
+		if err := json.Unmarshal(out, &data); err == nil {
+			if len(data) > 0 && data[0].Endpoints.Docker.Host != "" {
+				potentialHosts = append(potentialHosts, data[0].Endpoints.Docker.Host)
+			}
+		}
+	}
+
+	// If the code above fails, then fall back to some educated guesses.
+	// Unfortunately, these can easily be wrong if the user is using a non-standard
+	// docker context, or if we've missed any common installation configs here.
+	switch goos {
+	case "darwin":
+		potentialHosts = append(potentialHosts, 
+			"unix:///var/run/docker.sock",
+			fmt.Sprintf("unix://%s/.docker/run/docker.sock", paths.UserHome),
+		)
+	case "windows":
+		potentialHosts = append(potentialHosts, "npipe:////./pipe/docker_engine")
+	default:
+		potentialHosts = append(potentialHosts, 
+			"unix:///var/run/docker.sock",
+			fmt.Sprintf("unix://%s/.docker/desktop/docker-cli.sock", paths.UserHome),
+		)
+	}
 
 	dockerOpts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
 
-	switch goos {
-	case "darwin":
-		// on mac, sometimes the docker host isn't set correctly, if it fails check the home directory
-		dockerCli, err = createAndPing(ctx, newPing, "unix:///var/run/docker.sock", dockerOpts)
+	for _, host := range potentialHosts {
+		dockerCli, err := createAndPing(ctx, newPing, host, dockerOpts)
 		if err != nil {
-			var err2 error
-			dockerCli, err2 = createAndPing(ctx, newPing, fmt.Sprintf("unix://%s/.docker/run/docker.sock", paths.UserHome), dockerOpts)
-			if err2 != nil {
-				return nil, fmt.Errorf("%w: unable to create docker client: (%w, %w)", localerr.ErrDocker, err, err2)
-			}
-			// if we made it here, clear out the original error,
-			// as we were able to successfully connect on the second attempt
-			err = nil
+			pterm.Debug.Printfln("error connecting to docker host %s: %s", host, err)
+		} else {
+			return &Docker{Client: dockerCli}, nil
 		}
-	case "windows":
-		dockerCli, err = createAndPing(ctx, newPing, "npipe:////./pipe/docker_engine", dockerOpts)
-	default:
-		dockerCli, err = createAndPing(ctx, newPing, "unix:///var/run/docker.sock", dockerOpts)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("%w: unable to create docker client: %w", localerr.ErrDocker, err)
-	}
-
-	return &Docker{Client: dockerCli}, nil
+	
+	return nil, fmt.Errorf("%w: unable to create docker client", localerr.ErrDocker)
 }
 
 // createAndPing attempts to create a docker client and ping it to ensure we can communicate

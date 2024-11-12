@@ -93,17 +93,17 @@ func TestNewWithOptions_InitErr(t *testing.T) {
 		{
 			name:        "darwin",
 			goos:        "darwin",
-			expAttempts: 2, // darwin will attempt two different locations
+			expAttempts: 3,
 		},
 		{
 			name:        "windows",
 			goos:        "windows",
-			expAttempts: 1,
+			expAttempts: 2,
 		},
 		{
 			name:        "linux",
 			goos:        "linux",
-			expAttempts: 1,
+			expAttempts: 3,
 		},
 	}
 
