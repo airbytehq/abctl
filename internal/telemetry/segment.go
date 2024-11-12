@@ -86,7 +86,7 @@ func (s *SegmentClient) User() string {
 	return s.cfg.AnalyticsID.toUUID().String()
 }
 
-func (s *SegmentClient) Wrap(ctx context.Context, et EventType, f func() error) error {
+func (s *SegmentClient) Wrap(ctx context.Context, et EventType, f func() error) (res error) {
 	attemptSuccessFailure := true
 
 	if err := s.Start(ctx, et); err != nil {
@@ -94,13 +94,26 @@ func (s *SegmentClient) Wrap(ctx context.Context, et EventType, f func() error) 
 		attemptSuccessFailure = false
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			pterm.Error.Printfln("recovered from panic: %v", r)
+			err, ok := r.(error)
+			if !ok {
+				err = fmt.Errorf("panic: %v", r)
+			}
+			res = err
+			if errTel := s.Failure(ctx, et, err); errTel != nil {
+				pterm.Debug.Printfln("Unable to send telemetry failure data: %s", errTel)
+			}
+		}
+	}()
+
 	if err := f(); err != nil {
 		if attemptSuccessFailure {
 			if errTel := s.Failure(ctx, et, err); errTel != nil {
 				pterm.Debug.Printfln("Unable to send telemetry failure data: %s", errTel)
 			}
 		}
-
 		return err
 	}
 
