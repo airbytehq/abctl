@@ -332,10 +332,11 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 			if err != nil {
 				msg = "unknown: failed to get pod logs."
 			}
+			
 			preview := logs
-			// if len(preview) > 50 {
-			// 	preview = preview[:50]
-			// }
+			if len(preview) > 50 {
+				preview = preview[:50]
+			}
 			pterm.Debug.Println("found logs: ", preview)
 
 			trace.AttachLog(fmt.Sprintf("%s.log", pod.Name), logs)
