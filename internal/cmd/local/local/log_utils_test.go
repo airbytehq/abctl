@@ -22,27 +22,6 @@ Caused by: io.airbyte.db.check.DatabaseCheckException: Unable to connect to the 
 2024-09-12T15:56:33.125352208Z Thread-4 INFO Loading mask data from '/seed/specs_secrets_mask.yaml
 `)
 
-var testLogs2 = strings.TrimSpace(`
-2024-11-12 20:52:07,403 [main]	[1;31mERROR[0;39m	i.a.d.c.DatabaseAvailabilityCheck(lambda$isDatabaseConnected$1):78 - Failed to verify database connection.
-org.jooq.exception.DataAccessException: Error getting connection from data source HikariDataSource (HikariPool-1)
-	at org.jooq_3.19.7.POSTGRES.debug(Unknown Source)
-	at org.jooq.impl.DataSourceConnectionProvider.acquire(DataSourceConnectionProvider.java:90)
-Caused by: java.sql.SQLTransientConnectionException: HikariPool-1 - Connection is not available, request timed out after 30110ms (total=0, active=0, idle=0, waiting=0)
-	at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:686)
-	at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:179)
-	at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:144)
-	at com.zaxxer.hikari.HikariDataSource.getConnection(HikariDataSource.java:99)
-	at org.jooq.impl.DataSourceConnectionProvider.acquire(DataSourceConnectionProvider.java:87)
-	... 22 common frames omitted
-Caused by: org.postgresql.util.PSQLException: The connection attempt failed.
-	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:364)
-	at org.postgresql.core.ConnectionFactory.openConnection(ConnectionFactory.java:54)
-Caused by: java.net.UnknownHostException: airbyte-db-svc
-	at java.base/sun.nio.ch.NioSocketImpl.connect(NioSocketImpl.java:567)
-	at org.postgresql.core.v3.ConnectionFactoryImpl.openConnectionImpl(ConnectionFactoryImpl.java:268)
-	... 14 common frames omitted
-`)
-
 func TestJavaLogScanner(t *testing.T) {
 	s := newLogScanner(strings.NewReader(testLogs))
 
