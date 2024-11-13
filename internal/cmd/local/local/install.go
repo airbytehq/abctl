@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -253,7 +254,9 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 	}); err != nil {
 		// if trace.SpanError isn't called here, the logs attached
 		// in the diagnoseAirbyteChartFailure method are lost
-		return trace.SpanError(span, c.diagnoseAirbyteChartFailure(ctx, err))
+		err = c.diagnoseAirbyteChartFailure(ctx, err)
+		err = fmt.Errorf("unable to install airbyte chart: %w", err)
+		return trace.SpanError(span, err)
 	}
 
 	nginxValues, err := helm.BuildNginxValues(c.portHTTP)
@@ -318,46 +321,54 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 }
 
 func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr error) error {
-	if podList, err := c.k8s.PodList(ctx, common.AirbyteNamespace); err == nil {
-		var errors []string
-		for _, pod := range podList.Items {
-			pterm.Debug.Println(fmt.Sprintf("looking at %s\n  %s(%s)", pod.Name, pod.Status.Phase, pod.Status.Reason))
-			if pod.Status.Phase != corev1.PodFailed {
-				continue
-			}
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return chartErr
+	}
+	
+	podList, err := c.k8s.PodList(ctx, common.AirbyteNamespace)
+	if err != nil {
+		return chartErr
+	}
 
-			msg := "unknown"
-
-			logs, err := c.k8s.LogsGet(ctx, common.AirbyteNamespace, pod.Name)
-			if err != nil {
-				msg = "unknown: failed to get pod logs."
-			}
-			
-			preview := logs
-			if len(preview) > 50 {
-				preview = preview[:50]
-			}
-			pterm.Debug.Println("found logs: ", preview)
-
-			trace.AttachLog(fmt.Sprintf("%s.log", pod.Name), logs)
-
-			m, err := getLastLogError(strings.NewReader(logs))
-			if err != nil {
-				msg = "unknown: failed to find error log."
-			}
-			if m != "" {
-				msg = m
-			}
-
-			errors = append(errors, fmt.Sprintf("pod %s: %s", pod.Name, msg))
-		}
-
-		if errors != nil {
-			return fmt.Errorf("unable to install airbyte chart:\n%s", strings.Join(errors, "\n"))
+	var failedPods []string
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == corev1.PodFailed {
+			failedPods = append(failedPods, pod.Name)
 		}
 	}
 
-	return fmt.Errorf("unable to install airbyte chart: %w", chartErr)
+	// If none of the pods failed, don't bother looking at logs.
+	if len(failedPods) == 0 {
+		return chartErr
+	}
+
+	for _, pod := range podList.Items {
+		// skip pods that aren't part of the platform release (e.g. job pods)
+		if !strings.HasPrefix(pod.Name, common.AirbyteChartRelease) {
+			continue
+		}
+		pterm.Debug.Printfln("looking at %s\n  %s(%s)", pod.Name, pod.Status.Phase, pod.Status.Reason)
+
+		logs, err := c.k8s.LogsGet(ctx, common.AirbyteNamespace, pod.Name)
+		if err != nil {
+			pterm.Debug.Printfln("failed to get pod logs: %s", err)
+			continue
+		}
+
+		preview := logs
+		if len(preview) > 50 {
+			preview = preview[:50]
+		}
+		pterm.Debug.Println("found logs: ", preview)
+
+		trace.AttachLog(fmt.Sprintf("%s.log", pod.Name), logs)
+	}
+
+	if len(failedPods) == 1 && failedPods[0] == common.AirbyteBootloaderPodName {
+		return localerr.ErrBootloaderFailed
+	}
+
+	return chartErr
 }
 
 func (c *Command) handleIngress(ctx context.Context, hosts []string) error {
