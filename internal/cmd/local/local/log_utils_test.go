@@ -47,14 +47,3 @@ func TestJavaLogScanner(t *testing.T) {
 	expectLogLine("INFO", "i.m.r.Micronaut(lambda$start$0):118 - Embedded Application shutting down")
 	expectLogLine("INFO", "2024-09-12T15:56:33.125352208Z Thread-4 INFO Loading mask data from '/seed/specs_secrets_mask.yaml")
 }
-
-func TestLastErrorLog(t *testing.T) {
-	l, err := getLastLogError(strings.NewReader(testLogs))
-	if err != nil {
-		t.Errorf("unexpected error %s", err)
-	}
-	expect := "Caused by: io.airbyte.db.check.DatabaseCheckException: Unable to connect to the database."
-	if l != expect {
-		t.Errorf("expected %q but got %q", expect, l)
-	}
-}

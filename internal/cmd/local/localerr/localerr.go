@@ -80,4 +80,9 @@ IP addresses won't work. Ports won't work (e.g. example:8000). URLs won't work (
 
 By default, abctl will allow access from any hostname or IP, so you might not need the --host flag.`,
 	}
+
+	ErrBootloaderFailed = &LocalError{
+		msg: "bootloader failed",
+		help: "The bootloader failed to its initialization checks or migrations. Try running again with --verbose to see the full bootloader logs.",
+	}
 )

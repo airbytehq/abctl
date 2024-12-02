@@ -59,21 +59,3 @@ func (j *logScanner) Scan() bool {
 func (j *logScanner) Err() error {
 	return j.scanner.Err()
 }
-
-func getLastLogError(r io.Reader) (string, error) {
-	var lines []logLine
-	s := newLogScanner(r)
-	for s.Scan() {
-		lines = append(lines, s.line)
-	}
-	if s.Err() != nil {
-		return "", s.Err()
-	}
-
-	for i := len(lines) - 1; i >= 0; i-- {
-		if lines[i].level == "ERROR" {
-			return lines[i].msg, nil
-		}
-	}
-	return "", nil
-}

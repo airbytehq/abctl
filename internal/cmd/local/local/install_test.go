@@ -227,7 +227,7 @@ func TestCommand_InstallError(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = c.Install(context.Background(), installOpts)
-	expect := "unable to install airbyte chart:\npod test-pod-1: unknown"
+	expect := "unable to install airbyte chart: unable to install helm: test error"
 	if expect != err.Error() {
 		t.Errorf("expected %q but got %q", expect, err)
 	}
