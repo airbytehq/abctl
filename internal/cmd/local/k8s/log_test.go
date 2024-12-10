@@ -11,12 +11,12 @@ import (
 
 func TestLogger_HandleWarningHeader(t *testing.T) {
 	b := bytes.NewBufferString("")
-	pterm.SetDefaultOutput(b)
+	pterm.Debug.Writer = b
 	pterm.EnableDebugMessages()
 	// remove color codes from output
 	pterm.DisableColor()
 	t.Cleanup(func() {
-		pterm.SetDefaultOutput(os.Stdout)
+		pterm.Debug.Writer = os.Stdout
 		pterm.DisableDebugMessages()
 		pterm.EnableColor()
 	})

@@ -18,11 +18,13 @@ import (
 
 func TestDeploymentsCmd(t *testing.T) {
 	b := bytes.NewBufferString("")
+	pterm.Info.Writer = b
+	// SetDefaultOutput isn't overriding the Info.Writer
 	pterm.SetDefaultOutput(b)
 	pterm.EnableDebugMessages()
-	// remove color codes from output
 	pterm.DisableColor()
 	t.Cleanup(func() {
+		pterm.Info.Writer = os.Stdout
 		pterm.SetDefaultOutput(os.Stdout)
 		pterm.DisableDebugMessages()
 		pterm.EnableColor()
