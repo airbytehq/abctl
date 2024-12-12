@@ -324,7 +324,7 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 	if errors.Is(ctx.Err(), context.Canceled) {
 		return chartErr
 	}
-	
+
 	podList, err := c.k8s.PodList(ctx, common.AirbyteNamespace)
 	if err != nil {
 		return chartErr
@@ -344,7 +344,9 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 
 	for _, pod := range podList.Items {
 		// skip pods that aren't part of the platform release (e.g. job pods)
-		if !strings.HasPrefix(pod.Name, common.AirbyteChartRelease) {
+		// note: the db (airbyte-db-0) and minio (airbyte-minio-0) pods are not release-name aware
+		// so we need to check for pod names that start with "airbyte"
+		if !strings.HasPrefix(pod.Name, "airbyte") {
 			continue
 		}
 		pterm.Debug.Printfln("looking at %s\n  %s(%s)", pod.Name, pod.Status.Phase, pod.Status.Reason)
