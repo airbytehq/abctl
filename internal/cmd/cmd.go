@@ -25,7 +25,7 @@ type Cmd struct {
 	Verbose verbose     `short:"v" help:"Enable verbose output."`
 }
 
-func (c *Cmd) BeforeApply(ctx context.Context, kCtx *kong.Context) error {
+func (c *Cmd) BeforeApply(_ context.Context, kCtx *kong.Context) error {
 	kCtx.BindTo(k8s.DefaultProvider, (*k8s.Provider)(nil))
 	return nil
 }

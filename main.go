@@ -115,7 +115,6 @@ func checkForNewerAbctlVersion(ctx context.Context) func() {
 		ver := <-c
 		if ver != "" {
 			pterm.Info.Printfln("A new release of abctl is available: %s -> %s\nUpdating to the latest version is highly recommended", build.Version, ver)
-
 		}
 	}
 }
