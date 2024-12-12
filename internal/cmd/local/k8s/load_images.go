@@ -38,9 +38,10 @@ func loadImages(ctx context.Context, dockerClient docker.Client, nodes []nodesli
 				pterm.Debug.Printfln("error pulling image %s", err)
 				// image pull errors are intentionally dropped because we're in a goroutine,
 				// and because we don't want to interrupt other image pulls.
+			} else {
+				defer r.Close()
+				io.Copy(io.Discard, r)
 			}
-			defer r.Close()
-			io.Copy(io.Discard, r)
 		}(img)
 	}
 	wg.Wait()
