@@ -33,50 +33,40 @@ type Client interface {
 	// This is a blocking call, it should only return once the deployment has completed.
 	DeploymentRestart(ctx context.Context, namespace, name string) error
 
-	// IngressCreate creates an ingress in the given namespace
+	EventsWatch(ctx context.Context, namespace string) (watch.Interface, error)
+
 	IngressCreate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
-	// IngressExists returns true if the ingress exists in the namespace, false otherwise.
 	IngressExists(ctx context.Context, namespace string, ingress string) bool
-	// IngressUpdate updates an existing ingress in the given namespace
 	IngressUpdate(ctx context.Context, namespace string, ingress *networkingv1.Ingress) error
 
-	// NamespaceCreate creates a namespace
+	LogsGet(ctx context.Context, namespace string, name string) (string, error)
+
 	NamespaceCreate(ctx context.Context, namespace string) error
-	// NamespaceExists returns true if the namespace exists, false otherwise
 	NamespaceExists(ctx context.Context, namespace string) bool
-	// NamespaceDelete deletes the existing namespace
 	NamespaceDelete(ctx context.Context, namespace string) error
 
-	// PersistentVolumeCreate creates a persistent volume
 	PersistentVolumeCreate(ctx context.Context, namespace, name string) error
-	// PersistentVolumeExists returns true if the persistent volume exists, false otherwise
 	PersistentVolumeExists(ctx context.Context, namespace, name string) bool
-	// PersistentVolumeDelete deletes the existing persistent volume
 	PersistentVolumeDelete(ctx context.Context, namespace, name string) error
 
-	// PersistentVolumeClaimCreate creates a persistent volume claim
 	PersistentVolumeClaimCreate(ctx context.Context, namespace, name, volumeName string) error
-	// PersistentVolumeClaimExists returns true if the persistent volume claim exists, false otherwise
 	PersistentVolumeClaimExists(ctx context.Context, namespace, name, volumeName string) bool
-	// PersistentVolumeClaimDelete deletes the existing persistent volume claim
 	PersistentVolumeClaimDelete(ctx context.Context, namespace, name, volumeName string) error
 
-	// SecretCreateOrUpdate will update or create the secret name with the payload of data in the specified namespace
+	PodList(ctx context.Context, namespace string) (*corev1.PodList, error)
+
 	SecretCreateOrUpdate(ctx context.Context, secret corev1.Secret) error
-	// SecretGet returns the secrets for the namespace and name
+	// SecretDeleteCollection deletes multiple secrets.
+	// Note this takes a `type` and not a `name`.  All secrets matching this type will be removed.
+	SecretDeleteCollection(ctx context.Context, namespace, _type string) error
 	SecretGet(ctx context.Context, namespace, name string) (*corev1.Secret, error)
 
-	// ServiceGet returns the service for the given namespace and name
 	ServiceGet(ctx context.Context, namespace, name string) (*corev1.Service, error)
+
+	StreamPodLogs(ctx context.Context, namespace string, podName string, since time.Time) (io.ReadCloser, error)
 
 	// ServerVersionGet returns the kubernetes version.
 	ServerVersionGet() (string, error)
-
-	EventsWatch(ctx context.Context, namespace string) (watch.Interface, error)
-
-	LogsGet(ctx context.Context, namespace string, name string) (string, error)
-	StreamPodLogs(ctx context.Context, namespace string, podName string, since time.Time) (io.ReadCloser, error)
-	PodList(ctx context.Context, namespace string) (*corev1.PodList, error)
 }
 
 var _ Client = (*DefaultK8sClient)(nil)
@@ -287,6 +277,13 @@ func (d *DefaultK8sClient) SecretCreateOrUpdate(ctx context.Context, secret core
 	}
 
 	return fmt.Errorf("unexpected error while handling the secret %s: %w", name, err)
+}
+
+func (d *DefaultK8sClient) SecretDeleteCollection(ctx context.Context, namespace, _type string) error {
+	listOptions := metav1.ListOptions{
+		FieldSelector: "type=" + _type,
+	}
+	return d.ClientSet.CoreV1().Secrets(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, listOptions)
 }
 
 func (d *DefaultK8sClient) SecretGet(ctx context.Context, namespace, name string) (*corev1.Secret, error) {

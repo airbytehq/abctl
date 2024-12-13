@@ -41,12 +41,24 @@ Ensure that Docker is running and is accessible.  You may need to upgrade to a n
 For additional help please visit https://docs.docker.com/get-docker/`,
 	}
 
+	// ErrHelmStuck is returned if when running a helm install or upgrade command, a previous install or upgrade
+	// attempt is already in progress which this tool cannot work around.
+	ErrHelmStuck = &LocalError{
+		msg: "another helm operation (install/upgrade/rollback) is in progress",
+		help: `An error occurred while attempting to run a helm install or upgrade.
+If this error persists, you may need to run the "abctl local uninstall" command before attempting to run the
+"abctl local install" command again.
+Your data will persist between the uninstall and install commands.
+`,
+	}
+
 	// ErrKubernetes is returned anytime an error occurs when attempting to communicate with the kubernetes cluster.
 	ErrKubernetes = &LocalError{
 		msg: "error communicating with kubernetes",
 		help: `An error occurred while communicating with the Kubernetes cluster.
-		If this error persists, you may need to run the uninstall command before attempting to run
-		the install command again.`,
+If this error persists, you may need to run the "abctl local uninstall" command before attempting to run the
+"abctl local install" command again.
+Your data will persist between the uninstall and install commands.`,
 	}
 
 	// ErrIngress is returned in the event that ingress configuration failed.
@@ -82,7 +94,7 @@ By default, abctl will allow access from any hostname or IP, so you might not ne
 	}
 
 	ErrBootloaderFailed = &LocalError{
-		msg: "bootloader failed",
+		msg:  "bootloader failed",
 		help: "The bootloader failed to its initialization checks or migrations. Try running again with --verbose to see the full bootloader logs.",
 	}
 )
