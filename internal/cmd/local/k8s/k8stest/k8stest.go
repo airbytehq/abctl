@@ -30,6 +30,7 @@ type MockClient struct {
 	FnPersistentVolumeClaimExists func(ctx context.Context, namespace, name, volumeName string) bool
 	FnPersistentVolumeClaimDelete func(ctx context.Context, namespace, name, volumeName string) error
 	FnSecretCreateOrUpdate        func(ctx context.Context, secret corev1.Secret) error
+	FnSecretDeleteCollection      func(ctx context.Context, namespace, _type string) error
 	FnSecretGet                   func(ctx context.Context, namespace, name string) (*corev1.Secret, error)
 	FnServerVersionGet            func() (string, error)
 	FnServiceGet                  func(ctx context.Context, namespace, name string) (*corev1.Service, error)
@@ -144,6 +145,14 @@ func (m *MockClient) SecretGet(ctx context.Context, namespace, name string) (*co
 	}
 
 	return nil, nil
+}
+
+func (m *MockClient) SecretDeleteCollection(ctx context.Context, namespace, _type string) error {
+	if m.FnSecretDeleteCollection != nil {
+		return m.FnSecretDeleteCollection(ctx, namespace, _type)
+	}
+
+	return nil
 }
 
 func (m *MockClient) ServiceGet(ctx context.Context, namespace, name string) (*corev1.Service, error) {

@@ -648,29 +648,44 @@ func (c *Command) handleChart(
 		}
 	}
 
-	pterm.Info.Println(fmt.Sprintf(
-		"Starting Helm Chart installation of '%s' (version: %s)",
-		req.chartName, helmChart.Metadata.Version,
-	))
-	c.spinner.UpdateText(fmt.Sprintf(
-		"Installing '%s' (version: %s) Helm Chart (this may take several minutes)",
-		req.chartName, helmChart.Metadata.Version,
-	))
-	helmRelease, err := c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
-		ReleaseName:     req.chartRelease,
-		ChartName:       req.chartLoc,
-		CreateNamespace: true,
-		Namespace:       req.namespace,
-		Wait:            true,
-		Timeout:         60 * time.Minute,
-		ValuesYaml:      req.valuesYAML,
-		Version:         req.chartVersion,
-	},
-		&helmclient.GenericHelmOptions{},
-	)
-	if err != nil {
-		pterm.Error.Printfln("Failed to install %s Helm Chart", req.chartName)
-		return fmt.Errorf("unable to install helm: %w", err)
+	var helmRelease *release.Release
+
+	// it's possible that an existing helm installation is stuck in a non-final state
+	// which this code will detect, attempt to clean up, and try again up to three times
+	for attemptCount := 0; attemptCount < 3; attemptCount++ {
+		pterm.Info.Println(fmt.Sprintf(
+			"Starting Helm Chart installation of '%s' (version: %s)",
+			req.chartName, helmChart.Metadata.Version,
+		))
+		c.spinner.UpdateText(fmt.Sprintf(
+			"Installing '%s' (version: %s) Helm Chart (this may take several minutes)",
+			req.chartName, helmChart.Metadata.Version,
+		))
+
+		helmRelease, err = c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
+			ReleaseName:     req.chartRelease,
+			ChartName:       req.chartLoc,
+			CreateNamespace: true,
+			Namespace:       req.namespace,
+			Wait:            true,
+			Timeout:         60 * time.Minute,
+			ValuesYaml:      req.valuesYAML,
+			Version:         req.chartVersion,
+		},
+			&helmclient.GenericHelmOptions{},
+		)
+
+		if err != nil {
+			if strings.Contains(err.Error(), "another operation (install/upgrade/rollback) is in progress") {
+				if err := c.k8s.SecretDeleteCollection(ctx, common.AirbyteNamespace, "helm.sh/release.v1"); err != nil {
+					pterm.Debug.Println(fmt.Sprintf("unable to delete secrets helm.sh/release.v1: %s", err))
+				}
+				continue
+			}
+			pterm.Error.Printfln("Failed to install %s Helm Chart", req.chartName)
+			return fmt.Errorf("unable to install helm: %w", err)
+		}
+		break
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
