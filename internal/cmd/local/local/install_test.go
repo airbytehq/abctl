@@ -11,6 +11,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/k8stest"
+	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
@@ -25,7 +26,7 @@ import (
 const portTest = 9999
 const testAirbyteChartLoc = "https://airbytehq.github.io/helm-charts/airbyte-1.2.3.tgz"
 
-func TestCommand_Install(t *testing.T) {
+func TestCommand_Install_HappyPath(t *testing.T) {
 	valuesYaml := mustReadFile(t, "testdata/test-edition.values.yaml")
 	expChartRepoCnt := 0
 	expChartRepo := []struct {
@@ -172,7 +173,136 @@ func TestCommand_Install(t *testing.T) {
 	}
 }
 
-func TestCommand_InstallBadHelmState(t *testing.T) {
+func TestCommand_Install_BadHelmState(t *testing.T) {
+	valuesYaml := mustReadFile(t, "testdata/test-edition.values.yaml")
+
+	expChartCnt := 0
+	expNginxValues, _ := helm.BuildNginxValues(9999)
+	expChart := []struct {
+		chart   helmclient.ChartSpec
+		release release.Release
+	}{
+		{
+			chart: helmclient.ChartSpec{
+				ReleaseName:     common.AirbyteChartRelease,
+				ChartName:       testAirbyteChartLoc,
+				Namespace:       common.AirbyteNamespace,
+				CreateNamespace: true,
+				Wait:            true,
+				Timeout:         60 * time.Minute,
+				ValuesYaml:      valuesYaml,
+			},
+			release: release.Release{
+				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "1.2.3.4"}},
+				Name:      common.AirbyteChartRelease,
+				Namespace: common.AirbyteNamespace,
+				Version:   0,
+			},
+		},
+		{
+			chart: helmclient.ChartSpec{
+				ReleaseName:     common.NginxChartRelease,
+				ChartName:       common.NginxChartName,
+				Namespace:       common.NginxNamespace,
+				CreateNamespace: true,
+				Wait:            true,
+				Timeout:         60 * time.Minute,
+				ValuesYaml:      expNginxValues,
+			},
+			release: release.Release{
+				Chart:     &chart.Chart{Metadata: &chart.Metadata{Version: "4.3.2.1"}},
+				Name:      common.NginxChartRelease,
+				Namespace: common.NginxNamespace,
+				Version:   0,
+			},
+		},
+	}
+
+	installCalled := 0
+	helm := mockHelmClient{
+		addOrUpdateChartRepo: func(entry repo.Entry) error {
+			return nil
+		},
+
+		getChart: func(name string, _ *action.ChartPathOptions) (*chart.Chart, string, error) {
+			switch {
+			case name == testAirbyteChartLoc:
+				return &chart.Chart{Metadata: &chart.Metadata{Version: "test.airbyte.version"}}, "", nil
+			case name == common.NginxChartName:
+				return &chart.Chart{Metadata: &chart.Metadata{Version: "test.nginx.version"}}, "", nil
+			default:
+				t.Error("unsupported chart name", name)
+				return nil, "", errors.New("unexpected chart name")
+			}
+		},
+
+		getRelease: func(name string) (*release.Release, error) {
+			switch {
+			case name == common.AirbyteChartRelease:
+				t.Error("should not have been called", name)
+				return nil, errors.New("should not have been called")
+			case name == common.NginxChartRelease:
+				return nil, errors.New("not found")
+			default:
+				t.Error("unsupported chart name", name)
+				return nil, errors.New("unexpected chart name")
+			}
+		},
+
+		installOrUpgradeChart: func(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error) {
+			if installCalled > 0 {
+				defer func() { expChartCnt++ }()
+
+				return &expChart[expChartCnt].release, nil
+			}
+
+			installCalled++
+			return nil, errHelmStuck
+		},
+
+		uninstallReleaseByName: func(s string) error {
+			return nil
+		},
+	}
+
+	k8sClient := k8stest.MockClient{
+		FnIngressExists: func(ctx context.Context, namespace string, ingress string) bool {
+			return false
+		},
+	}
+
+	tel := telemetry.MockClient{}
+
+	httpClient := mockHTTP{do: func(req *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200}, nil
+	}}
+
+	c, err := New(
+		k8s.TestProvider,
+		WithPortHTTP(portTest),
+		WithHelmClient(&helm),
+		WithK8sClient(&k8sClient),
+		WithTelemetryClient(&tel),
+		WithHTTPClient(&httpClient),
+		WithBrowserLauncher(func(url string) error {
+			return nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	installOpts := &InstallOpts{
+		HelmValuesYaml:  valuesYaml,
+		AirbyteChartLoc: testAirbyteChartLoc,
+	}
+	if err := c.Install(context.Background(), installOpts); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// verify functionality if the bad (stuck) helm state persists between attempts
+func TestCommand_Install_BadHelmStatePersists(t *testing.T) {
 	valuesYaml := mustReadFile(t, "testdata/test-edition.values.yaml")
 	expChartRepoCnt := 0
 	expChartRepo := []struct {
@@ -225,7 +355,7 @@ func TestCommand_InstallBadHelmState(t *testing.T) {
 		},
 	}
 
-	installCalled := false
+	installCalled := 0
 	helm := mockHelmClient{
 		addOrUpdateChartRepo: func(entry repo.Entry) error {
 			if d := cmp.Diff(expChartRepo[expChartRepoCnt].name, entry.Name); d != "" {
@@ -270,14 +400,8 @@ func TestCommand_InstallBadHelmState(t *testing.T) {
 				t.Error("chart mismatch", d)
 			}
 
-			if installCalled {
-				defer func() { expChartCnt++ }()
-
-				return &expChart[expChartCnt].release, nil
-			}
-
-			installCalled = true
-			return nil, errors.New("another operation (install/upgrade/rollback) is in progress")
+			installCalled++
+			return nil, errHelmStuck
 		},
 
 		uninstallReleaseByName: func(s string) error {
@@ -320,8 +444,14 @@ func TestCommand_InstallBadHelmState(t *testing.T) {
 		HelmValuesYaml:  valuesYaml,
 		AirbyteChartLoc: testAirbyteChartLoc,
 	}
-	if err := c.Install(context.Background(), installOpts); err != nil {
-		t.Fatal(err)
+	if err := c.Install(context.Background(), installOpts); err == nil {
+		t.Fatal("expected error")
+	} else if !errors.Is(err, localerr.ErrHelmStuck) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if d := cmp.Diff(3, installCalled); d != "" {
+		t.Error("install attempts", d)
 	}
 }
 

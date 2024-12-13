@@ -589,6 +589,13 @@ type chartRequest struct {
 	uninstallFirst bool
 }
 
+// errHelmStuck is the error returned (only from a msg perspective, not this actual error) from the underlying helm
+// client when the most recent install/upgrade attempt was terminated early (e.g. via ctrl+c) and was
+// unable to (or not configured to) rollback to a prior version.
+//
+// The actual error returned by the underlying helm-client isn't exported.
+var errHelmStuck = errors.New("another operation (install/upgrade/rollback) is in progress")
+
 // handleChart will handle the installation of a chart
 func (c *Command) handleChart(
 	ctx context.Context,
@@ -648,10 +655,14 @@ func (c *Command) handleChart(
 		}
 	}
 
+	// This will be non-nil if the following for-loop is able to successfully install/upgrade the chart
+	// AND that for-loop doesn't return early with an error.
 	var helmRelease *release.Release
 
 	// it's possible that an existing helm installation is stuck in a non-final state
-	// which this code will detect, attempt to clean up, and try again up to three times
+	// which this code will detect, attempt to clean up, and try again up to three times.
+	// Only the helmStuckError (based on error-message equivalence) will be retried, all other errors
+	// will be returned.
 	for attemptCount := 0; attemptCount < 3; attemptCount++ {
 		pterm.Info.Println(fmt.Sprintf(
 			"Starting Helm Chart installation of '%s' (version: %s)",
@@ -676,7 +687,9 @@ func (c *Command) handleChart(
 		)
 
 		if err != nil {
-			if strings.Contains(err.Error(), "another operation (install/upgrade/rollback) is in progress") {
+			// If the error is the errHelmStuck error, attempt to resolve this by removing the helm release secret.
+			// See: https://github.com/helm/helm/issues/8987#issuecomment-1082992461
+			if strings.Contains(err.Error(), errHelmStuck.Error()) {
 				if err := c.k8s.SecretDeleteCollection(ctx, common.AirbyteNamespace, "helm.sh/release.v1"); err != nil {
 					pterm.Debug.Println(fmt.Sprintf("unable to delete secrets helm.sh/release.v1: %s", err))
 				}
@@ -686,6 +699,13 @@ func (c *Command) handleChart(
 			return fmt.Errorf("unable to install helm: %w", err)
 		}
 		break
+	}
+
+	// If helmRelease is nil, that means we were unable to successfully install/upgrade the chart.
+	// This is an error situation.  As only one specific error message should cause this (all other errors
+	// should have returned out of the for-loop), we can treat this as if the underlying helm-client
+	if helmRelease == nil {
+		return localerr.ErrHelmStuck
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))

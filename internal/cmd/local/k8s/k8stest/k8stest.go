@@ -189,7 +189,7 @@ func (m *MockClient) StreamPodLogs(ctx context.Context, namespace string, podNam
 
 func (m *MockClient) PodList(ctx context.Context, namespace string) (*corev1.PodList, error) {
 	if m.FnPodList == nil {
-		return nil, nil
+		return &corev1.PodList{}, nil
 	}
 	return m.FnPodList(ctx, namespace)
 }
