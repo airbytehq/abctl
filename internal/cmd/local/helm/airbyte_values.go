@@ -25,6 +25,7 @@ func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 		"global.auth.enabled=true",
 		"global.jobs.resources.limits.cpu=3",
 		"global.jobs.resources.limits.memory=4Gi",
+		"airbyte-bootloader.env_vars.PLATFORM_LOG_FORMAT=json",
 	}
 
 	span.SetAttributes(
