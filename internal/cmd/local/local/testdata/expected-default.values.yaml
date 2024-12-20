@@ -1,3 +1,6 @@
+airbyte-bootloader:
+    env_vars:
+        PLATFORM_LOG_FORMAT: json
 global:
     auth:
         enabled: "true"

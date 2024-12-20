@@ -2,18 +2,9 @@ package local
 
 import (
 	"bufio"
+	"encoding/json"
 	"io"
-	"regexp"
-	"strings"
 )
-
-// 2024-09-10 20:16:24 WARN i.m.s.r.u.Loggers$Slf4JLogger(warn):299 - [273....
-var logRx = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \x1b\[(?:1;)?\d+m(?P<level>[A-Z]+)\x1b\[m (?P<msg>\S+ - .*)`)
-
-type logLine struct {
-	msg   string
-	level string
-}
 
 type logScanner struct {
 	scanner *bufio.Scanner
@@ -23,10 +14,6 @@ type logScanner struct {
 func newLogScanner(r io.Reader) *logScanner {
 	return &logScanner{
 		scanner: bufio.NewScanner(r),
-		line: logLine{
-			msg:   "",
-			level: "DEBUG",
-		},
 	}
 }
 
@@ -36,26 +23,86 @@ func (j *logScanner) Scan() bool {
 			return false
 		}
 
-		// skip java stacktrace noise
-		if strings.HasPrefix(j.scanner.Text(), "\tat ") || strings.HasPrefix(j.scanner.Text(), "\t... ") {
-			continue
-		}
-
-		m := logRx.FindSubmatch(j.scanner.Bytes())
-
-		if m != nil {
-			j.line.msg = string(m[2])
-			j.line.level = string(m[1])
+		var data logLine
+		err := json.Unmarshal(j.scanner.Bytes(), &data)
+		// not all lines are JSON. don't propogate errors, just include the full line.
+		if err != nil {
+			j.line = logLine{Message: j.scanner.Text()}
 		} else {
-			// Some logs aren't from java (e.g. temporal) or they have a different format,
-			// or the log covers multiple lines (e.g. java stack trace). In that case, use the full line
-			// and reuse the level of the previous line.
-			j.line.msg = j.scanner.Text()
+			j.line = data
 		}
+
 		return true
 	}
 }
 
 func (j *logScanner) Err() error {
 	return j.scanner.Err()
+}
+
+/*
+	{
+	  "timestamp": 1734712334950,
+	  "message": "Unable to bootstrap Airbyte environment.",
+	  "level": "ERROR",
+	  "logSource": "platform",
+	  "caller": {
+	    "className": "io.airbyte.bootloader.Application",
+	    "methodName": "main",
+	    "lineNumber": 28,
+	    "threadName": "main"
+	  },
+	  "throwable": {
+	    "cause": {
+	      "cause": null,
+	      "stackTrace": [
+	        {
+	          "cn": "io.airbyte.bootloader.Application",
+	          "ln": 25,
+	          "mn": "main"
+	        }
+	      ],
+	      "message": "Unable to connect to the database.",
+	      "suppressed": [],
+	      "localizedMessage": "Unable to connect to the database."
+	    },
+	    "stackTrace": [
+	      {
+	        "cn": "io.airbyte.bootloader.Application",
+	        "ln": 25,
+	        "mn": "main"
+	      }
+	    ],
+	    "message": "Database availability check failed.",
+	    "suppressed": [],
+	    "localizedMessage": "Database availability check failed."
+	  }
+	}
+*/
+type logLine struct {
+	Timestamp int64         `json:"timestamp"`
+	Message   string        `json:"message"`
+	Level     string        `json:"level"`
+	LogSource string        `json:"logSource"`
+	Caller    *logCaller    `json:"caller"`
+	Throwable *logThrowable `json:throwable`
+}
+
+type logCaller struct {
+	ClassName  string `json:"className"`
+	MethodName string `json:"methodName"`
+	LineNumber int    `json:"lineNumber"`
+	ThreadName string `json:"threadName"`
+}
+
+type logStackElement struct {
+	ClassName  string `json:"cn"`
+	LineNumber int    `json:"ln"`
+	MethodName string `json:"mn"`
+}
+
+type logThrowable struct {
+	Cause      *logThrowable     `json:"cause"`
+	Stacktrace []logStackElement `json:"stackTrace"`
+	Message    string            `json:"message"`
 }
