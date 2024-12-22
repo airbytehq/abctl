@@ -15,6 +15,7 @@ type ValuesOpts struct {
 	InsecureCookies bool
 	TelemetryUser   string
 	ImagePullSecret string
+	DisableAuth     bool
 }
 
 func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
@@ -22,7 +23,6 @@ func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 
 	vals := []string{
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + opts.TelemetryUser,
-		"global.auth.enabled=true",
 		"global.jobs.resources.limits.cpu=3",
 		"global.jobs.resources.limits.memory=4Gi",
 	}
@@ -32,6 +32,10 @@ func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 		attribute.Bool("insecure-cookies", opts.InsecureCookies),
 		attribute.Bool("image-pull-secret", opts.ImagePullSecret != ""),
 	)
+
+	if !opts.DisableAuth {
+		vals = append(vals, "global.auth.enabled=true")
+	}
 
 	if opts.LowResourceMode {
 		vals = append(vals,
