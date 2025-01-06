@@ -442,10 +442,10 @@ func (c *Command) streamPodLogs(ctx context.Context, namespace, podName, prefix 
 
 	s := newLogScanner(r)
 	for s.Scan() {
-		if s.line.level == "ERROR" {
-			pterm.Error.Printfln("%s: %s", prefix, s.line.msg)
+		if s.line.Level == "ERROR" {
+			pterm.Error.Printfln("%s: %s", prefix, s.line.Message)
 		} else {
-			pterm.Debug.Printfln("%s: %s", prefix, s.line.msg)
+			pterm.Debug.Printfln("%s: %s", prefix, s.line.Message)
 		}
 	}
 
