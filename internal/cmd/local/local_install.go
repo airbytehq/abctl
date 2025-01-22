@@ -18,6 +18,7 @@ import (
 type InstallCmd struct {
 	Chart           string   `help:"Path to chart." xor:"chartver"`
 	ChartVersion    string   `help:"Version to install." xor:"chartver"`
+	DisableAuth     bool     `help:"Disable auth."`
 	DockerEmail     string   `group:"docker" help:"Docker email." env:"ABCTL_LOCAL_INSTALL_DOCKER_EMAIL"`
 	DockerPassword  string   `group:"docker" help:"Docker password." env:"ABCTL_LOCAL_INSTALL_DOCKER_PASSWORD"`
 	DockerServer    string   `group:"docker" default:"https://index.docker.io/v1/" help:"Docker server." env:"ABCTL_LOCAL_INSTALL_DOCKER_SERVER"`
@@ -68,6 +69,7 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		ValuesFile:      i.Values,
 		InsecureCookies: i.InsecureCookies,
 		LowResourceMode: i.LowResourceMode,
+		DisableAuth:     i.DisableAuth,
 	}
 
 	if opts.DockerAuth() {
@@ -166,9 +168,9 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			return fmt.Errorf("unable to initialize local command: %w", err)
 		}
 
-		spinner.UpdateText("Pulling images")		
+		spinner.UpdateText("Pulling images")
 		lc.PrepImages(ctx, cluster, opts)
-		
+
 		if err := lc.Install(ctx, opts); err != nil {
 			spinner.Fail("Unable to install Airbyte locally")
 			return err
