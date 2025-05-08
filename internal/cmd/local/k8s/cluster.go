@@ -12,6 +12,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
+	"go.opentelemetry.io/otel/attribute"
 	"gopkg.in/yaml.v3"
 	"sigs.k8s.io/kind/pkg/cluster"
 	kindExec "sigs.k8s.io/kind/pkg/exec"
@@ -116,6 +117,11 @@ func (k *kindCluster) Exists(ctx context.Context) bool {
 // This is a best-effort optimization, which is why it doesn't return an error.
 // It's possible that only some images will be loaded.
 func (k *kindCluster) LoadImages(ctx context.Context, dockerClient docker.Client, images []string) {
+	ctx, span := trace.NewSpan(ctx, "kindCluster.LoadImages")
+	defer span.End()
+
+	span.SetAttributes(attribute.Int("total_images", len(images)))
+
 	// Get a list of Kind nodes.
 	nodes, err := k.p.ListNodes(k.clusterName)
 	if err != nil {
