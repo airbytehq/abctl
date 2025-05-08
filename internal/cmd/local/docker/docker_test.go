@@ -57,7 +57,7 @@ func TestNewWithOptions(t *testing.T) {
 			f := func(opts ...client.Opt) (pinger, error) {
 				// as go doesn't have a way to compare to functions, count the number of functions we have
 				// and compare those instead
-				if d := cmp.Diff(3, len(opts)); d != "" {
+				if d := cmp.Diff(4, len(opts)); d != "" {
 					t.Error("unexpected client option count options", d)
 				}
 

@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pterm/pterm"
+	"go.opentelemetry.io/otel/sdk/trace"
 )
 
 // Version contains al the version information that is being tracked.
@@ -117,20 +118,26 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 	// docker context, or if we've missed any common installation configs here.
 	switch goos {
 	case "darwin":
-		potentialHosts = append(potentialHosts, 
+		potentialHosts = append(potentialHosts,
 			"unix:///var/run/docker.sock",
 			fmt.Sprintf("unix://%s/.docker/run/docker.sock", paths.UserHome),
 		)
 	case "windows":
 		potentialHosts = append(potentialHosts, "npipe:////./pipe/docker_engine")
 	default:
-		potentialHosts = append(potentialHosts, 
+		potentialHosts = append(potentialHosts,
 			"unix:///var/run/docker.sock",
 			fmt.Sprintf("unix://%s/.docker/desktop/docker-cli.sock", paths.UserHome),
 		)
 	}
 
-	dockerOpts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation()}
+	// Do not sample Docker traces. Dockers Net/HTTP client has Otel instrumentation enabled.
+	// URL's and other fields may contain PII, or sensitive information.
+	noopTraceProvider := trace.NewTracerProvider(
+		trace.WithSampler(trace.NeverSample()),
+	)
+
+	dockerOpts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation(), client.WithTraceProvider(noopTraceProvider)}
 
 	for _, host := range potentialHosts {
 		dockerCli, err := createAndPing(ctx, newPing, host, dockerOpts)
@@ -140,7 +147,7 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 			return &Docker{Client: dockerCli}, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("%w: unable to create docker client", localerr.ErrDocker)
 }
 
