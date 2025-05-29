@@ -79,6 +79,14 @@ func TestFromSlice(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "boolean values",
+			input: []string{"a=true", "b=false"},
+			want: map[string]any{
+				"a": true,
+				"b": false,
+			},
+		},
 	}
 
 	for _, tt := range tests {

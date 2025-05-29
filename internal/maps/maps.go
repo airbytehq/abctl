@@ -3,6 +3,7 @@ package maps
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -31,6 +32,17 @@ func FromSlice(slice []string) map[string]any {
 		for i, k := range keys {
 			// last key, put the value into the map
 			if i == len(keys)-1 {
+				// handle boolean values (convert "true"/"false" strings to Go bool types)
+				// this is necessary for Helm chart dependency conditions
+				// which require actual boolean values
+				if value == "true" || value == "false" {
+					boolValue, err := strconv.ParseBool(value)
+					if err == nil {
+						p[k] = boolValue
+						continue
+					}
+				}
+
 				p[k] = value
 				continue
 			}
