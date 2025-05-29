@@ -156,6 +156,9 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 // PrepImages determines the docker images needed by the chart, pulls them, and loads them into the cluster.
 // This is best effort, so errors are dropped here.
 func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *InstallOpts) {
+	ctx, span := trace.NewSpan(ctx, "command.PrepImages")
+	defer span.End()
+
 	manifest, err := images.FindImagesFromChart(opts.HelmValuesYaml, opts.AirbyteChartLoc, opts.HelmChartVersion)
 	if err != nil {
 		pterm.Debug.Printfln("error building image manifest: %s", err)
