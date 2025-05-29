@@ -44,6 +44,8 @@ func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 			"global.jobs.resources.requests.cpu=0",
 			"global.jobs.resources.requests.memory=0",
 
+			"connector-builder-server.enabled=false",
+
 			"workload-launcher.env_vars.CHECK_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
 			"workload-launcher.env_vars.CHECK_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
 			"workload-launcher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
