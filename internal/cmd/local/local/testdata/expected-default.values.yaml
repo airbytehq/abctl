@@ -11,3 +11,5 @@ global:
             limits:
                 cpu: "3"
                 memory: 4Gi
+    storage:
+        type: local
