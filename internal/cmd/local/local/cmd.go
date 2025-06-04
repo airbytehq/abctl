@@ -3,6 +3,8 @@ package local
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/docker"
@@ -191,4 +193,21 @@ func DefaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	}
 
 	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil
+}
+
+// SupportMinio checks if a MinIO persistent volume directory exists on the
+// local filesystem. It returns true if the MinIO data directory exists.
+// Otherwise it returns false.
+func SupportMinio() (bool, error) {
+	minioPath := filepath.Join(paths.Data, pvMinio)
+	f, err := os.Stat(minioPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+
+		return false, fmt.Errorf("failed to determine if minio physical volume dir exists: %w", err)
+	}
+
+	return f.IsDir(), nil
 }
