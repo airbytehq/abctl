@@ -51,12 +51,22 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		}
 	}
 
+	supportMinio, err := local.SupportMinio()
+	if err != nil {
+		return nil, err
+	}
+
+	if supportMinio {
+		pterm.Warning.Println("Found MinIO physical volume. Consider migrating it to local storage (see project docs)")
+	}
+
 	opts := &local.InstallOpts{
 		HelmChartVersion:  i.ChartVersion,
 		AirbyteChartLoc:   helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
 		Secrets:           i.Secret,
 		Migrate:           i.Migrate,
 		Hosts:             i.Host,
+		LocalStorage:      !supportMinio,
 		ExtraVolumeMounts: extraVolumeMounts,
 		DockerServer:      i.DockerServer,
 		DockerUser:        i.DockerUsername,
@@ -70,6 +80,7 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		InsecureCookies: i.InsecureCookies,
 		LowResourceMode: i.LowResourceMode,
 		DisableAuth:     i.DisableAuth,
+		LocalStorage:    !supportMinio,
 	}
 
 	if opts.DockerAuth() {
