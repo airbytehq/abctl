@@ -16,6 +16,7 @@ type ValuesOpts struct {
 	TelemetryUser   string
 	ImagePullSecret string
 	DisableAuth     bool
+	LocalStorage    bool
 }
 
 func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
@@ -28,10 +29,15 @@ func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 		"airbyte-bootloader.env_vars.PLATFORM_LOG_FORMAT=json",
 	}
 
+	if opts.LocalStorage {
+		vals = append(vals, "global.storage.type=local")
+	}
+
 	span.SetAttributes(
 		attribute.Bool("low-resource-mode", opts.LowResourceMode),
 		attribute.Bool("insecure-cookies", opts.InsecureCookies),
 		attribute.Bool("image-pull-secret", opts.ImagePullSecret != ""),
+		attribute.Bool("local-storage", opts.LocalStorage),
 	)
 
 	if !opts.DisableAuth {

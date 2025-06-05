@@ -157,6 +157,7 @@ func TestInstallOpts(t *testing.T) {
 	expect := &local.InstallOpts{
 		HelmValuesYaml:  string(b),
 		AirbyteChartLoc: "/test/path/to/chart",
+		LocalStorage:    true,
 	}
 	opts, err := cmd.InstallOpts(context.Background(), "test-user")
 	if err != nil {

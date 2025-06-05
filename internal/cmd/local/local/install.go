@@ -38,10 +38,12 @@ import (
 const (
 	// persistent volume constants, these are named to match the values given in the helm chart
 	pvMinio = "airbyte-minio-pv"
+	pvLocal = "airbyte-local-pv"
 	pvPsql  = "airbyte-volume-db"
 
 	// persistent volume claim constants, these are named to match the values given in the helm chart
 	pvcMinio = "airbyte-minio-pv-claim-airbyte-minio-0"
+	pvcLocal = "airbyte-storage-pvc"
 	pvcPsql  = "airbyte-volume-db-airbyte-db-0"
 )
 
@@ -53,6 +55,7 @@ type InstallOpts struct {
 	Migrate           bool
 	Hosts             []string
 	ExtraVolumeMounts []k8s.ExtraVolumeMount
+	LocalStorage      bool
 
 	DockerServer string
 	DockerUser   string
@@ -189,9 +192,16 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 		pterm.Info.Printfln("Namespace '%s' already exists", common.AirbyteNamespace)
 	}
 
-	if err := c.persistentVolume(ctx, common.AirbyteNamespace, pvMinio); err != nil {
-		return err
+	if opts.LocalStorage {
+		if err := c.persistentVolume(ctx, common.AirbyteNamespace, pvLocal); err != nil {
+			return err
+		}
+	} else {
+		if err := c.persistentVolume(ctx, common.AirbyteNamespace, pvMinio); err != nil {
+			return err
+		}
 	}
+
 	if err := c.persistentVolume(ctx, common.AirbyteNamespace, pvPsql); err != nil {
 		return err
 	}
@@ -205,9 +215,16 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 		}
 	}
 
-	if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcMinio, pvMinio); err != nil {
-		return err
+	if opts.LocalStorage {
+		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcLocal, pvLocal); err != nil {
+			return err
+		}
+	} else {
+		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcMinio, pvMinio); err != nil {
+			return err
+		}
 	}
+
 	if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcPsql, pvPsql); err != nil {
 		return err
 	}
