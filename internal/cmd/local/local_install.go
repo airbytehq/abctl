@@ -26,7 +26,6 @@ type InstallCmd struct {
 	Host            []string `help:"HTTP ingress host."`
 	InsecureCookies bool     `help:"Allow cookies to be served over HTTP."`
 	LowResourceMode bool     `help:"Run Airbyte in low resource mode."`
-	Migrate         bool     `help:"Migrate data from a previous Docker Compose Airbyte installation."`
 	NoBrowser       bool     `help:"Disable launching a browser post install."`
 	Port            int      `default:"8000" help:"HTTP ingress port."`
 	Secret          []string `type:"existingfile" help:"An Airbyte helm chart secret file."`
@@ -64,7 +63,6 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		HelmChartVersion:  i.ChartVersion,
 		AirbyteChartLoc:   helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
 		Secrets:           i.Secret,
-		Migrate:           i.Migrate,
 		Hosts:             i.Host,
 		LocalStorage:      !supportMinio,
 		ExtraVolumeMounts: extraVolumeMounts,
