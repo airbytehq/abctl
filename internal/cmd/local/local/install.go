@@ -34,11 +34,6 @@ import (
 )
 
 const (
-	// persistent volume constants, these are named to match the values given in the helm chart
-	pvMinio = "airbyte-minio-pv"
-	pvLocal = "airbyte-local-pv"
-	pvPsql  = "airbyte-volume-db"
-
 	// persistent volume claim constants, these are named to match the values given in the helm chart
 	pvcMinio = "airbyte-minio-pv-claim-airbyte-minio-0"
 	pvcLocal = "airbyte-storage-pvc"
@@ -191,29 +186,29 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 
 	// Storage volumes.
 	if opts.LocalStorage {
-		if err := c.persistentVolume(ctx, common.AirbyteNamespace, pvLocal); err != nil {
+		if err := c.persistentVolume(ctx, common.AirbyteNamespace, paths.PvLocal); err != nil {
 			return err
 		}
 
-		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcLocal, pvLocal); err != nil {
+		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcLocal, paths.PvLocal); err != nil {
 			return err
 		}
 	} else {
-		if err := c.persistentVolume(ctx, common.AirbyteNamespace, pvMinio); err != nil {
+		if err := c.persistentVolume(ctx, common.AirbyteNamespace, paths.PvMinio); err != nil {
 			return err
 		}
 
-		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcMinio, pvMinio); err != nil {
+		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcMinio, paths.PvMinio); err != nil {
 			return err
 		}
 	}
 
 	// PSQL volumes.
-	if err := c.persistentVolume(ctx, common.AirbyteNamespace, pvPsql); err != nil {
+	if err := c.persistentVolume(ctx, common.AirbyteNamespace, paths.PvPsql); err != nil {
 		return err
 	}
 
-	if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcPsql, pvPsql); err != nil {
+	if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcPsql, paths.PvPsql); err != nil {
 		return err
 	}
 

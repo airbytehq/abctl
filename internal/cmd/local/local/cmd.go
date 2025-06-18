@@ -199,7 +199,7 @@ func DefaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 // local filesystem. It returns true if the MinIO data directory exists.
 // Otherwise it returns false.
 func SupportMinio() (bool, error) {
-	minioPath := filepath.Join(paths.Data, pvMinio)
+	minioPath := filepath.Join(paths.Data, paths.PvMinio)
 	f, err := os.Stat(minioPath)
 	if err != nil {
 		if os.IsNotExist(err) {

@@ -7,6 +7,13 @@ import (
 
 const (
 	FileKubeconfig = "abctl.kubeconfig"
+
+	// PvMinio is the persistent volume directory for Minio storage.
+	PvMinio = "airbyte-minio-pv"
+	// PvLocal is the persistent volume directory for Local storage.
+	PvLocal = "airbyte-local-pv"
+	// PvPsql is the persistent volume directory for Psql storage.
+	PvPsql = "airbyte-volume-db"
 )
 
 var (
