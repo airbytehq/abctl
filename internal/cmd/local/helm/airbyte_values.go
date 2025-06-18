@@ -17,6 +17,7 @@ type ValuesOpts struct {
 	ImagePullSecret string
 	DisableAuth     bool
 	LocalStorage    bool
+	PatchPsql17     bool
 }
 
 func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
@@ -31,6 +32,10 @@ func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 
 	if opts.LocalStorage {
 		vals = append(vals, "global.storage.type=local")
+	}
+
+	if opts.PatchPsql17 {
+		vals = append(vals, "postgresql.image.tag=1.7.0-17")
 	}
 
 	span.SetAttributes(
