@@ -18,6 +18,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/common"
+	"github.com/airbytehq/abctl/internal/merge"
 	"github.com/airbytehq/abctl/internal/trace"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
@@ -48,6 +49,7 @@ type InstallOpts struct {
 	Hosts             []string
 	ExtraVolumeMounts []k8s.ExtraVolumeMount
 	LocalStorage      bool
+	PatchPsql17       bool
 
 	DockerServer string
 	DockerUser   string
@@ -150,15 +152,22 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 
 // PrepImages determines the docker images needed by the chart, pulls them, and loads them into the cluster.
 // This is best effort, so errors are dropped here.
-func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *InstallOpts) {
+func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *InstallOpts, patchImages ...string) {
 	ctx, span := trace.NewSpan(ctx, "command.PrepImages")
 	defer span.End()
+
+	for _, image := range patchImages {
+		pterm.Info.Printfln("Patching image %s", image)
+	}
 
 	manifest, err := images.FindImagesFromChart(opts.HelmValuesYaml, opts.AirbyteChartLoc, opts.HelmChartVersion)
 	if err != nil {
 		pterm.Debug.Printfln("error building image manifest: %s", err)
 		return
 	}
+
+	// Patch the manifest.
+	manifest = merge.DockerImages(manifest, patchImages)
 
 	cluster.LoadImages(ctx, c.docker.Client, manifest)
 }
