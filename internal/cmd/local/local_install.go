@@ -59,12 +59,22 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		pterm.Warning.Println("Found MinIO physical volume. Consider migrating it to local storage (see project docs)")
 	}
 
+	patchPsql17, err := local.PatchPsql17()
+	if err != nil {
+		return nil, err
+	}
+
+	if !patchPsql17 {
+		pterm.Warning.Println("Psql 13 detected. Consider upgrading to 17")
+	}
+
 	opts := &local.InstallOpts{
 		HelmChartVersion:  i.ChartVersion,
 		AirbyteChartLoc:   helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
 		Secrets:           i.Secret,
 		Hosts:             i.Host,
 		LocalStorage:      !supportMinio,
+		PatchPsql17:       patchPsql17,
 		ExtraVolumeMounts: extraVolumeMounts,
 		DockerServer:      i.DockerServer,
 		DockerUser:        i.DockerUsername,
@@ -79,6 +89,7 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		LowResourceMode: i.LowResourceMode,
 		DisableAuth:     i.DisableAuth,
 		LocalStorage:    !supportMinio,
+		PatchPsql17:     patchPsql17,
 	}
 
 	if opts.DockerAuth() {
@@ -113,9 +124,16 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
 
+	// Patch images override Helm chart images.
+	patchImages := []string{}
+
 	opts, err := i.InstallOpts(ctx, telClient.User())
 	if err != nil {
 		return err
+	}
+
+	if opts.PatchPsql17 {
+		patchImages = append(patchImages, "airbyte/db:1.7.0-17")
 	}
 
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
@@ -178,7 +196,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		}
 
 		spinner.UpdateText("Pulling images")
-		lc.PrepImages(ctx, cluster, opts)
+		lc.PrepImages(ctx, cluster, opts, patchImages...)
 
 		if err := lc.Install(ctx, opts); err != nil {
 			spinner.Fail("Unable to install Airbyte locally")
