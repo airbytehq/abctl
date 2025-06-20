@@ -216,10 +216,10 @@ func SupportMinio() (bool, error) {
 	return f.IsDir(), nil
 }
 
-// PatchPsql17 checks if PostgreSQL data needs patching by examining the
+// EnablePsql17 checks if PostgreSQL data needs patching by examining the
 // local PostgreSQL data directory. It returns true if the directory doesn't
 // exist or contains PostgreSQL version 17. Otherwise it returns false.
-func PatchPsql17() (bool, error) {
+func EnablePsql17() (bool, error) {
 	pgData := pgdata.New(&pgdata.Config{
 		Path: path.Join(paths.Data, paths.PvPsql, "pgdata"),
 	})

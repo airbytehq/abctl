@@ -158,7 +158,7 @@ func TestInstallOpts(t *testing.T) {
 		HelmValuesYaml:  string(b),
 		AirbyteChartLoc: "/test/path/to/chart",
 		LocalStorage:    true,
-		PatchPsql17:     true,
+		EnablePsql17:    true,
 	}
 	opts, err := cmd.InstallOpts(context.Background(), "test-user")
 	if err != nil {

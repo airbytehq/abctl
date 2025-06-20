@@ -49,7 +49,7 @@ type InstallOpts struct {
 	Hosts             []string
 	ExtraVolumeMounts []k8s.ExtraVolumeMount
 	LocalStorage      bool
-	PatchPsql17       bool
+	EnablePsql17      bool
 
 	DockerServer string
 	DockerUser   string
@@ -152,11 +152,11 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 
 // PrepImages determines the docker images needed by the chart, pulls them, and loads them into the cluster.
 // This is best effort, so errors are dropped here.
-func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *InstallOpts, patchImages ...string) {
+func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *InstallOpts, withImages ...string) {
 	ctx, span := trace.NewSpan(ctx, "command.PrepImages")
 	defer span.End()
 
-	for _, image := range patchImages {
+	for _, image := range withImages {
 		pterm.Info.Printfln("Patching image %s", image)
 	}
 
@@ -166,8 +166,8 @@ func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *Ins
 		return
 	}
 
-	// Patch the manifest.
-	manifest = merge.DockerImages(manifest, patchImages)
+	// Merge images with the manifest.
+	manifest = merge.DockerImages(manifest, withImages)
 
 	cluster.LoadImages(ctx, c.docker.Client, manifest)
 }

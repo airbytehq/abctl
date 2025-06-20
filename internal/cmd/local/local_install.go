@@ -59,12 +59,12 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		pterm.Warning.Println("Found MinIO physical volume. Consider migrating it to local storage (see project docs)")
 	}
 
-	patchPsql17, err := local.PatchPsql17()
+	enablePsql17, err := local.EnablePsql17()
 	if err != nil {
 		return nil, err
 	}
 
-	if !patchPsql17 {
+	if !enablePsql17 {
 		pterm.Warning.Println("Psql 13 detected. Consider upgrading to 17")
 	}
 
@@ -74,7 +74,7 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		Secrets:           i.Secret,
 		Hosts:             i.Host,
 		LocalStorage:      !supportMinio,
-		PatchPsql17:       patchPsql17,
+		EnablePsql17:      enablePsql17,
 		ExtraVolumeMounts: extraVolumeMounts,
 		DockerServer:      i.DockerServer,
 		DockerUser:        i.DockerUsername,
@@ -89,7 +89,7 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		LowResourceMode: i.LowResourceMode,
 		DisableAuth:     i.DisableAuth,
 		LocalStorage:    !supportMinio,
-		PatchPsql17:     patchPsql17,
+		EnablePsql17:    enablePsql17,
 	}
 
 	if opts.DockerAuth() {
@@ -124,16 +124,16 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
 
-	// Patch images override Helm chart images.
-	patchImages := []string{}
+	// Overrides Helm chart images.
+	overrideImages := []string{}
 
 	opts, err := i.InstallOpts(ctx, telClient.User())
 	if err != nil {
 		return err
 	}
 
-	if opts.PatchPsql17 {
-		patchImages = append(patchImages, "airbyte/db:"+helm.Psql17AirbyteTag)
+	if opts.EnablePsql17 {
+		overrideImages = append(overrideImages, "airbyte/db:"+helm.Psql17AirbyteTag)
 	}
 
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
@@ -196,7 +196,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		}
 
 		spinner.UpdateText("Pulling images")
-		lc.PrepImages(ctx, cluster, opts, patchImages...)
+		lc.PrepImages(ctx, cluster, opts, overrideImages...)
 
 		if err := lc.Install(ctx, opts); err != nil {
 			spinner.Fail("Unable to install Airbyte locally")
