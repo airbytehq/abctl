@@ -133,7 +133,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 	}
 
 	if opts.PatchPsql17 {
-		patchImages = append(patchImages, "airbyte/db:1.7.0-17")
+		patchImages = append(patchImages, "airbyte/db:"+helm.Psql17AirbyteTag)
 	}
 
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
