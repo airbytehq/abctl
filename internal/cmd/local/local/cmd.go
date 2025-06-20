@@ -1,9 +1,12 @@
 package local
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -12,6 +15,7 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/common"
+	"github.com/airbytehq/abctl/internal/pgdata"
 	"k8s.io/client-go/rest"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
@@ -199,7 +203,7 @@ func DefaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 // local filesystem. It returns true if the MinIO data directory exists.
 // Otherwise it returns false.
 func SupportMinio() (bool, error) {
-	minioPath := filepath.Join(paths.Data, pvMinio)
+	minioPath := filepath.Join(paths.Data, paths.PvMinio)
 	f, err := os.Stat(minioPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -210,4 +214,24 @@ func SupportMinio() (bool, error) {
 	}
 
 	return f.IsDir(), nil
+}
+
+// EnablePsql17 checks if PostgreSQL data needs patching by examining the
+// local PostgreSQL data directory. It returns true if the directory doesn't
+// exist or contains PostgreSQL version 17. Otherwise it returns false.
+func EnablePsql17() (bool, error) {
+	pgData := pgdata.New(&pgdata.Config{
+		Path: path.Join(paths.Data, paths.PvPsql, "pgdata"),
+	})
+
+	pgVersion, err := pgData.Version()
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return false, fmt.Errorf("failed to determine if any previous psql version exists: %w", err)
+	}
+
+	if pgVersion == "" || pgVersion == "17" {
+		return true, nil
+	}
+
+	return false, nil
 }

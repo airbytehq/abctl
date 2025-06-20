@@ -26,7 +26,6 @@ type InstallCmd struct {
 	Host            []string `help:"HTTP ingress host."`
 	InsecureCookies bool     `help:"Allow cookies to be served over HTTP."`
 	LowResourceMode bool     `help:"Run Airbyte in low resource mode."`
-	Migrate         bool     `help:"Migrate data from a previous Docker Compose Airbyte installation."`
 	NoBrowser       bool     `help:"Disable launching a browser post install."`
 	Port            int      `default:"8000" help:"HTTP ingress port."`
 	Secret          []string `type:"existingfile" help:"An Airbyte helm chart secret file."`
@@ -60,13 +59,22 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		pterm.Warning.Println("Found MinIO physical volume. Consider migrating it to local storage (see project docs)")
 	}
 
+	enablePsql17, err := local.EnablePsql17()
+	if err != nil {
+		return nil, err
+	}
+
+	if !enablePsql17 {
+		pterm.Warning.Println("Psql 13 detected. Consider upgrading to 17")
+	}
+
 	opts := &local.InstallOpts{
 		HelmChartVersion:  i.ChartVersion,
 		AirbyteChartLoc:   helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
 		Secrets:           i.Secret,
-		Migrate:           i.Migrate,
 		Hosts:             i.Host,
 		LocalStorage:      !supportMinio,
+		EnablePsql17:      enablePsql17,
 		ExtraVolumeMounts: extraVolumeMounts,
 		DockerServer:      i.DockerServer,
 		DockerUser:        i.DockerUsername,
@@ -81,6 +89,7 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		LowResourceMode: i.LowResourceMode,
 		DisableAuth:     i.DisableAuth,
 		LocalStorage:    !supportMinio,
+		EnablePsql17:    enablePsql17,
 	}
 
 	if opts.DockerAuth() {
@@ -115,9 +124,16 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
 
+	// Overrides Helm chart images.
+	overrideImages := []string{}
+
 	opts, err := i.InstallOpts(ctx, telClient.User())
 	if err != nil {
 		return err
+	}
+
+	if opts.EnablePsql17 {
+		overrideImages = append(overrideImages, "airbyte/db:"+helm.Psql17AirbyteTag)
 	}
 
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
@@ -180,7 +196,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		}
 
 		spinner.UpdateText("Pulling images")
-		lc.PrepImages(ctx, cluster, opts)
+		lc.PrepImages(ctx, cluster, opts, overrideImages...)
 
 		if err := lc.Install(ctx, opts); err != nil {
 			spinner.Fail("Unable to install Airbyte locally")

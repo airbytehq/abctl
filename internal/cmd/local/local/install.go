@@ -16,10 +16,9 @@ import (
 	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
-	"github.com/airbytehq/abctl/internal/cmd/local/migrate"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/common"
-	"github.com/airbytehq/abctl/internal/telemetry"
+	"github.com/airbytehq/abctl/internal/merge"
 	"github.com/airbytehq/abctl/internal/trace"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
@@ -36,11 +35,6 @@ import (
 )
 
 const (
-	// persistent volume constants, these are named to match the values given in the helm chart
-	pvMinio = "airbyte-minio-pv"
-	pvLocal = "airbyte-local-pv"
-	pvPsql  = "airbyte-volume-db"
-
 	// persistent volume claim constants, these are named to match the values given in the helm chart
 	pvcMinio = "airbyte-minio-pv-claim-airbyte-minio-0"
 	pvcLocal = "airbyte-storage-pvc"
@@ -52,10 +46,10 @@ type InstallOpts struct {
 	HelmValuesYaml    string
 	AirbyteChartLoc   string
 	Secrets           []string
-	Migrate           bool
 	Hosts             []string
 	ExtraVolumeMounts []k8s.ExtraVolumeMount
 	LocalStorage      bool
+	EnablePsql17      bool
 
 	DockerServer string
 	DockerUser   string
@@ -158,15 +152,22 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 
 // PrepImages determines the docker images needed by the chart, pulls them, and loads them into the cluster.
 // This is best effort, so errors are dropped here.
-func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *InstallOpts) {
+func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *InstallOpts, withImages ...string) {
 	ctx, span := trace.NewSpan(ctx, "command.PrepImages")
 	defer span.End()
+
+	for _, image := range withImages {
+		pterm.Info.Printfln("Patching image %s", image)
+	}
 
 	manifest, err := images.FindImagesFromChart(opts.HelmValuesYaml, opts.AirbyteChartLoc, opts.HelmChartVersion)
 	if err != nil {
 		pterm.Debug.Printfln("error building image manifest: %s", err)
 		return
 	}
+
+	// Merge images with the manifest.
+	manifest = merge.DockerImages(manifest, withImages)
 
 	cluster.LoadImages(ctx, c.docker.Client, manifest)
 }
@@ -192,40 +193,31 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 		pterm.Info.Printfln("Namespace '%s' already exists", common.AirbyteNamespace)
 	}
 
+	// Storage volumes.
 	if opts.LocalStorage {
-		if err := c.persistentVolume(ctx, common.AirbyteNamespace, pvLocal); err != nil {
+		if err := c.persistentVolume(ctx, common.AirbyteNamespace, paths.PvLocal); err != nil {
+			return err
+		}
+
+		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcLocal, paths.PvLocal); err != nil {
 			return err
 		}
 	} else {
-		if err := c.persistentVolume(ctx, common.AirbyteNamespace, pvMinio); err != nil {
+		if err := c.persistentVolume(ctx, common.AirbyteNamespace, paths.PvMinio); err != nil {
+			return err
+		}
+
+		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcMinio, paths.PvMinio); err != nil {
 			return err
 		}
 	}
 
-	if err := c.persistentVolume(ctx, common.AirbyteNamespace, pvPsql); err != nil {
+	// PSQL volumes.
+	if err := c.persistentVolume(ctx, common.AirbyteNamespace, paths.PvPsql); err != nil {
 		return err
 	}
 
-	span.SetAttributes(attribute.Bool("migrate", opts.Migrate))
-	if opts.Migrate {
-		c.spinner.UpdateText("Migrating airbyte data")
-		if err := c.tel.Wrap(ctx, telemetry.Migrate, func() error { return migrate.FromDockerVolume(ctx, c.docker.Client, "airbyte_db") }); err != nil {
-			pterm.Error.Println("Failed to migrate data from previous Airbyte installation")
-			return fmt.Errorf("unable to migrate data from previous airbyte installation: %w", err)
-		}
-	}
-
-	if opts.LocalStorage {
-		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcLocal, pvLocal); err != nil {
-			return err
-		}
-	} else {
-		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcMinio, pvMinio); err != nil {
-			return err
-		}
-	}
-
-	if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcPsql, pvPsql); err != nil {
+	if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcPsql, paths.PvPsql); err != nil {
 		return err
 	}
 

@@ -17,7 +17,12 @@ type ValuesOpts struct {
 	ImagePullSecret string
 	DisableAuth     bool
 	LocalStorage    bool
+	EnablePsql17    bool
 }
+
+const (
+	Psql17AirbyteTag = "1.7.0-17"
+)
 
 func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 	span := trace.SpanFromContext(ctx)
@@ -31,6 +36,10 @@ func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 
 	if opts.LocalStorage {
 		vals = append(vals, "global.storage.type=local")
+	}
+
+	if opts.EnablePsql17 {
+		vals = append(vals, "postgresql.image.tag="+Psql17AirbyteTag)
 	}
 
 	span.SetAttributes(

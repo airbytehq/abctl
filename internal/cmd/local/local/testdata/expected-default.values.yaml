@@ -13,3 +13,6 @@ global:
                 memory: 4Gi
     storage:
         type: local
+postgresql:
+    image:
+        tag: 1.7.0-17
