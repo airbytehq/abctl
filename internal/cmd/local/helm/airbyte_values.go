@@ -20,6 +20,10 @@ type ValuesOpts struct {
 	PatchPsql17     bool
 }
 
+const (
+	Psql17AirbyteTag = "1.7.0-17"
+)
+
 func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 	span := trace.SpanFromContext(ctx)
 
@@ -35,7 +39,7 @@ func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 	}
 
 	if opts.PatchPsql17 {
-		vals = append(vals, "postgresql.image.tag=1.7.0-17")
+		vals = append(vals, "postgresql.image.tag="+Psql17AirbyteTag)
 	}
 
 	span.SetAttributes(
