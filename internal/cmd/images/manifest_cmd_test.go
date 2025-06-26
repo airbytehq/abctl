@@ -6,49 +6,40 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	helmlib "github.com/mittwald/go-helm-client"
-
-	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 )
-
-func getHelmTestClient(t *testing.T) helm.Client {
-	client, err := helmlib.New(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return client
-}
 
 func TestManifestCmd(t *testing.T) {
 	cmd := ManifestCmd{
-		ChartVersion: "1.1.0",
+		ChartVersion: "2.0.5",
 	}
 	actual, err := cmd.findAirbyteImages(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	expect := []string{
-		"airbyte/bootloader:1.1.0",
-		"airbyte/connector-builder-server:1.1.0",
-		"airbyte/cron:1.1.0",
-		"airbyte/db:1.1.0",
-		"airbyte/mc",
-		"airbyte/server:1.1.0",
-		"airbyte/webapp:1.1.0",
-		"airbyte/worker:1.1.0",
-		"airbyte/workload-api-server:1.1.0",
-		"airbyte/workload-launcher:1.1.0",
-		"bitnami/kubectl:1.28.9",
-		"busybox",
+		"airbyte/async-profiler:1.7.0",
+		"airbyte/bootloader:1.7.0",
+		"airbyte/connector-builder-server:1.7.0",
+		"airbyte/connector-sidecar:1.7.0",
+		"airbyte/container-orchestrator:1.7.0",
+		"airbyte/cron:1.7.0",
+		"airbyte/db:1.7.0",
+		"airbyte/server:1.7.0",
+		"airbyte/utils:1.7.0",
+		"airbyte/webapp:1.7.0",
+		"airbyte/worker:1.7.0",
+		"airbyte/workload-api-server:1.7.0",
+		"airbyte/workload-init-container:1.7.0",
+		"airbyte/workload-launcher:1.7.0",
 		"minio/minio:RELEASE.2023-11-20T22-40-07Z",
-		"temporalio/auto-setup:1.23.0",
+		"temporalio/auto-setup:1.27.2",
 	}
 	compareList(t, expect, actual)
 }
 
 func TestManifestCmd_Enterprise(t *testing.T) {
 	cmd := ManifestCmd{
-		ChartVersion: "1.1.0",
+		ChartVersion: "2.0.5",
 		Values:       "testdata/enterprise.values.yaml",
 	}
 	actual, err := cmd.findAirbyteImages(context.Background())
@@ -56,61 +47,22 @@ func TestManifestCmd_Enterprise(t *testing.T) {
 		t.Fatal(err)
 	}
 	expect := []string{
-		"airbyte/bootloader:1.1.0",
-		"airbyte/connector-builder-server:1.1.0",
-		"airbyte/cron:1.1.0",
-		"airbyte/db:1.1.0",
-		"airbyte/keycloak-setup:1.1.0",
-		"airbyte/keycloak:1.1.0",
-		"airbyte/mc",
-		"airbyte/server:1.1.0",
-		"airbyte/webapp:1.1.0",
-		"airbyte/worker:1.1.0",
-		"airbyte/workload-api-server:1.1.0",
-		"airbyte/workload-launcher:1.1.0",
-		"bitnami/kubectl:1.28.9",
-		"busybox",
-		"curlimages/curl:8.1.1",
+		"airbyte/async-profiler:1.7.0",
+		"airbyte/bootloader:1.7.0",
+		"airbyte/connector-builder-server:1.7.0",
+		"airbyte/connector-sidecar:1.7.0",
+		"airbyte/container-orchestrator:1.7.0",
+		"airbyte/cron:1.7.0",
+		"airbyte/db:1.7.0",
+		"airbyte/server:1.7.0",
+		"airbyte/utils:1.7.0",
+		"airbyte/webapp:1.7.0",
+		"airbyte/worker:1.7.0",
+		"airbyte/workload-api-server:1.7.0",
+		"airbyte/workload-init-container:1.7.0",
+		"airbyte/workload-launcher:1.7.0",
 		"minio/minio:RELEASE.2023-11-20T22-40-07Z",
-		"postgres:13-alpine",
-		"temporalio/auto-setup:1.23.0",
-	}
-	compareList(t, expect, actual)
-}
-
-func TestManifestCmd_Nightly(t *testing.T) {
-	cmd := ManifestCmd{
-		// This version includes chart fixes that expose images more consistently and completely.
-		ChartVersion: "1.1.0-nightly-1728428783-9025e1a46e",
-		Values:       "testdata/enterprise.values.yaml",
-	}
-	actual, err := cmd.findAirbyteImages(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	expect := []string{
-		"airbyte/bootloader:nightly-1728428783-9025e1a46e",
-		"airbyte/connector-builder-server:nightly-1728428783-9025e1a46e",
-		"airbyte/connector-sidecar:nightly-1728428783-9025e1a46e",
-		"airbyte/container-orchestrator:nightly-1728428783-9025e1a46e",
-		"airbyte/cron:nightly-1728428783-9025e1a46e",
-		"airbyte/db:nightly-1728428783-9025e1a46e",
-		"airbyte/keycloak-setup:nightly-1728428783-9025e1a46e",
-		"airbyte/keycloak:nightly-1728428783-9025e1a46e",
-		"airbyte/mc:latest",
-		"airbyte/server:nightly-1728428783-9025e1a46e",
-		"airbyte/webapp:nightly-1728428783-9025e1a46e",
-		"airbyte/worker:nightly-1728428783-9025e1a46e",
-		"airbyte/workload-api-server:nightly-1728428783-9025e1a46e",
-		"airbyte/workload-init-container:nightly-1728428783-9025e1a46e",
-		"airbyte/workload-launcher:nightly-1728428783-9025e1a46e",
-		"bitnami/kubectl:1.28.9",
-		"busybox:1.35",
-		"busybox:latest",
-		"curlimages/curl:8.1.1",
-		"minio/minio:RELEASE.2023-11-20T22-40-07Z",
-		"postgres:13-alpine",
-		"temporalio/auto-setup:1.23.0",
+		"temporalio/auto-setup:1.27.2",
 	}
 	compareList(t, expect, actual)
 }

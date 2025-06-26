@@ -13,6 +13,7 @@ Airbyte's command line tool for local Airbyte deployments.
 
 - [Quickstart](#quickstart)
 - [Overview](#overview)
+- [Compatibility](#compatibility)
 - [Commands](#commands)
 - [Contributing](#contributing) 
 
@@ -65,12 +66,32 @@ Airbyte's command line tool for local Airbyte deployments.
 
 ![arch.png](imgs/arch.png)
 
-As mentioned in the [quickstart](#quickstart), the only prerequisite `abctl` has is that [Docker](https://www.docker.com/) 
-must be installed, running, and accessible. However, the Airbyte platform requires a [Kubernetes](https://kubernetes.io/) 
-cluster, which `abctl` creates by utilizing [kind](https://kind.sigs.k8s.io/) (kind runs a Kubernetes cluster within a 
-Docker container). With kind's Kubernetes cluster, `abctl` uses [helm](https://helm.sh/) to install (or update to) the 
-latest (by default) Airbyte helm chart and the latest [NGINX Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/) 
+As mentioned in the [quickstart](#quickstart), the only prerequisite `abctl` has is that [Docker](https://www.docker.com/)
+must be installed, running, and accessible. However, the Airbyte platform requires a [Kubernetes](https://kubernetes.io/)
+cluster, which `abctl` creates by utilizing [kind](https://kind.sigs.k8s.io/) (kind runs a Kubernetes cluster within a
+Docker container). With kind's Kubernetes cluster, `abctl` uses [helm](https://helm.sh/) to install (or update to) the
+latest (by default) Airbyte helm chart and the latest [NGINX Ingress Controller](https://docs.nginx.com/nginx-ingress-controller/)
 helm chart.
+
+# Compatibility
+
+> [!IMPORTANT]
+> Always use the latest version of `abctl` for the most up-to-date features and bug fixes.
+> Only use older versions if you need to maintain compatibility with specific Airbyte versions.
+
+| Airbyte Version Range | Recommended Abctl Version | Support Status | Notes |
+|----------------------|---------------------------|----------------|-------|
+| `1.7.x` and newer   | `v0.28.0` and newer      | ✅ **Active**  | Latest features, Helm Chart v2, PostgreSQL 17 & local storage support |
+| `1.6.x` and older   | `v0.27.0`                | ⚠️ **Legacy**   | Helm Chart v1, PostgreSQL 17 & local storage support*, consider upgrading |
+
+## Version Compatibility Details
+
+- **Airbyte 1.7.x+**: Requires `abctl v0.28.0+` for Helm Chart v2 compatibility and latest features
+- **Airbyte 1.6.x and below**: Use `abctl v0.27.0` - uses Helm Chart v1, newer abctl versions may not be compatible due to chart structure changes
+- **PostgreSQL 17 Support**: Available in both v0.27.0 and v0.28.0+ when no existing PostgreSQL data exists or when upgrading from PostgreSQL 17 installations
+- **Local Storage Support**: Available in both v0.27.0 and v0.28.0+ when no existing MinIO data is present (new installations default to local storage)
+- **Helm Chart versions**: Airbyte 1.7.x introduced Helm Chart v2 with significant structural changes, while 1.6.x and earlier use Helm Chart v1
+- **Chart selection**: `abctl` automatically selects the latest compatible Helm chart version unless `--chart-version` is explicitly specified
 
 # Commands
 

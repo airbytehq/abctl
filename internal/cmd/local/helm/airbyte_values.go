@@ -28,10 +28,14 @@ func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 	span := trace.SpanFromContext(ctx)
 
 	vals := []string{
+		// TODO (bernielomax): The following environment variable can be
+		// removed after webapp has been completely migrated to the server.
+		"server.env_vars.WEBAPP_URL= http://airbyte-abctl-airbyte-server-svc:80",
+
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + opts.TelemetryUser,
 		"global.jobs.resources.limits.cpu=3",
 		"global.jobs.resources.limits.memory=4Gi",
-		"airbyte-bootloader.env_vars.PLATFORM_LOG_FORMAT=json",
+		"airbyteBootloader.env_vars.PLATFORM_LOG_FORMAT=json",
 	}
 
 	if opts.LocalStorage {
@@ -59,16 +63,16 @@ func BuildAirbyteValues(ctx context.Context, opts ValuesOpts) (string, error) {
 			"global.jobs.resources.requests.cpu=0",
 			"global.jobs.resources.requests.memory=0",
 
-			"connector-builder-server.enabled=false",
+			"connectorBuilderServer.enabled=false",
 
-			"workload-launcher.env_vars.CHECK_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
-			"workload-launcher.env_vars.CHECK_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
-			"workload-launcher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
-			"workload-launcher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
-			"workload-launcher.env_vars.SPEC_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
-			"workload-launcher.env_vars.SPEC_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
-			"workload-launcher.env_vars.SIDECAR_MAIN_CONTAINER_CPU_REQUEST=0",
-			"workload-launcher.env_vars.SIDECAR_MAIN_CONTAINER_MEMORY_REQUEST=0",
+			"workloadLauncher.env_vars.CHECK_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
+			"workloadLauncher.env_vars.CHECK_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
+			"workloadLauncher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
+			"workloadLauncher.env_vars.DISCOVER_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
+			"workloadLauncher.env_vars.SPEC_JOB_MAIN_CONTAINER_CPU_REQUEST=0",
+			"workloadLauncher.env_vars.SPEC_JOB_MAIN_CONTAINER_MEMORY_REQUEST=0",
+			"workloadLauncher.env_vars.SIDECAR_MAIN_CONTAINER_CPU_REQUEST=0",
+			"workloadLauncher.env_vars.SIDECAR_MAIN_CONTAINER_MEMORY_REQUEST=0",
 		)
 	}
 

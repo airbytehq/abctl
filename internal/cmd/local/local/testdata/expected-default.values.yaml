@@ -1,4 +1,4 @@
-airbyte-bootloader:
+airbyteBootloader:
     env_vars:
         PLATFORM_LOG_FORMAT: json
 global:
@@ -16,3 +16,6 @@ global:
 postgresql:
     image:
         tag: 1.7.0-17
+server:
+    env_vars:
+        WEBAPP_URL: ' http://airbyte-abctl-airbyte-server-svc:80'
