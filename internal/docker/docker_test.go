@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/docker/dockertest"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/docker/dockertest"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/google/go-cmp/cmp"

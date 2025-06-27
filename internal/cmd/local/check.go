@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/docker"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"

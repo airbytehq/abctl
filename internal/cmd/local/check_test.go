@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/docker"
-	"github.com/airbytehq/abctl/internal/cmd/local/docker/dockertest"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/docker"
+	"github.com/airbytehq/abctl/internal/docker/dockertest"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
