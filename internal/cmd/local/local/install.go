@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/airbytehq/abctl/internal/abctl"
+	"github.com/airbytehq/abctl/internal/airbyte"
 	"github.com/airbytehq/abctl/internal/cmd/images"
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/docker"
@@ -452,12 +453,12 @@ func (c *Command) streamPodLogs(ctx context.Context, namespace, podName, prefix 
 	}
 	defer r.Close()
 
-	s := newLogScanner(r)
+	s := airbyte.NewLogScanner(r)
 	for s.Scan() {
-		if s.line.Level == "ERROR" {
-			pterm.Error.Printfln("%s: %s", prefix, s.line.Message)
+		if s.Line.Level == "ERROR" {
+			pterm.Error.Printfln("%s: %s", prefix, s.Line.Message)
 		} else {
-			pterm.Debug.Printfln("%s: %s", prefix, s.line.Message)
+			pterm.Debug.Printfln("%s: %s", prefix, s.Line.Message)
 		}
 	}
 

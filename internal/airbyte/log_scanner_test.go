@@ -1,4 +1,4 @@
-package local
+package airbyte
 
 import (
 	"strings"
@@ -11,16 +11,16 @@ nonjsonline
 `)
 
 func TestJavaLogScanner(t *testing.T) {
-	s := newLogScanner(strings.NewReader(testLogs))
+	s := NewLogScanner(strings.NewReader(testLogs))
 
 	expectLogLine := func(level, msg string) {
 		s.Scan()
 
-		if s.line.Level != level {
-			t.Errorf("expected level %q but got %q", level, s.line.Level)
+		if s.Line.Level != level {
+			t.Errorf("expected level %q but got %q", level, s.Line.Level)
 		}
-		if s.line.Message != msg {
-			t.Errorf("expected msg %q but got %q", msg, s.line.Message)
+		if s.Line.Message != msg {
+			t.Errorf("expected msg %q but got %q", msg, s.Line.Message)
 		}
 		if s.Err() != nil {
 			t.Errorf("unexpected error %v", s.Err())
