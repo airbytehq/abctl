@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/airbytehq/abctl/internal/abctl"
-	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/k8s"
+	"github.com/airbytehq/abctl/internal/service"
 	"github.com/alecthomas/kong"
 
 	"github.com/airbytehq/abctl/internal/paths"
@@ -154,7 +154,7 @@ func TestInstallOpts(t *testing.T) {
 		// Don't let the code dynamically resolve the latest chart version.
 		Chart: "/test/path/to/chart",
 	}
-	expect := &local.InstallOpts{
+	expect := &service.InstallOpts{
 		HelmValuesYaml:  string(b),
 		AirbyteChartLoc: "/test/path/to/chart",
 		LocalStorage:    true,

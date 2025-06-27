@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/k8s"
+	"github.com/airbytehq/abctl/internal/service"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
@@ -49,12 +49,12 @@ func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient
 
 		pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
 
-		lc, err := local.New(provider, local.WithTelemetryClient(telClient), local.WithSpinner(spinner))
+		lc, err := service.New(provider, service.WithTelemetryClient(telClient), service.WithSpinner(spinner))
 		if err != nil {
 			pterm.Warning.Printfln("Failed to initialize 'local' command\nUninstallation attempt will continue")
 			pterm.Debug.Printfln("Initialization of 'local' failed with %s", err.Error())
 		} else {
-			if err := lc.Uninstall(ctx, local.UninstallOpts{Persisted: u.Persisted}); err != nil {
+			if err := lc.Uninstall(ctx, service.UninstallOpts{Persisted: u.Persisted}); err != nil {
 				pterm.Warning.Printfln("unable to complete uninstall: %s", err.Error())
 				pterm.Warning.Println("will still attempt to uninstall the cluster")
 			}

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/k8s"
+	"github.com/airbytehq/abctl/internal/service"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
@@ -62,10 +62,10 @@ func status(ctx context.Context, provider k8s.Provider, telClient telemetry.Clie
 		return err
 	}
 
-	lc, err := local.New(provider,
-		local.WithPortHTTP(port),
-		local.WithTelemetryClient(telClient),
-		local.WithSpinner(spinner),
+	lc, err := service.New(provider,
+		service.WithPortHTTP(port),
+		service.WithTelemetryClient(telClient),
+		service.WithSpinner(spinner),
 	)
 	if err != nil {
 		pterm.Error.Printfln("Failed to initialize 'local' command")

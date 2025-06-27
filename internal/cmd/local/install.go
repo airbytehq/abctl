@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/helm"
 	"github.com/airbytehq/abctl/internal/k8s"
+	"github.com/airbytehq/abctl/internal/service"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
@@ -33,7 +33,7 @@ type InstallCmd struct {
 	Volume          []string `help:"Additional volume mounts. Must be in the format <HOST_PATH>:<GUEST_PATH>."`
 }
 
-func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.InstallOpts, error) {
+func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*service.InstallOpts, error) {
 	ctx, span := trace.NewSpan(ctx, "InstallCmd.InstallOpts")
 	defer span.End()
 
@@ -50,7 +50,7 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		}
 	}
 
-	supportMinio, err := local.SupportMinio()
+	supportMinio, err := service.SupportMinio()
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		pterm.Warning.Println("Found MinIO physical volume. Consider migrating it to local storage (see project docs)")
 	}
 
-	enablePsql17, err := local.EnablePsql17()
+	enablePsql17, err := service.EnablePsql17()
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*local.Insta
 		pterm.Warning.Println("Psql 13 detected. Consider upgrading to 17")
 	}
 
-	opts := &local.InstallOpts{
+	opts := &service.InstallOpts{
 		HelmChartVersion:  i.ChartVersion,
 		AirbyteChartLoc:   helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
 		Secrets:           i.Secret,
@@ -184,11 +184,11 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			pterm.Success.Printfln("Cluster '%s' created", provider.ClusterName)
 		}
 
-		lc, err := local.New(provider,
-			local.WithPortHTTP(i.Port),
-			local.WithTelemetryClient(telClient),
-			local.WithSpinner(spinner),
-			local.WithDockerClient(dockerClient),
+		lc, err := service.New(provider,
+			service.WithPortHTTP(i.Port),
+			service.WithTelemetryClient(telClient),
+			service.WithSpinner(spinner),
+			service.WithDockerClient(dockerClient),
 		)
 		if err != nil {
 			pterm.Error.Printfln("Failed to initialize 'local' command")
