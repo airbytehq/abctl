@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/docker/dockertest"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -121,7 +121,7 @@ func TestNewWithOptions_InitErr(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			if d := cmp.Diff(true, errors.Is(err, localerr.ErrDocker)); d != "" {
+			if d := cmp.Diff(true, errors.Is(err, abctl.ErrDocker)); d != "" {
 				t.Error("unexpected error, should be ErrDocker", d)
 			}
 
@@ -174,7 +174,7 @@ func TestNewWithOptions_PingErr(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			if d := cmp.Diff(true, errors.Is(err, localerr.ErrDocker)); d != "" {
+			if d := cmp.Diff(true, errors.Is(err, abctl.ErrDocker)); d != "" {
 				t.Error("unexpected error, should be ErrDocker", d)
 			}
 		})

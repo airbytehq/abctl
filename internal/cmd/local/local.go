@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/pterm/pterm"
@@ -26,7 +26,7 @@ func (c *Cmd) BeforeApply() error {
 	}
 
 	if err := checkAirbyteDir(); err != nil {
-		return fmt.Errorf("%w: %w", localerr.ErrAirbyteDir, err)
+		return fmt.Errorf("%w: %w", abctl.ErrAirbyteDir, err)
 	}
 
 	return nil

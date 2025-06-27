@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/airbytehq/abctl/internal/cmd"
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/airbytehq/abctl/internal/update"
@@ -88,7 +88,7 @@ func handleErr(ctx context.Context, err error) int {
 		_ = kong.DefaultHelpPrinter(kong.HelpOptions{}, errParse.Context)
 	}
 
-	var e *localerr.LocalError
+	var e *abctl.Error
 	if errors.As(err, &e) {
 		pterm.Println()
 		pterm.Info.Println(e.Help())

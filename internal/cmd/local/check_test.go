@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/docker"
 	"github.com/airbytehq/abctl/internal/docker/dockertest"
 	"github.com/airbytehq/abctl/internal/telemetry"
@@ -107,7 +107,7 @@ func TestPortAvailable_Unavailable(t *testing.T) {
 	if err == nil {
 		t.Error("portAvailable should have returned an error")
 	}
-	if !errors.Is(err, localerr.ErrPort) {
+	if !errors.Is(err, abctl.ErrPort) {
 		t.Error("error should be of type ErrPort")
 	}
 }
@@ -276,11 +276,11 @@ func TestValidateHostFlag(t *testing.T) {
 			t.Errorf("expected error %v for host %q but got %v", expect, host, err)
 		}
 	}
-	expectErr("1.2.3.4", localerr.ErrIpAddressForHostFlag)
-	expectErr("1.2.3.4:8000", localerr.ErrInvalidHostFlag)
-	expectErr("1.2.3.4:8000", localerr.ErrInvalidHostFlag)
-	expectErr("ABC-DEF-GHI.abcd.efgh", localerr.ErrInvalidHostFlag)
-	expectErr("http://airbyte.foo-data-platform-sbx.bar.cloud", localerr.ErrInvalidHostFlag)
+	expectErr("1.2.3.4", abctl.ErrIpAddressForHostFlag)
+	expectErr("1.2.3.4:8000", abctl.ErrInvalidHostFlag)
+	expectErr("1.2.3.4:8000", abctl.ErrInvalidHostFlag)
+	expectErr("ABC-DEF-GHI.abcd.efgh", abctl.ErrInvalidHostFlag)
+	expectErr("http://airbyte.foo-data-platform-sbx.bar.cloud", abctl.ErrInvalidHostFlag)
 
 	expectOk := func(host string) {
 		err := validateHostFlag(host)

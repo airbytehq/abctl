@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/docker"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
@@ -35,14 +35,14 @@ func dockerInstalled(ctx context.Context, telClient telemetry.Client) (docker.Ve
 	if dockerClient == nil {
 		if dockerClient, err = docker.New(ctx); err != nil {
 			pterm.Error.Println("Unable to create Docker client")
-			return docker.Version{}, fmt.Errorf("%w: unable to create client: %w", localerr.ErrDocker, err)
+			return docker.Version{}, fmt.Errorf("%w: unable to create client: %w", abctl.ErrDocker, err)
 		}
 	}
 
 	version, err := dockerClient.Version(ctx)
 	if err != nil {
 		pterm.Error.Println("Unable to communicate with the Docker daemon")
-		return docker.Version{}, fmt.Errorf("%w: %w", localerr.ErrDocker, err)
+		return docker.Version{}, fmt.Errorf("%w: %w", abctl.ErrDocker, err)
 	}
 
 	span.SetAttributes(
@@ -94,10 +94,10 @@ func portAvailable(ctx context.Context, port int) error {
 	lc := &net.ListenConfig{}
 	listener, err := lc.Listen(ctx, "tcp", fmt.Sprintf("localhost:%d", port))
 	if isErrorAddressAlreadyInUse(err) {
-		return fmt.Errorf("%w: port %d is already in use", localerr.ErrPort, port)
+		return fmt.Errorf("%w: port %d is already in use", abctl.ErrPort, port)
 	}
 	if err != nil {
-		return fmt.Errorf("%w: unable to determine if port '%d' is available: %w", localerr.ErrPort, port, err)
+		return fmt.Errorf("%w: unable to determine if port '%d' is available: %w", abctl.ErrPort, port, err)
 	}
 	// if we're able to bind to the port (and then release it), it should be available
 	defer func() {
@@ -193,10 +193,10 @@ func (e InvalidPortError) Error() string {
 
 func validateHostFlag(host string) error {
 	if ip := net.ParseIP(host); ip != nil {
-		return localerr.ErrIpAddressForHostFlag
+		return abctl.ErrIpAddressForHostFlag
 	}
 	if !regexp.MustCompile(`^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9](?:[-a-z0-9]*[a-z0-9])?)*$`).MatchString(host) {
-		return localerr.ErrInvalidHostFlag
+		return abctl.ErrInvalidHostFlag
 	}
 	return nil
 }

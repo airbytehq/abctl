@@ -1,4 +1,4 @@
-package localerr
+package abctl
 
 import (
 	"errors"
@@ -9,14 +9,14 @@ import (
 
 func TestLocalError(t *testing.T) {
 	f := func() error {
-		return &LocalError{
+		return &Error{
 			help: "help message",
 			msg:  "error message",
 		}
 	}
 
 	err := f()
-	var e *LocalError
+	var e *Error
 	if !errors.As(err, &e) {
 		t.Fatal("error should be of type LocalError")
 	}

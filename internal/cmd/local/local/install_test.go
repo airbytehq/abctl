@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/helm"
 	"github.com/airbytehq/abctl/internal/k8s"
@@ -446,7 +446,7 @@ func TestCommand_Install_BadHelmStatePersists(t *testing.T) {
 	}
 	if err := c.Install(context.Background(), installOpts); err == nil {
 		t.Fatal("expected error")
-	} else if !errors.Is(err, localerr.ErrHelmStuck) {
+	} else if !errors.Is(err, abctl.ErrHelmStuck) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

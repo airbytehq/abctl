@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/alecthomas/kong"
 
@@ -135,7 +135,7 @@ func TestValues_BadYaml(t *testing.T) {
 func TestInvalidHostFlag_IpAddr(t *testing.T) {
 	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4"}}
 	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
-	if !errors.Is(err, localerr.ErrIpAddressForHostFlag) {
+	if !errors.Is(err, abctl.ErrIpAddressForHostFlag) {
 		t.Errorf("expected ErrIpAddressForHostFlag but got %v", err)
 	}
 }
@@ -143,7 +143,7 @@ func TestInvalidHostFlag_IpAddr(t *testing.T) {
 func TestInvalidHostFlag_IpAddrWithPort(t *testing.T) {
 	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4:8000"}}
 	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
-	if !errors.Is(err, localerr.ErrInvalidHostFlag) {
+	if !errors.Is(err, abctl.ErrInvalidHostFlag) {
 		t.Errorf("expected ErrInvalidHostFlag but got %v", err)
 	}
 }
