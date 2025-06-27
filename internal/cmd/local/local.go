@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/k8s"
+	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/pterm/pterm"
 )
 

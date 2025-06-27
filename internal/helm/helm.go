@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/paths"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/action"

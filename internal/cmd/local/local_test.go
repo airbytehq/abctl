@@ -14,7 +14,7 @@ import (
 	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/alecthomas/kong"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
 )

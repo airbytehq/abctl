@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/docker"
 	"github.com/airbytehq/abctl/internal/helm"
 	"github.com/airbytehq/abctl/internal/k8s/kind"
+	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/airbytehq/abctl/internal/pgdata"
 	"k8s.io/client-go/rest"
 

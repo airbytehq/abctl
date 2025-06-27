@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/docker"
 	"github.com/airbytehq/abctl/internal/k8s/kind"
+	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
 	"go.opentelemetry.io/otel/attribute"

@@ -1,7 +1,7 @@
 package kind
 
 import (
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/paths"
 )
 
 // IngressPort is the default port that Airbyte will deploy to.

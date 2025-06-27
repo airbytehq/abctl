@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/pterm/pterm"
 )
 
