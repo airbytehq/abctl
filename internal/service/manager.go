@@ -34,8 +34,8 @@ type HTTPClient interface {
 // BrowserLauncher primarily for testing purposes.
 type BrowserLauncher func(url string) error
 
-// Command is the local command, responsible for installing, uninstalling, or other local actions.
-type Command struct {
+// Manager for the Abctl service.
+type Manager struct {
 	provider k8s.Provider
 	docker   *docker.Docker
 
@@ -49,134 +49,134 @@ type Command struct {
 	userHome string
 }
 
-// Option for configuring the Command, primarily exists for testing
-type Option func(*Command)
+// Option for configuring the Manager, primarily exists for testing
+type Option func(*Manager)
 
 func WithDockerClient(client *docker.Docker) Option {
-	return func(c *Command) {
-		c.docker = client
+	return func(m *Manager) {
+		m.docker = client
 	}
 }
 
 // WithTelemetryClient define the telemetry client for this command.
 func WithTelemetryClient(client telemetry.Client) Option {
-	return func(c *Command) {
-		c.tel = client
+	return func(m *Manager) {
+		m.tel = client
 	}
 }
 
 // WithHTTPClient define the http client for this command.
 func WithHTTPClient(client HTTPClient) Option {
-	return func(c *Command) {
-		c.http = client
+	return func(m *Manager) {
+		m.http = client
 	}
 }
 
 // WithHelmClient define the helm client for this command.
 func WithHelmClient(client helm.Client) Option {
-	return func(c *Command) {
-		c.helm = client
+	return func(m *Manager) {
+		m.helm = client
 	}
 }
 
 // WithK8sClient define the k8s client for this command.
 func WithK8sClient(client k8s.Client) Option {
-	return func(c *Command) {
-		c.k8s = client
+	return func(m *Manager) {
+		m.k8s = client
 	}
 }
 
 // WithBrowserLauncher define the browser launcher for this command.
 func WithBrowserLauncher(launcher BrowserLauncher) Option {
-	return func(c *Command) {
-		c.launcher = launcher
+	return func(m *Manager) {
+		m.launcher = launcher
 	}
 }
 
 // WithUserHome define the user's home directory.
 func WithUserHome(home string) Option {
-	return func(c *Command) {
-		c.userHome = home
+	return func(m *Manager) {
+		m.userHome = home
 	}
 }
 
 func WithSpinner(spinner *pterm.SpinnerPrinter) Option {
-	return func(c *Command) {
-		c.spinner = spinner
+	return func(m *Manager) {
+		m.spinner = spinner
 	}
 }
 
 func WithPortHTTP(port int) Option {
-	return func(c *Command) {
-		c.portHTTP = port
+	return func(m *Manager) {
+		m.portHTTP = port
 	}
 }
 
-// New creates a new Command
-func New(provider k8s.Provider, opts ...Option) (*Command, error) {
-	c := &Command{provider: provider}
+// New creates a new Manager
+func New(provider k8s.Provider, opts ...Option) (*Manager, error) {
+	m := &Manager{provider: provider}
 	for _, opt := range opts {
-		opt(c)
+		opt(m)
 	}
 
 	// determine userhome if not defined
-	if c.userHome == "" {
-		c.userHome = paths.UserHome
+	if m.userHome == "" {
+		m.userHome = paths.UserHome
 	}
 
 	// set http client, if not defined
-	if c.http == nil {
-		c.http = &http.Client{Timeout: 10 * time.Second}
+	if m.http == nil {
+		m.http = &http.Client{Timeout: 10 * time.Second}
 	}
 
-	if c.portHTTP == 0 {
-		c.portHTTP = kind.IngressPort
+	if m.portHTTP == 0 {
+		m.portHTTP = kind.IngressPort
 	}
 
 	// set k8s client, if not defined
-	if c.k8s == nil {
+	if m.k8s == nil {
 		var err error
-		if c.k8s, err = DefaultK8s(provider.Kubeconfig, provider.Context); err != nil {
+		if m.k8s, err = DefaultK8s(provider.Kubeconfig, provider.Context); err != nil {
 			return nil, err
 		}
 	}
 
 	// set the helm client, if not defined
-	if c.helm == nil {
+	if m.helm == nil {
 		var err error
-		if c.helm, err = helm.New(provider.Kubeconfig, provider.Context, common.AirbyteNamespace); err != nil {
+		if m.helm, err = helm.New(provider.Kubeconfig, provider.Context, common.AirbyteNamespace); err != nil {
 			return nil, err
 		}
 	}
 
 	// set telemetry client, if not defined
-	if c.tel == nil {
-		c.tel = telemetry.NoopClient{}
+	if m.tel == nil {
+		m.tel = telemetry.NoopClient{}
 	}
 
 	// set spinner, if not defined
-	if c.spinner == nil {
-		c.spinner, _ = pterm.DefaultSpinner.Start()
+	if m.spinner == nil {
+		m.spinner, _ = pterm.DefaultSpinner.Start()
 	}
 
 	// set the browser launcher, if not defined
-	if c.launcher == nil {
-		c.launcher = browser.OpenURL
+	if m.launcher == nil {
+		m.launcher = browser.OpenURL
 	}
 
 	// fetch k8s version information
 	{
-		k8sVersion, err := c.k8s.ServerVersionGet()
+		k8sVersion, err := m.k8s.ServerVersionGet()
 		if err != nil {
 			return nil, fmt.Errorf("%w: unable to fetch kubernetes server version: %w", abctl.ErrKubernetes, err)
 		}
-		c.tel.Attr("k8s_version", k8sVersion)
+		m.tel.Attr("k8s_version", k8sVersion)
 	}
 
 	// set provider version
-	c.tel.Attr("provider", provider.Name)
+	m.tel.Attr("provider", provider.Name)
 
-	return c, nil
+	return m, nil
 }
 
 // DefaultK8s returns the default k8s client
