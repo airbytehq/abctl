@@ -27,7 +27,7 @@ const portTest = 9999
 const testAirbyteChartLoc = "https://airbytehq.github.io/helm-charts/airbyte-1.2.3.tgz"
 
 func TestCommand_Install_HappyPath(t *testing.T) {
-	valuesYaml := mustReadFile(t, "testdata/test-edition.values.yaml")
+	valuesYaml := mustReadFile(t, "./testdata/test-edition.values.yaml")
 	expChartRepoCnt := 0
 	expChartRepo := []struct {
 		name string
