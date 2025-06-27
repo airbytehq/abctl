@@ -36,7 +36,7 @@ func run() int {
 
 	shutdowns, err := trace.Init(ctx, telClient.User())
 	if err != nil {
-		pterm.Debug.Printf(fmt.Sprintf("Trace disabled: %s", err))
+		pterm.Debug.Printf("Trace disabled: %s", err)
 	}
 	defer func() {
 		for _, shutdown := range shutdowns {

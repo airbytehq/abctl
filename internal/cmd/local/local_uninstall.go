@@ -62,10 +62,10 @@ func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient
 
 		spinner.UpdateText(fmt.Sprintf("Verifying uninstallation status of cluster '%s'", provider.ClusterName))
 		if err := cluster.Delete(ctx); err != nil {
-			pterm.Error.Printfln(fmt.Sprintf("Uninstallation of cluster '%s' failed", provider.ClusterName))
+			pterm.Error.Printfln("Uninstallation of cluster '%s' failed", provider.ClusterName)
 			return fmt.Errorf("unable to uninstall cluster %s", provider.ClusterName)
 		}
-		pterm.Success.Printfln(fmt.Sprintf("Uninstallation of cluster '%s' completed successfully", provider.ClusterName))
+		pterm.Success.Printfln("Uninstallation of cluster '%s' completed successfully", provider.ClusterName)
 
 		spinner.Success("Airbyte uninstallation complete")
 
