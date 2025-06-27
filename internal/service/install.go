@@ -1,4 +1,4 @@
-package local
+package service
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/airbytehq/abctl/internal/abctl"
+	"github.com/airbytehq/abctl/internal/airbyte"
 	"github.com/airbytehq/abctl/internal/cmd/images"
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/docker"
@@ -66,7 +67,7 @@ func (i *InstallOpts) DockerAuth() bool {
 // persistentVolume creates a persistent volume in the namespace with the name provided.
 // if uid (user id) and gid (group id) are non-zero, the persistent directory on the host machine that holds the
 // persistent volume will be changed to be owned by
-func (c *Command) persistentVolume(ctx context.Context, namespace, name string) error {
+func (m *Manager) persistentVolume(ctx context.Context, namespace, name string) error {
 	ctx, span := trace.NewSpan(ctx, "command.persistentVolume")
 	span.SetAttributes(
 		attribute.String("namespace", namespace),
@@ -74,8 +75,8 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 	)
 	defer span.End()
 
-	if !c.k8s.PersistentVolumeExists(ctx, namespace, name) {
-		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume '%s'", name))
+	if !m.k8s.PersistentVolumeExists(ctx, namespace, name) {
+		m.spinner.UpdateText(fmt.Sprintf("Creating persistent volume '%s'", name))
 
 		// Pre-create the volume directory.
 		//
@@ -97,7 +98,7 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
 
-		if err := c.k8s.PersistentVolumeCreate(ctx, namespace, name); err != nil {
+		if err := m.k8s.PersistentVolumeCreate(ctx, namespace, name); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Unable to create persistent volume '%s'", name))
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
@@ -127,7 +128,7 @@ func (c *Command) persistentVolume(ctx context.Context, namespace, name string) 
 	return nil
 }
 
-func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, volumeName string) error {
+func (m *Manager) persistentVolumeClaim(ctx context.Context, namespace, name, volumeName string) error {
 	ctx, span := trace.NewSpan(ctx, "command.persistentVolumeClaim")
 	span.SetAttributes(
 		attribute.String("namespace", namespace),
@@ -136,9 +137,9 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 	)
 	defer span.End()
 
-	if !c.k8s.PersistentVolumeClaimExists(ctx, namespace, name, volumeName) {
-		c.spinner.UpdateText(fmt.Sprintf("Creating persistent volume claim '%s'", name))
-		if err := c.k8s.PersistentVolumeClaimCreate(ctx, namespace, name, volumeName); err != nil {
+	if !m.k8s.PersistentVolumeClaimExists(ctx, namespace, name, volumeName) {
+		m.spinner.UpdateText(fmt.Sprintf("Creating persistent volume claim '%s'", name))
+		if err := m.k8s.PersistentVolumeClaimCreate(ctx, namespace, name, volumeName); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Unable to create persistent volume claim '%s'", name))
 			return fmt.Errorf("unable to create persistent volume claim '%s': %w", name, err)
 		}
@@ -152,7 +153,7 @@ func (c *Command) persistentVolumeClaim(ctx context.Context, namespace, name, vo
 
 // PrepImages determines the docker images needed by the chart, pulls them, and loads them into the cluster.
 // This is best effort, so errors are dropped here.
-func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *InstallOpts, withImages ...string) {
+func (m *Manager) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *InstallOpts, withImages ...string) {
 	ctx, span := trace.NewSpan(ctx, "command.PrepImages")
 	defer span.End()
 
@@ -169,22 +170,22 @@ func (c *Command) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *Ins
 	// Merge images with the manifest.
 	manifest = merge.DockerImages(manifest, withImages)
 
-	cluster.LoadImages(ctx, c.docker.Client, manifest)
+	cluster.LoadImages(ctx, m.docker.Client, manifest)
 }
 
 // Install handles the installation of Airbyte
-func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
+func (m *Manager) Install(ctx context.Context, opts *InstallOpts) error {
 	ctx, span := trace.NewSpan(ctx, "command.Install")
 	defer span.End()
 
 	// Provide a child context to the watcher so that it can shut it down early to ensure the watcher cleanly shutdown.
 	ctxWatch, watchStop := context.WithCancel(ctx)
 	defer watchStop()
-	go c.watchEvents(ctxWatch)
+	go m.watchEvents(ctxWatch)
 
-	if !c.k8s.NamespaceExists(ctx, common.AirbyteNamespace) {
-		c.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", common.AirbyteNamespace))
-		if err := c.k8s.NamespaceCreate(ctx, common.AirbyteNamespace); err != nil {
+	if !m.k8s.NamespaceExists(ctx, common.AirbyteNamespace) {
+		m.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", common.AirbyteNamespace))
+		if err := m.k8s.NamespaceCreate(ctx, common.AirbyteNamespace); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Unable to create namespace '%s'", common.AirbyteNamespace))
 			return fmt.Errorf("unable to create airbyte namespace: %w", err)
 		}
@@ -195,35 +196,35 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 
 	// Storage volumes.
 	if opts.LocalStorage {
-		if err := c.persistentVolume(ctx, common.AirbyteNamespace, paths.PvLocal); err != nil {
+		if err := m.persistentVolume(ctx, common.AirbyteNamespace, paths.PvLocal); err != nil {
 			return err
 		}
 
-		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcLocal, paths.PvLocal); err != nil {
+		if err := m.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcLocal, paths.PvLocal); err != nil {
 			return err
 		}
 	} else {
-		if err := c.persistentVolume(ctx, common.AirbyteNamespace, paths.PvMinio); err != nil {
+		if err := m.persistentVolume(ctx, common.AirbyteNamespace, paths.PvMinio); err != nil {
 			return err
 		}
 
-		if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcMinio, paths.PvMinio); err != nil {
+		if err := m.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcMinio, paths.PvMinio); err != nil {
 			return err
 		}
 	}
 
 	// PSQL volumes.
-	if err := c.persistentVolume(ctx, common.AirbyteNamespace, paths.PvPsql); err != nil {
+	if err := m.persistentVolume(ctx, common.AirbyteNamespace, paths.PvPsql); err != nil {
 		return err
 	}
 
-	if err := c.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcPsql, paths.PvPsql); err != nil {
+	if err := m.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcPsql, paths.PvPsql); err != nil {
 		return err
 	}
 
 	if opts.DockerAuth() {
 		pterm.Debug.Println(fmt.Sprintf("Creating '%s' secret", common.DockerAuthSecretName))
-		if err := c.handleDockerSecret(ctx, opts.DockerServer, opts.DockerUser, opts.DockerPass, opts.DockerEmail); err != nil {
+		if err := m.handleDockerSecret(ctx, opts.DockerServer, opts.DockerUser, opts.DockerPass, opts.DockerEmail); err != nil {
 			pterm.Debug.Println(fmt.Sprintf("Unable to create '%s' secret", common.DockerAuthSecretName))
 			return fmt.Errorf("unable to create '%s' secret: %w", common.DockerAuthSecretName, err)
 		}
@@ -231,7 +232,7 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 	}
 
 	for _, secretFile := range opts.Secrets {
-		c.spinner.UpdateText(fmt.Sprintf("Creating secret from '%s'", secretFile))
+		m.spinner.UpdateText(fmt.Sprintf("Creating secret from '%s'", secretFile))
 		raw, err := os.ReadFile(secretFile)
 		if err != nil {
 			pterm.Error.Println(fmt.Sprintf("Unable to read secret file '%s': %s", secretFile, err))
@@ -245,7 +246,7 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 		}
 		secret.ObjectMeta.Namespace = common.AirbyteNamespace
 
-		if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
+		if err := m.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Unable to create secret from file '%s'", secretFile))
 			return fmt.Errorf("unable to create secret from file '%s': %w", secretFile, err)
 		}
@@ -253,7 +254,7 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 		pterm.Success.Println(fmt.Sprintf("Secret from '%s' created or updated", secretFile))
 	}
 
-	if err := c.handleChart(ctx, chartRequest{
+	if err := m.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     common.AirbyteRepoName,
 		repoURL:      common.AirbyteRepoURL,
@@ -266,18 +267,18 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 	}); err != nil {
 		// if trace.SpanError isn't called here, the logs attached
 		// in the diagnoseAirbyteChartFailure method are lost
-		err = c.diagnoseAirbyteChartFailure(ctx, err)
+		err = m.diagnoseAirbyteChartFailure(ctx, err)
 		err = fmt.Errorf("unable to install airbyte chart: %w", err)
 		return trace.SpanError(span, err)
 	}
 
-	nginxValues, err := helm.BuildNginxValues(c.portHTTP)
+	nginxValues, err := helm.BuildNginxValues(m.portHTTP)
 	if err != nil {
 		return err
 	}
 	pterm.Debug.Printfln("nginx values:\n%s", nginxValues)
 
-	if err := c.handleChart(ctx, chartRequest{
+	if err := m.handleChart(ctx, chartRequest{
 		name:           "nginx",
 		uninstallFirst: true,
 		repoName:       common.NginxRepoName,
@@ -293,9 +294,9 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 		if strings.Contains(err.Error(), "client rate limiter Wait returned an error") {
 			pterm.Warning.Printfln("Encountered an error while installing the %s Helm Chart.\n"+
 				"This could be an indication that port %d is not available.\n"+
-				"If installation fails, please try again with a different port.", common.NginxChartName, c.portHTTP)
+				"If installation fails, please try again with a different port.", common.NginxChartName, m.portHTTP)
 
-			srv, err := c.k8s.ServiceGet(ctx, common.NginxNamespace, "ingress-nginx-controller")
+			srv, err := m.k8s.ServiceGet(ctx, common.NginxNamespace, "ingress-nginx-controller")
 			// If there is an error, we can ignore it as we only are checking for a missing ingress entry,
 			// and an error would indicate the inability to check for that entry.
 			if err == nil {
@@ -309,14 +310,14 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 		return fmt.Errorf("unable to install nginx chart: %w", err)
 	}
 
-	if err := c.handleIngress(ctx, opts.Hosts); err != nil {
+	if err := m.handleIngress(ctx, opts.Hosts); err != nil {
 		return err
 	}
 	watchStop()
 
 	// verify ingress using localhost
-	url := fmt.Sprintf("http://localhost:%d", c.portHTTP)
-	if err := c.verifyIngress(ctx, url); err != nil {
+	url := fmt.Sprintf("http://localhost:%d", m.portHTTP)
+	if err := m.verifyIngress(ctx, url); err != nil {
 		return err
 	}
 
@@ -326,18 +327,18 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 			url,
 		))
 	} else {
-		c.launch(url)
+		m.launch(url)
 	}
 
 	return nil
 }
 
-func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr error) error {
+func (m *Manager) diagnoseAirbyteChartFailure(ctx context.Context, chartErr error) error {
 	if errors.Is(ctx.Err(), context.Canceled) {
 		return chartErr
 	}
 
-	podList, err := c.k8s.PodList(ctx, common.AirbyteNamespace)
+	podList, err := m.k8s.PodList(ctx, common.AirbyteNamespace)
 	if err != nil {
 		return chartErr
 	}
@@ -363,7 +364,7 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 		}
 		pterm.Debug.Printfln("looking at %s\n  %s(%s)", pod.Name, pod.Status.Phase, pod.Status.Reason)
 
-		logs, err := c.k8s.LogsGet(ctx, common.AirbyteNamespace, pod.Name)
+		logs, err := m.k8s.LogsGet(ctx, common.AirbyteNamespace, pod.Name)
 		if err != nil {
 			pterm.Debug.Printfln("failed to get pod logs: %s", err)
 			continue
@@ -385,14 +386,14 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 	return chartErr
 }
 
-func (c *Command) handleIngress(ctx context.Context, hosts []string) error {
+func (m *Manager) handleIngress(ctx context.Context, hosts []string) error {
 	ctx, span := trace.NewSpan(ctx, "command.handleIngress")
 	defer span.End()
-	c.spinner.UpdateText("Checking for existing Ingress")
+	m.spinner.UpdateText("Checking for existing Ingress")
 
-	if c.k8s.IngressExists(ctx, common.AirbyteNamespace, common.AirbyteIngress) {
+	if m.k8s.IngressExists(ctx, common.AirbyteNamespace, common.AirbyteIngress) {
 		pterm.Success.Println("Found existing Ingress")
-		if err := c.k8s.IngressUpdate(ctx, common.AirbyteNamespace, ingress(hosts)); err != nil {
+		if err := m.k8s.IngressUpdate(ctx, common.AirbyteNamespace, k8s.Ingress(hosts)); err != nil {
 			pterm.Error.Printfln("Unable to update existing Ingress")
 			return fmt.Errorf("unable to update existing ingress: %w", err)
 		}
@@ -401,7 +402,7 @@ func (c *Command) handleIngress(ctx context.Context, hosts []string) error {
 	}
 
 	pterm.Info.Println("No existing Ingress found, creating one")
-	if err := c.k8s.IngressCreate(ctx, common.AirbyteNamespace, ingress(hosts)); err != nil {
+	if err := m.k8s.IngressCreate(ctx, common.AirbyteNamespace, k8s.Ingress(hosts)); err != nil {
 		pterm.Error.Println("Unable to create ingress")
 		return fmt.Errorf("unable to create ingress: %w", err)
 	}
@@ -409,12 +410,12 @@ func (c *Command) handleIngress(ctx context.Context, hosts []string) error {
 	return nil
 }
 
-func (c *Command) watchEvents(ctx context.Context) {
+func (m *Manager) watchEvents(ctx context.Context) {
 	ctx, span := trace.NewSpan(ctx, "command.watchEvents")
 	defer span.End()
 	pterm.Debug.Println("Event watcher started.")
 
-	watcher, err := c.k8s.EventsWatch(ctx, common.AirbyteNamespace)
+	watcher, err := m.k8s.EventsWatch(ctx, common.AirbyteNamespace)
 	if err != nil {
 		pterm.Warning.Printfln("Unable to watch airbyte events\n  %s", err)
 		return
@@ -437,7 +438,7 @@ func (c *Command) watchEvents(ctx context.Context) {
 			}
 			numEvents++
 			if convertedEvent, ok := event.Object.(*eventsv1.Event); ok {
-				c.handleEvent(ctx, convertedEvent)
+				m.handleEvent(ctx, convertedEvent)
 			} else {
 				pterm.Debug.Printfln("Received unexpected event: %T", event.Object)
 			}
@@ -445,26 +446,26 @@ func (c *Command) watchEvents(ctx context.Context) {
 	}
 }
 
-func (c *Command) streamPodLogs(ctx context.Context, namespace, podName, prefix string, since time.Time) error {
-	r, err := c.k8s.StreamPodLogs(ctx, namespace, podName, since)
+func (m *Manager) streamPodLogs(ctx context.Context, namespace, podName, prefix string, since time.Time) error {
+	r, err := m.k8s.StreamPodLogs(ctx, namespace, podName, since)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 
-	s := newLogScanner(r)
+	s := airbyte.NewLogScanner(r)
 	for s.Scan() {
-		if s.line.Level == "ERROR" {
-			pterm.Error.Printfln("%s: %s", prefix, s.line.Message)
+		if s.Line.Level == "ERROR" {
+			pterm.Error.Printfln("%s: %s", prefix, s.Line.Message)
 		} else {
-			pterm.Debug.Printfln("%s: %s", prefix, s.line.Message)
+			pterm.Debug.Printfln("%s: %s", prefix, s.Line.Message)
 		}
 	}
 
 	return s.Err()
 }
 
-func (c *Command) watchBootloaderLogs(ctx context.Context) {
+func (m *Manager) watchBootloaderLogs(ctx context.Context) {
 	pterm.Debug.Printfln("start streaming bootloader logs")
 	since := time.Now()
 
@@ -472,7 +473,7 @@ func (c *Command) watchBootloaderLogs(ctx context.Context) {
 		// Wait a few seconds on the first iteration, give the bootloaders some time to start.
 		time.Sleep(5 * time.Second)
 
-		err := c.streamPodLogs(ctx, common.AirbyteNamespace, common.AirbyteBootloaderPodName, "airbyte-bootloader", since)
+		err := m.streamPodLogs(ctx, common.AirbyteNamespace, common.AirbyteBootloaderPodName, "airbyte-bootloader", since)
 		if err == nil {
 			break
 		} else {
@@ -510,7 +511,7 @@ func captureAttributes(ctx context.Context, msg string) {
 }
 
 // handleEvent converts a kubernetes event into a console log message
-func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
+func (m *Manager) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	// This should be replaced with series.lastObservedTime, however that field is always nil...
 	if e.DeprecatedLastTimestamp.Before(now) {
 		return
@@ -522,7 +523,7 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 		if strings.EqualFold(e.Reason, "backoff") {
 			pterm.Warning.Println(e.Note)
 		} else if e.Reason == "Started" && e.Regarding.Name == "airbyte-abctl-airbyte-bootloader" {
-			go c.watchBootloaderLogs(ctx)
+			go m.watchBootloaderLogs(ctx)
 		} else {
 			pterm.Debug.Println(e.Note)
 		}
@@ -538,7 +539,7 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 
 		if strings.EqualFold(e.Reason, "backoff") {
 			var err error
-			logs, err = c.k8s.LogsGet(ctx, e.Regarding.Namespace, e.Regarding.Name)
+			logs, err = m.k8s.LogsGet(ctx, e.Regarding.Namespace, e.Regarding.Name)
 			if err != nil {
 				logs = fmt.Sprintf("Unable to retrieve logs for %s:%s\n  %s", e.Regarding.Namespace, e.Regarding.Name, err)
 			}
@@ -562,7 +563,7 @@ func (c *Command) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	}
 }
 
-func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
+func (m *Manager) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
 	secretBody, err := docker.Secret(server, user, pass, email)
 	if err != nil {
 		pterm.Error.Println("Unable to create docker secret")
@@ -579,7 +580,7 @@ func (c *Command) handleDockerSecret(ctx context.Context, server, user, pass, em
 		Type: corev1.SecretTypeDockerConfigJson,
 	}
 
-	if err := c.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
+	if err := m.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
 		pterm.Error.Println("Unable to create Docker-auth secret")
 		return fmt.Errorf("unable to create docker-auth secret: %w", err)
 	}
@@ -609,7 +610,7 @@ type chartRequest struct {
 var errHelmStuck = errors.New("another operation (install/upgrade/rollback) is in progress")
 
 // handleChart will handle the installation of a chart
-func (c *Command) handleChart(
+func (m *Manager) handleChart(
 	ctx context.Context,
 	req chartRequest,
 ) error {
@@ -621,9 +622,9 @@ func (c *Command) handleChart(
 		attribute.String("chartVersion", req.chartVersion),
 	)
 
-	c.spinner.UpdateText(fmt.Sprintf("Configuring %s Helm repository", req.name))
+	m.spinner.UpdateText(fmt.Sprintf("Configuring %s Helm repository", req.name))
 
-	if err := c.helm.AddOrUpdateChartRepo(repo.Entry{
+	if err := m.helm.AddOrUpdateChartRepo(repo.Entry{
 		Name: req.repoName,
 		URL:  req.repoURL,
 	}); err != nil {
@@ -631,20 +632,20 @@ func (c *Command) handleChart(
 		return fmt.Errorf("unable to add %s chart repo: %w", req.name, err)
 	}
 
-	c.spinner.UpdateText(fmt.Sprintf("Fetching %s Helm Chart with version", req.chartName))
+	m.spinner.UpdateText(fmt.Sprintf("Fetching %s Helm Chart with version", req.chartName))
 
-	// chartLoc := c.locateChart(req.chartName, req.chartVersion, req.chartFlag)
+	// chartLoc := m.locateChart(req.chartName, req.chartVersion, req.chartFlag)
 
-	helmChart, _, err := c.helm.GetChart(req.chartLoc, &action.ChartPathOptions{Version: req.chartVersion})
+	helmChart, _, err := m.helm.GetChart(req.chartLoc, &action.ChartPathOptions{Version: req.chartVersion})
 	if err != nil {
 		return fmt.Errorf("unable to fetch helm chart %q: %w", req.chartName, err)
 	}
 
-	c.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
+	m.tel.Attr(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version)
 	span.SetAttributes(attribute.String(fmt.Sprintf("helm_%s_chart_version", req.name), helmChart.Metadata.Version))
 
 	if req.uninstallFirst {
-		chartAction := determineHelmChartAction(c.helm, helmChart, req.chartRelease)
+		chartAction := determineHelmChartAction(m.helm, helmChart, req.chartRelease)
 		switch chartAction {
 		case none:
 			pterm.Success.Println(fmt.Sprintf(
@@ -654,7 +655,7 @@ func (c *Command) handleChart(
 			return nil
 		case uninstall:
 			pterm.Debug.Println(fmt.Sprintf("Attempting to uninstall Helm Release %s", req.chartRelease))
-			if err := c.helm.UninstallReleaseByName(req.chartRelease); err != nil {
+			if err := m.helm.UninstallReleaseByName(req.chartRelease); err != nil {
 				pterm.Error.Println(fmt.Sprintf("Unable to uninstall Helm Release %s", req.chartRelease))
 				return fmt.Errorf("unable to uninstall Helm Release %s: %w", req.chartRelease, err)
 			} else {
@@ -680,12 +681,12 @@ func (c *Command) handleChart(
 			"Starting Helm Chart installation of '%s' (version: %s)",
 			req.chartName, helmChart.Metadata.Version,
 		))
-		c.spinner.UpdateText(fmt.Sprintf(
+		m.spinner.UpdateText(fmt.Sprintf(
 			"Installing '%s' (version: %s) Helm Chart (this may take several minutes)",
 			req.chartName, helmChart.Metadata.Version,
 		))
 
-		helmRelease, err = c.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
+		helmRelease, err = m.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
 			ReleaseName:     req.chartRelease,
 			ChartName:       req.chartLoc,
 			CreateNamespace: true,
@@ -702,7 +703,7 @@ func (c *Command) handleChart(
 			// If the error is the errHelmStuck error, attempt to resolve this by removing the helm release secret.
 			// See: https://github.com/helm/helm/issues/8987#issuecomment-1082992461
 			if strings.Contains(err.Error(), errHelmStuck.Error()) {
-				if err := c.k8s.SecretDeleteCollection(ctx, common.AirbyteNamespace, "helm.sh/release.v1"); err != nil {
+				if err := m.k8s.SecretDeleteCollection(ctx, common.AirbyteNamespace, "helm.sh/release.v1"); err != nil {
 					pterm.Debug.Println(fmt.Sprintf("unable to delete secrets helm.sh/release.v1: %s", err))
 				}
 				continue
@@ -720,7 +721,7 @@ func (c *Command) handleChart(
 		return abctl.ErrHelmStuck
 	}
 
-	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
+	m.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))
 	span.SetAttributes(attribute.String(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version)))
 
 	pterm.Success.Println(fmt.Sprintf(
@@ -732,8 +733,8 @@ func (c *Command) handleChart(
 
 // verifyIngress will open the url in the user's browser but only if the url returns a 200 response code first
 // TODO: clean up this method, make it testable
-func (c *Command) verifyIngress(ctx context.Context, url string) error {
-	c.spinner.UpdateText("Verifying ingress")
+func (m *Manager) verifyIngress(ctx context.Context, url string) error {
+	m.spinner.UpdateText("Verifying ingress")
 
 	ingressCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
@@ -751,7 +752,7 @@ func (c *Command) verifyIngress(ctx context.Context, url string) error {
 				if err != nil {
 					alive <- fmt.Errorf("unable to create request: %w", err)
 				}
-				res, _ := c.http.Do(req)
+				res, _ := m.http.Do(req)
 				// if no auth, we should get a 200
 				if res != nil && res.StatusCode == http.StatusOK {
 					alive <- nil
@@ -778,10 +779,10 @@ func (c *Command) verifyIngress(ctx context.Context, url string) error {
 	return nil
 }
 
-func (c *Command) launch(url string) {
-	c.spinner.UpdateText(fmt.Sprintf("Attempting to launch web-browser for %s", url))
+func (m *Manager) launch(url string) {
+	m.spinner.UpdateText(fmt.Sprintf("Attempting to launch web-browser for %s", url))
 
-	if err := c.launcher(url); err != nil {
+	if err := m.launcher(url); err != nil {
 		pterm.Warning.Println(fmt.Sprintf(
 			"Failed to launch web-browser.\nPlease launch your web-browser to access %s",
 			url,

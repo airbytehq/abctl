@@ -1,4 +1,4 @@
-package local
+package k8s
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ingress creates an ingress type for defining the webapp ingress rules.
-func ingress(hosts []string) *networkingv1.Ingress {
+// Ingress creates an ingress type for defining the webapp ingress rules.
+func Ingress(hosts []string) *networkingv1.Ingress {
 	var ingressClassName = "nginx"
 
 	// if no host is defined, default to an empty host

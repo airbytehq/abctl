@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/k8s"
+	"github.com/airbytehq/abctl/internal/service"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"go.opencensus.io/trace"
@@ -19,7 +19,7 @@ func (d *DeploymentsCmd) Run(ctx context.Context, telClient telemetry.Client, pr
 	ctx, span := trace.StartSpan(ctx, "local deployments")
 	defer span.End()
 
-	k8sClient, err := local.DefaultK8s(provider.Kubeconfig, provider.Context)
+	k8sClient, err := service.DefaultK8s(provider.Kubeconfig, provider.Context)
 	if err != nil {
 		return err
 	}

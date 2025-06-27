@@ -1,4 +1,4 @@
-package local
+package airbyte
 
 import (
 	"bufio"
@@ -6,18 +6,20 @@ import (
 	"io"
 )
 
-type logScanner struct {
+// LogScanner
+type LogScanner struct {
 	scanner *bufio.Scanner
-	line    logLine
+	Line    logLine
 }
 
-func newLogScanner(r io.Reader) *logScanner {
-	return &logScanner{
+// NewLogScanner returns an initialized Airbyte log scanner.
+func NewLogScanner(r io.Reader) *LogScanner {
+	return &LogScanner{
 		scanner: bufio.NewScanner(r),
 	}
 }
 
-func (j *logScanner) Scan() bool {
+func (j *LogScanner) Scan() bool {
 	for {
 		if ok := j.scanner.Scan(); !ok {
 			return false
@@ -27,16 +29,16 @@ func (j *logScanner) Scan() bool {
 		err := json.Unmarshal(j.scanner.Bytes(), &data)
 		// not all lines are JSON. don't propogate errors, just include the full line.
 		if err != nil {
-			j.line = logLine{Message: j.scanner.Text()}
+			j.Line = logLine{Message: j.scanner.Text()}
 		} else {
-			j.line = data
+			j.Line = data
 		}
 
 		return true
 	}
 }
 
-func (j *logScanner) Err() error {
+func (j *LogScanner) Err() error {
 	return j.scanner.Err()
 }
 

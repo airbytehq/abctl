@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/airbytehq/abctl/internal/abctl"
-	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/k8s"
+	"github.com/airbytehq/abctl/internal/service"
 	"github.com/alecthomas/kong"
 
 	"github.com/airbytehq/abctl/internal/paths"
@@ -121,7 +121,7 @@ func TestValues_FileDoesntExist(t *testing.T) {
 
 func TestValues_BadYaml(t *testing.T) {
 
-	cmd := InstallCmd{Values: "./local/testdata/invalid.values.yaml"}
+	cmd := InstallCmd{Values: "./testdata/invalid.values.yaml"}
 	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
 	if err == nil {
 		t.Fatal("expected error")
@@ -149,12 +149,12 @@ func TestInvalidHostFlag_IpAddrWithPort(t *testing.T) {
 }
 
 func TestInstallOpts(t *testing.T) {
-	b, _ := os.ReadFile("local/testdata/expected-default.values.yaml")
+	b, _ := os.ReadFile("./testdata/expected-default.values.yaml")
 	cmd := InstallCmd{
 		// Don't let the code dynamically resolve the latest chart version.
 		Chart: "/test/path/to/chart",
 	}
-	expect := &local.InstallOpts{
+	expect := &service.InstallOpts{
 		HelmValuesYaml:  string(b),
 		AirbyteChartLoc: "/test/path/to/chart",
 		LocalStorage:    true,

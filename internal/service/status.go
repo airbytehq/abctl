@@ -1,4 +1,4 @@
-package local
+package service
 
 import (
 	"context"
@@ -10,15 +10,15 @@ import (
 )
 
 // Status handles the status of local Airbyte.
-func (c *Command) Status(ctx context.Context) error {
+func (m *Manager) Status(ctx context.Context) error {
 	_, span := trace.StartSpan(ctx, "command.Status")
 	defer span.End()
 
 	charts := []string{common.AirbyteChartRelease, common.NginxChartRelease}
 	for _, name := range charts {
-		c.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", name))
+		m.spinner.UpdateText(fmt.Sprintf("Verifying %s Helm Chart installation status", name))
 
-		rel, err := c.helm.GetRelease(name)
+		rel, err := m.helm.GetRelease(name)
 		if err != nil {
 			pterm.Warning.Println("Unable to fetch airbyte release")
 			pterm.Debug.Printfln("unable to fetch airbyte release: %s", err)
@@ -31,7 +31,7 @@ func (c *Command) Status(ctx context.Context) error {
 		))
 	}
 
-	pterm.Info.Println(fmt.Sprintf("Airbyte should be accessible via http://localhost:%d", c.portHTTP))
+	pterm.Info.Println(fmt.Sprintf("Airbyte should be accessible via http://localhost:%d", m.portHTTP))
 
 	return nil
 }
