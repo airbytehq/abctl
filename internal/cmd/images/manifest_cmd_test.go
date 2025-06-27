@@ -8,7 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	helmlib "github.com/mittwald/go-helm-client"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/helm"
+	"github.com/airbytehq/abctl/internal/helm"
 )
 
 func getHelmTestClient(t *testing.T) helm.Client {

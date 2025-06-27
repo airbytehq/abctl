@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/abctl"
+	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -148,7 +148,7 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 		}
 	}
 
-	return nil, fmt.Errorf("%w: unable to create docker client", localerr.ErrDocker)
+	return nil, fmt.Errorf("%w: unable to create docker client", abctl.ErrDocker)
 }
 
 // createAndPing attempts to create a docker client and ping it to ensure we can communicate

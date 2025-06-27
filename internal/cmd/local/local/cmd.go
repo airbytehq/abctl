@@ -10,16 +10,16 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/docker"
-	"github.com/airbytehq/abctl/internal/cmd/local/helm"
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/common"
+	"github.com/airbytehq/abctl/internal/docker"
+	"github.com/airbytehq/abctl/internal/helm"
+	"github.com/airbytehq/abctl/internal/k8s/kind"
+	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/airbytehq/abctl/internal/pgdata"
 	"k8s.io/client-go/rest"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/cli/browser"
 	"github.com/pterm/pterm"
@@ -168,7 +168,7 @@ func New(provider k8s.Provider, opts ...Option) (*Command, error) {
 	{
 		k8sVersion, err := c.k8s.ServerVersionGet()
 		if err != nil {
-			return nil, fmt.Errorf("%w: unable to fetch kubernetes server version: %w", localerr.ErrKubernetes, err)
+			return nil, fmt.Errorf("%w: unable to fetch kubernetes server version: %w", abctl.ErrKubernetes, err)
 		}
 		c.tel.Attr("k8s_version", k8sVersion)
 	}
@@ -189,11 +189,11 @@ func DefaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 
 	restCfg, err := k8sCfg.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("%w: could not create rest config: %w", localerr.ErrKubernetes, err)
+		return nil, fmt.Errorf("%w: could not create rest config: %w", abctl.ErrKubernetes, err)
 	}
 	k8sClient, err := kubernetes.NewForConfig(restCfg)
 	if err != nil {
-		return nil, fmt.Errorf("%w: could not create clientset: %w", localerr.ErrKubernetes, err)
+		return nil, fmt.Errorf("%w: could not create clientset: %w", abctl.ErrKubernetes, err)
 	}
 
 	return &k8s.DefaultK8sClient{ClientSet: k8sClient}, nil

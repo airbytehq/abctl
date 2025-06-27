@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/cmd/images"
-	"github.com/airbytehq/abctl/internal/cmd/local/docker"
-	"github.com/airbytehq/abctl/internal/cmd/local/helm"
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/common"
+	"github.com/airbytehq/abctl/internal/docker"
+	"github.com/airbytehq/abctl/internal/helm"
+	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/airbytehq/abctl/internal/merge"
+	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/airbytehq/abctl/internal/trace"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
@@ -302,7 +302,7 @@ func (c *Command) Install(ctx context.Context, opts *InstallOpts) error {
 				ingresses := srv.Status.LoadBalancer.Ingress
 				if len(ingresses) == 0 {
 					// if there are no ingresses, that is a possible indicator that the port is already in use.
-					return fmt.Errorf("%w: could not install nginx chart", localerr.ErrIngress)
+					return fmt.Errorf("%w: could not install nginx chart", abctl.ErrIngress)
 				}
 			}
 		}
@@ -379,7 +379,7 @@ func (c *Command) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 	}
 
 	if len(failedPods) == 1 && failedPods[0] == common.AirbyteBootloaderPodName {
-		return localerr.ErrBootloaderFailed
+		return abctl.ErrBootloaderFailed
 	}
 
 	return chartErr
@@ -717,7 +717,7 @@ func (c *Command) handleChart(
 	// This is an error situation.  As only one specific error message should cause this (all other errors
 	// should have returned out of the for-loop), we can treat this as if the underlying helm-client
 	if helmRelease == nil {
-		return localerr.ErrHelmStuck
+		return abctl.ErrHelmStuck
 	}
 
 	c.tel.Attr(fmt.Sprintf("helm_%s_release_version", req.name), strconv.Itoa(helmRelease.Version))

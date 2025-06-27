@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/airbyte"
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
+	"github.com/airbytehq/abctl/internal/airbyte"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
+	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/pterm/pterm"
 	"go.opencensus.io/trace"

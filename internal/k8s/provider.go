@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
 	"sigs.k8s.io/kind/pkg/cluster"
@@ -40,7 +40,7 @@ func (p Provider) Cluster(ctx context.Context) (Cluster, error) {
 	}
 
 	return &kindCluster{
-		p:          kindProvider,
+		p:           kindProvider,
 		kubeconfig:  p.Kubeconfig,
 		clusterName: p.ClusterName,
 	}, nil

@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/helm"
+	"github.com/airbytehq/abctl/internal/helm"
 	helmclient "github.com/mittwald/go-helm-client"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"

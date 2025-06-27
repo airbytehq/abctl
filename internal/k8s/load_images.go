@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/docker"
 	"github.com/airbytehq/abctl/internal/common"
+	"github.com/airbytehq/abctl/internal/docker"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"

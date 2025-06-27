@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
-	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/abctl"
+	"github.com/airbytehq/abctl/internal/paths"
 	helmclient "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
 	"helm.sh/helm/v3/pkg/action"
@@ -47,7 +47,7 @@ func New(kubecfg, kubectx, namespace string) (Client, error) {
 
 	restCfg, err := k8sCfg.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("%w: unable to create rest config: %w", localerr.ErrKubernetes, err)
+		return nil, fmt.Errorf("%w: unable to create rest config: %w", abctl.ErrKubernetes, err)
 	}
 
 	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
