@@ -392,7 +392,7 @@ func (c *Command) handleIngress(ctx context.Context, hosts []string) error {
 
 	if c.k8s.IngressExists(ctx, common.AirbyteNamespace, common.AirbyteIngress) {
 		pterm.Success.Println("Found existing Ingress")
-		if err := c.k8s.IngressUpdate(ctx, common.AirbyteNamespace, ingress(hosts)); err != nil {
+		if err := c.k8s.IngressUpdate(ctx, common.AirbyteNamespace, k8s.Ingress(hosts)); err != nil {
 			pterm.Error.Printfln("Unable to update existing Ingress")
 			return fmt.Errorf("unable to update existing ingress: %w", err)
 		}
@@ -401,7 +401,7 @@ func (c *Command) handleIngress(ctx context.Context, hosts []string) error {
 	}
 
 	pterm.Info.Println("No existing Ingress found, creating one")
-	if err := c.k8s.IngressCreate(ctx, common.AirbyteNamespace, ingress(hosts)); err != nil {
+	if err := c.k8s.IngressCreate(ctx, common.AirbyteNamespace, k8s.Ingress(hosts)); err != nil {
 		pterm.Error.Println("Unable to create ingress")
 		return fmt.Errorf("unable to create ingress: %w", err)
 	}

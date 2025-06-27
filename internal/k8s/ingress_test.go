@@ -1,4 +1,4 @@
-package local
+package k8s
 
 import (
 	"sort"
@@ -48,7 +48,7 @@ func TestIngress(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actHosts := extractHosts(ingress(tt.hosts))
+			actHosts := extractHosts(Ingress(tt.hosts))
 			sort.Strings(actHosts)
 			sort.Strings(tt.expHosts)
 			if d := cmp.Diff(tt.expHosts, actHosts); d != "" {
