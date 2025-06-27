@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/helm"
+	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"

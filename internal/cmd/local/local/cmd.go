@@ -10,16 +10,16 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s/kind"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/docker"
 	"github.com/airbytehq/abctl/internal/helm"
+	"github.com/airbytehq/abctl/internal/k8s/kind"
 	"github.com/airbytehq/abctl/internal/pgdata"
 	"k8s.io/client-go/rest"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/cli/browser"
 	"github.com/pterm/pterm"

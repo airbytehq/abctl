@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/local"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
+	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/alecthomas/kong"
 
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"

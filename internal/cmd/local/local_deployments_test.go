@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s/k8stest"
+	"github.com/airbytehq/abctl/internal/k8s/k8stest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/pterm/pterm"

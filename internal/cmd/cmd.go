@@ -5,8 +5,8 @@ import (
 
 	"github.com/airbytehq/abctl/internal/cmd/images"
 	"github.com/airbytehq/abctl/internal/cmd/local"
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/version"
+	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/alecthomas/kong"
 	"github.com/pterm/pterm"
 )

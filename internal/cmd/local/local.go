@@ -6,9 +6,9 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/cmd/local/paths"
+	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/pterm/pterm"
 )
 
