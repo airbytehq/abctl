@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s"
 	"github.com/airbytehq/abctl/internal/cmd/local/k8s/k8stest"
 	"github.com/airbytehq/abctl/internal/cmd/local/localerr"
 	"github.com/airbytehq/abctl/internal/common"
+	"github.com/airbytehq/abctl/internal/helm"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/google/go-cmp/cmp"
 	helmclient "github.com/mittwald/go-helm-client"

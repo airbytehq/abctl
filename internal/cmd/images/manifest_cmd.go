@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/airbytehq/abctl/internal/cmd/local/helm"
 	"github.com/airbytehq/abctl/internal/common"
+	"github.com/airbytehq/abctl/internal/helm"
 	"github.com/airbytehq/abctl/internal/trace"
 	helmlib "github.com/mittwald/go-helm-client"
 	"helm.sh/helm/v3/pkg/repo"
