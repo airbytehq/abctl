@@ -5,9 +5,9 @@ Airbyte's command line tool for local Airbyte deployments.
 <br />
 
 > [!NOTE]
-> This README primarily focuses on the `abctl` tool itself, not the Airbyte platform.
+> This README focuses on the `abctl` tool itself, not the Airbyte platform.
 > 
-> If you're looking for Airbyte's official quickstart documentation, that can be found [here](https://docs.airbyte.com/using-airbyte/getting-started/oss-quickstart).
+> See Airbyte's [Quickstart](https://docs.airbyte.com/platform/using-airbyte/getting-started/oss-quickstart) to walk through setting up Airbyte for the first time.
 
 ---
 
@@ -47,7 +47,7 @@ Airbyte's command line tool for local Airbyte deployments.
    abctl local credentials
    ```
 > [!NOTE]
-> Depending on internet speed, `abctl local install` could take in excess of 15 minutes.
+> Depending on your internet speed, `abctl local install` may take up to 30 minutes.
 > 
 > By default `abctl local install` configures Airbyte to accessible by all inbound requests on port `8000`.
 > This typically includes access via the host's ip-address and `localhost`.
@@ -153,7 +153,7 @@ Display kubernetes deployment information and allows for restarting a kubernetes
 Installs a local Airbyte instance or updates an existing installation which was initially installed by `abctl`.
 
 > [!NOTE]
-> Depending on your internet speed, `abctl local install` may take in excess of 20 minutes.
+> Depending on your internet speed, `abctl local install` may take up to 30 minutes.
 
 `install` supports the following optional flags:
 
@@ -173,7 +173,6 @@ Installs a local Airbyte instance or updates an existing installation which was 
 | --insecure-cookies  | -       | Disables secure cookie requirements.<br />Only set if using `--host` with an insecure (non `https`) connection.                                                                                                                                        |
 | --low-resource-mode | false   | Run Airbyte in low resource mode.                                                                                                                                                                                                                      |
 | --host              | ""      | FQDN where the Airbyte installation will be accessed. Default is to allow for all incoming traffic on port `--port`.<br />Set this if the Airbyte installation needs a more restricted host configuration.                                             |
-| --migrate           | -       | Enables data-migration from an existing docker-compose backed Airbyte installation.<br />Copies, leaving the original data unmodified, the data from a docker-compose<br />backed Airbyte installation into this `abctl` managed Airbyte installation. |
 | --no-browser        | -       | Disables launching the browser when installation completes.<br />Useful to set in situations where no browser is available.                                                                                                                            |
 | --port              | 8000    | Port where the Airbyte installation will be accessed.<br />Set this if port 8000 is already in use or if a different port is preferred.                                                                                                                |
 | --secret            | ""      | **Can be set multiple times**.<br />Creates a kubernetes secret based on the contents of the file provided.<br />Useful when used in conjunction with `--values` for customizing installation.                                                         |
