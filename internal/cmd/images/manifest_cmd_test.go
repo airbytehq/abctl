@@ -6,18 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	helmlib "github.com/mittwald/go-helm-client"
-
-	"github.com/airbytehq/abctl/internal/helm"
 )
-
-func getHelmTestClient(t *testing.T) helm.Client {
-	client, err := helmlib.New(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return client
-}
 
 func TestManifestCmd(t *testing.T) {
 	cmd := ManifestCmd{
