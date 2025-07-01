@@ -1,34 +1,19 @@
 package helm
 
 import (
-	"context"
 	"fmt"
 	"io"
 
 	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/paths"
-	helmclient "github.com/mittwald/go-helm-client"
+	goHelm "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/release"
-	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// Client primarily for testing purposes
-type Client interface {
-	AddOrUpdateChartRepo(entry repo.Entry) error
-	GetChart(name string, options *action.ChartPathOptions) (*chart.Chart, string, error)
-	GetRelease(name string) (*release.Release, error)
-	InstallOrUpgradeChart(ctx context.Context, spec *helmclient.ChartSpec, opts *helmclient.GenericHelmOptions) (*release.Release, error)
-	UninstallReleaseByName(name string) error
-	TemplateChart(spec *helmclient.ChartSpec, options *helmclient.HelmTemplateOptions) ([]byte, error)
-}
-
-func ClientOptions(namespace string) *helmclient.Options {
+func ClientOptions(namespace string) *goHelm.Options {
 	logger := helmLogger{}
-	return &helmclient.Options{
+	return &goHelm.Options{
 		Namespace:        namespace,
 		Output:           logger,
 		DebugLog:         logger.Debug,
@@ -39,7 +24,7 @@ func ClientOptions(namespace string) *helmclient.Options {
 }
 
 // New returns the default helm client
-func New(kubecfg, kubectx, namespace string) (Client, error) {
+func New(kubecfg, kubectx, namespace string) (goHelm.Client, error) {
 	k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
 		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
@@ -50,7 +35,7 @@ func New(kubecfg, kubectx, namespace string) (Client, error) {
 		return nil, fmt.Errorf("%w: unable to create rest config: %w", abctl.ErrKubernetes, err)
 	}
 
-	helm, err := helmclient.NewClientFromRestConf(&helmclient.RestConfClientOptions{
+	helm, err := goHelm.NewClientFromRestConf(&goHelm.RestConfClientOptions{
 		Options:    ClientOptions(namespace),
 		RestConfig: restCfg,
 	})
@@ -64,8 +49,7 @@ func New(kubecfg, kubectx, namespace string) (Client, error) {
 var _ io.Writer = (*helmLogger)(nil)
 
 // helmLogger is used by the Client to convert all helm output into debug logs.
-type helmLogger struct {
-}
+type helmLogger struct{}
 
 func (d helmLogger) Write(p []byte) (int, error) {
 	pterm.Debug.Println(fmt.Sprintf("helm: %s", string(p)))
