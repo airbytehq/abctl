@@ -47,7 +47,7 @@ func Ingress(hosts []string) *networkingv1.Ingress {
 	}
 }
 
-// ingressRule creates a rule for the host to the webapp service.
+// ingressRule creates a rule for the host with proper API routing.
 func ingressRule(host string) networkingv1.IngressRule {
 	var pathType = networkingv1.PathType("Prefix")
 
@@ -56,6 +56,20 @@ func ingressRule(host string) networkingv1.IngressRule {
 		IngressRuleValue: networkingv1.IngressRuleValue{
 			HTTP: &networkingv1.HTTPIngressRuleValue{
 				Paths: []networkingv1.HTTPIngressPath{
+					// Route connector builder API to connector-builder-server
+					{
+						Path:     "/api/v1/connector_builder",
+						PathType: &pathType,
+						Backend: networkingv1.IngressBackend{
+							Service: &networkingv1.IngressServiceBackend{
+								Name: fmt.Sprintf("%s-airbyte-connector-builder-server-svc", common.AirbyteChartRelease),
+								Port: networkingv1.ServiceBackendPort{
+									Name: "http",
+								},
+							},
+						},
+					},
+					// Default route for everything else to webapp
 					{
 						Path:     "/",
 						PathType: &pathType,
