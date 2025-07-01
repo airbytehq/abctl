@@ -22,6 +22,7 @@ import (
 	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/cli/browser"
+	goHelm "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -40,7 +41,7 @@ type Manager struct {
 	docker   *docker.Docker
 
 	http     HTTPClient
-	helm     helm.Client
+	helm     goHelm.Client
 	k8s      k8s.Client
 	portHTTP int
 	spinner  *pterm.SpinnerPrinter
@@ -73,7 +74,7 @@ func WithHTTPClient(client HTTPClient) Option {
 }
 
 // WithHelmClient define the helm client for this command.
-func WithHelmClient(client helm.Client) Option {
+func WithHelmClient(client goHelm.Client) Option {
 	return func(m *Manager) {
 		m.helm = client
 	}

@@ -21,7 +21,7 @@ import (
 	"github.com/airbytehq/abctl/internal/merge"
 	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/airbytehq/abctl/internal/trace"
-	helmclient "github.com/mittwald/go-helm-client"
+	goHelm "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
 	"go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -686,7 +686,7 @@ func (m *Manager) handleChart(
 			req.chartName, helmChart.Metadata.Version,
 		))
 
-		helmRelease, err = m.helm.InstallOrUpgradeChart(ctx, &helmclient.ChartSpec{
+		helmRelease, err = m.helm.InstallOrUpgradeChart(ctx, &goHelm.ChartSpec{
 			ReleaseName:     req.chartRelease,
 			ChartName:       req.chartLoc,
 			CreateNamespace: true,
@@ -696,9 +696,8 @@ func (m *Manager) handleChart(
 			ValuesYaml:      req.valuesYAML,
 			Version:         req.chartVersion,
 		},
-			&helmclient.GenericHelmOptions{},
+			&goHelm.GenericHelmOptions{},
 		)
-
 		if err != nil {
 			// If the error is the errHelmStuck error, attempt to resolve this by removing the helm release secret.
 			// See: https://github.com/helm/helm/issues/8987#issuecomment-1082992461
@@ -808,7 +807,7 @@ const (
 //
 // Returns none if no additional action needs to be taken. uninstall if the chart exists and the
 // version differs. install if the chart doesn't exist and needs to be created.
-func determineHelmChartAction(helm helm.Client, chart *chart.Chart, releaseName string) helmReleaseAction {
+func determineHelmChartAction(helm goHelm.Client, chart *chart.Chart, releaseName string) helmReleaseAction {
 	// look for an existing release, see if it matches the existing chart
 	rel, err := helm.GetRelease(releaseName)
 	if err != nil {
