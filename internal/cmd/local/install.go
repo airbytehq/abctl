@@ -3,7 +3,6 @@ package local
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/helm"
@@ -37,7 +36,7 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*service.Ins
 	ctx, span := trace.NewSpan(ctx, "InstallCmd.InstallOpts")
 	defer span.End()
 
-	extraVolumeMounts, err := parseVolumeMounts(i.Volume)
+	extraVolumeMounts, err := k8s.ParseVolumeMounts(i.Volume)
 	if err != nil {
 		return nil, err
 	}
@@ -210,25 +209,4 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		)
 		return nil
 	})
-}
-
-func parseVolumeMounts(specs []string) ([]k8s.ExtraVolumeMount, error) {
-	if len(specs) == 0 {
-		return nil, nil
-	}
-
-	mounts := make([]k8s.ExtraVolumeMount, len(specs))
-
-	for i, spec := range specs {
-		parts := strings.Split(spec, ":")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("volume %s is not a valid volume spec, must be <HOST_PATH>:<GUEST_PATH>", spec)
-		}
-		mounts[i] = k8s.ExtraVolumeMount{
-			HostPath:      parts[0],
-			ContainerPath: parts[1],
-		}
-	}
-
-	return mounts, nil
 }
