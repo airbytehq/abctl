@@ -137,7 +137,7 @@ func TestCommand_Install_HappyPath(t *testing.T) {
 	httpClient := mockHTTP{do: func(req *http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: 200}, nil
 	}}
-	c, err := New(
+	svcMgr, err := NewManager(
 		k8s.TestProvider,
 		WithPortHTTP(portTest),
 		WithHelmClient(helm),
@@ -153,7 +153,7 @@ func TestCommand_Install_HappyPath(t *testing.T) {
 		HelmValuesYaml:  valuesYaml,
 		AirbyteChartLoc: testAirbyteChartLoc,
 	}
-	if err := c.Install(context.Background(), installOpts); err != nil {
+	if err := svcMgr.Install(context.Background(), installOpts); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -216,7 +216,7 @@ func TestCommand_Install_BadHelmState(t *testing.T) {
 	httpClient := mockHTTP{do: func(req *http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: 200}, nil
 	}}
-	c, err := New(
+	svcMgr, err := NewManager(
 		k8s.TestProvider,
 		WithPortHTTP(portTest),
 		WithHelmClient(helm),
@@ -232,7 +232,7 @@ func TestCommand_Install_BadHelmState(t *testing.T) {
 		HelmValuesYaml:  valuesYaml,
 		AirbyteChartLoc: testAirbyteChartLoc,
 	}
-	if err := c.Install(context.Background(), installOpts); err != nil {
+	if err := svcMgr.Install(context.Background(), installOpts); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -273,7 +273,7 @@ func TestCommand_Install_BadHelmStatePersists(t *testing.T) {
 	httpClient := mockHTTP{do: func(req *http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: 200}, nil
 	}}
-	c, err := New(
+	svcMgr, err := NewManager(
 		k8s.TestProvider,
 		WithPortHTTP(portTest),
 		WithHelmClient(helm),
@@ -289,7 +289,7 @@ func TestCommand_Install_BadHelmStatePersists(t *testing.T) {
 		HelmValuesYaml:  valuesYaml,
 		AirbyteChartLoc: testAirbyteChartLoc,
 	}
-	if err := c.Install(context.Background(), installOpts); err == nil {
+	if err := svcMgr.Install(context.Background(), installOpts); err == nil {
 		t.Fatal("expected error")
 	} else if !errors.Is(err, abctl.ErrHelmStuck) {
 		t.Fatalf("unexpected error: %v", err)
@@ -332,7 +332,7 @@ func TestCommand_InstallError(t *testing.T) {
 		HelmValuesYaml:  valuesYaml,
 		AirbyteChartLoc: testAirbyteChartLoc,
 	}
-	c, err := New(
+	svcMgr, err := NewManager(
 		k8s.TestProvider,
 		WithPortHTTP(portTest),
 		WithHelmClient(helm),
@@ -344,7 +344,7 @@ func TestCommand_InstallError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = c.Install(context.Background(), installOpts)
+	err = svcMgr.Install(context.Background(), installOpts)
 	expect := "unable to install airbyte chart: unable to install helm: test error"
 	if expect != err.Error() {
 		t.Errorf("expected %q but got %q", expect, err)

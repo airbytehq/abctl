@@ -36,11 +36,6 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*service.Ins
 	ctx, span := trace.NewSpan(ctx, "InstallCmd.InstallOpts")
 	defer span.End()
 
-	extraVolumeMounts, err := k8s.ParseVolumeMounts(i.Volume)
-	if err != nil {
-		return nil, err
-	}
-
 	span.SetAttributes(attribute.Bool("host", len(i.Host) > 0))
 
 	for _, host := range i.Host {
@@ -68,18 +63,17 @@ func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*service.Ins
 	}
 
 	opts := &service.InstallOpts{
-		HelmChartVersion:  i.ChartVersion,
-		AirbyteChartLoc:   helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
-		Secrets:           i.Secret,
-		Hosts:             i.Host,
-		LocalStorage:      !supportMinio,
-		EnablePsql17:      enablePsql17,
-		ExtraVolumeMounts: extraVolumeMounts,
-		DockerServer:      i.DockerServer,
-		DockerUser:        i.DockerUsername,
-		DockerPass:        i.DockerPassword,
-		DockerEmail:       i.DockerEmail,
-		NoBrowser:         i.NoBrowser,
+		HelmChartVersion: i.ChartVersion,
+		AirbyteChartLoc:  helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
+		Secrets:          i.Secret,
+		Hosts:            i.Host,
+		LocalStorage:     !supportMinio,
+		EnablePsql17:     enablePsql17,
+		DockerServer:     i.DockerServer,
+		DockerUser:       i.DockerUsername,
+		DockerPass:       i.DockerPassword,
+		DockerEmail:      i.DockerEmail,
+		NoBrowser:        i.NoBrowser,
 	}
 
 	valuesOpts := helm.ValuesOpts{
@@ -113,26 +107,21 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 	ctx, span := trace.NewSpan(ctx, "local install")
 	defer span.End()
 
+	// Parse and validate extra volume mounts early to catch user input errors
+	// before proceeding with the installation process.
+	extraVolumeMounts, err := k8s.ParseVolumeMounts(i.Volume)
+	if err != nil {
+		return fmt.Errorf("failed to parse the extra volume mounts: %w", err)
+	}
+
 	spinner := &pterm.DefaultSpinner
 	spinner, _ = spinner.Start("Starting installation")
 	spinner.UpdateText("Checking for Docker installation")
 
-	_, err := dockerInstalled(ctx, telClient)
+	_, err = dockerInstalled(ctx, telClient)
 	if err != nil {
 		pterm.Error.Println("Unable to determine if Docker is installed")
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
-	}
-
-	// Overrides Helm chart images.
-	overrideImages := []string{}
-
-	opts, err := i.InstallOpts(ctx, telClient.User())
-	if err != nil {
-		return err
-	}
-
-	if opts.EnablePsql17 {
-		overrideImages = append(overrideImages, "airbyte/db:"+helm.Psql17AirbyteTag)
 	}
 
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
@@ -176,14 +165,26 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			pterm.Success.Printfln("Port %d appears to be available", i.Port)
 			spinner.UpdateText(fmt.Sprintf("Creating cluster '%s'", provider.ClusterName))
 
-			if err := cluster.Create(ctx, i.Port, opts.ExtraVolumeMounts); err != nil {
+			if err := cluster.Create(ctx, i.Port, extraVolumeMounts); err != nil {
 				pterm.Error.Printfln("Cluster '%s' could not be created", provider.ClusterName)
 				return err
 			}
 			pterm.Success.Printfln("Cluster '%s' created", provider.ClusterName)
 		}
 
-		lc, err := service.New(provider,
+		// Overrides Helm chart images.
+		overrideImages := []string{}
+
+		opts, err := i.InstallOpts(ctx, telClient.User())
+		if err != nil {
+			return err
+		}
+
+		if opts.EnablePsql17 {
+			overrideImages = append(overrideImages, "airbyte/db:"+helm.Psql17AirbyteTag)
+		}
+
+		svcMgr, err := service.NewManager(provider,
 			service.WithPortHTTP(i.Port),
 			service.WithTelemetryClient(telClient),
 			service.WithSpinner(spinner),
@@ -195,9 +196,9 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		}
 
 		spinner.UpdateText("Pulling images")
-		lc.PrepImages(ctx, cluster, opts, overrideImages...)
+		svcMgr.PrepImages(ctx, cluster, opts, overrideImages...)
 
-		if err := lc.Install(ctx, opts); err != nil {
+		if err := svcMgr.Install(ctx, opts); err != nil {
 			spinner.Fail("Unable to install Airbyte locally")
 			return err
 		}

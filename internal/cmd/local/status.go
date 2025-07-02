@@ -62,7 +62,7 @@ func status(ctx context.Context, provider k8s.Provider, telClient telemetry.Clie
 		return err
 	}
 
-	lc, err := service.New(provider,
+	svcMgr, err := service.NewManager(provider,
 		service.WithPortHTTP(port),
 		service.WithTelemetryClient(telClient),
 		service.WithSpinner(spinner),
@@ -72,7 +72,7 @@ func status(ctx context.Context, provider k8s.Provider, telClient telemetry.Clie
 		return fmt.Errorf("unable to initialize local command: %w", err)
 	}
 
-	if err := lc.Status(ctx); err != nil {
+	if err := svcMgr.Status(ctx); err != nil {
 		spinner.Fail("Unable to install Airbyte locally")
 		return err
 	}
