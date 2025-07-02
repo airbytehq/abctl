@@ -43,14 +43,13 @@ const (
 )
 
 type InstallOpts struct {
-	HelmChartVersion  string
-	HelmValuesYaml    string
-	AirbyteChartLoc   string
-	Secrets           []string
-	Hosts             []string
-	ExtraVolumeMounts []k8s.ExtraVolumeMount
-	LocalStorage      bool
-	EnablePsql17      bool
+	HelmChartVersion string
+	HelmValuesYaml   string
+	AirbyteChartLoc  string
+	Secrets          []string
+	Hosts            []string
+	LocalStorage     bool
+	EnablePsql17     bool
 
 	DockerServer string
 	DockerUser   string
