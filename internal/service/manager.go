@@ -113,8 +113,8 @@ func WithPortHTTP(port int) Option {
 	}
 }
 
-// New creates a new Manager
-func New(provider k8s.Provider, opts ...Option) (*Manager, error) {
+// NewManager initializes the service manager.
+func NewManager(provider k8s.Provider, opts ...Option) (*Manager, error) {
 	m := &Manager{provider: provider}
 	for _, opt := range opts {
 		opt(m)

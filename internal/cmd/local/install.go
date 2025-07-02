@@ -184,7 +184,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			overrideImages = append(overrideImages, "airbyte/db:"+helm.Psql17AirbyteTag)
 		}
 
-		lc, err := service.New(provider,
+		svcMgr, err := service.NewManager(provider,
 			service.WithPortHTTP(i.Port),
 			service.WithTelemetryClient(telClient),
 			service.WithSpinner(spinner),
@@ -196,9 +196,9 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		}
 
 		spinner.UpdateText("Pulling images")
-		lc.PrepImages(ctx, cluster, opts, overrideImages...)
+		svcMgr.PrepImages(ctx, cluster, opts, overrideImages...)
 
-		if err := lc.Install(ctx, opts); err != nil {
+		if err := svcMgr.Install(ctx, opts); err != nil {
 			spinner.Fail("Unable to install Airbyte locally")
 			return err
 		}

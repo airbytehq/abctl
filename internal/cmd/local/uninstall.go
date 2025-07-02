@@ -49,12 +49,12 @@ func (u *UninstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient
 
 		pterm.Success.Printfln("Existing cluster '%s' found", provider.ClusterName)
 
-		lc, err := service.New(provider, service.WithTelemetryClient(telClient), service.WithSpinner(spinner))
+		svcMgr, err := service.NewManager(provider, service.WithTelemetryClient(telClient), service.WithSpinner(spinner))
 		if err != nil {
 			pterm.Warning.Printfln("Failed to initialize 'local' command\nUninstallation attempt will continue")
 			pterm.Debug.Printfln("Initialization of 'local' failed with %s", err.Error())
 		} else {
-			if err := lc.Uninstall(ctx, service.UninstallOpts{Persisted: u.Persisted}); err != nil {
+			if err := svcMgr.Uninstall(ctx, service.UninstallOpts{Persisted: u.Persisted}); err != nil {
 				pterm.Warning.Printfln("unable to complete uninstall: %s", err.Error())
 				pterm.Warning.Println("will still attempt to uninstall the cluster")
 			}
