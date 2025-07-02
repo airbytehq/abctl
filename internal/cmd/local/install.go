@@ -124,18 +124,6 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
 
-	// Overrides Helm chart images.
-	overrideImages := []string{}
-
-	opts, err := i.InstallOpts(ctx, telClient.User())
-	if err != nil {
-		return err
-	}
-
-	if opts.EnablePsql17 {
-		overrideImages = append(overrideImages, "airbyte/db:"+helm.Psql17AirbyteTag)
-	}
-
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
 		spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
@@ -182,6 +170,18 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 				return err
 			}
 			pterm.Success.Printfln("Cluster '%s' created", provider.ClusterName)
+		}
+
+		// Overrides Helm chart images.
+		overrideImages := []string{}
+
+		opts, err := i.InstallOpts(ctx, telClient.User())
+		if err != nil {
+			return err
+		}
+
+		if opts.EnablePsql17 {
+			overrideImages = append(overrideImages, "airbyte/db:"+helm.Psql17AirbyteTag)
 		}
 
 		lc, err := service.New(provider,
