@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+// InstallCmd contains the arguments used when executing the install command.
 type InstallCmd struct {
 	Chart           string   `help:"Path to chart." xor:"chartver"`
 	ChartVersion    string   `help:"Version to install." xor:"chartver"`
@@ -32,6 +33,7 @@ type InstallCmd struct {
 	Volume          []string `help:"Additional volume mounts. Must be in the format <HOST_PATH>:<GUEST_PATH>."`
 }
 
+// Run executes the install command which creates the Kind cluster and installs the Airbyte service.
 func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
 	ctx, span := trace.NewSpan(ctx, "local install")
 	defer span.End()
