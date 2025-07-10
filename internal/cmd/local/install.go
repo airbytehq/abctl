@@ -32,77 +32,6 @@ type InstallCmd struct {
 	Volume          []string `help:"Additional volume mounts. Must be in the format <HOST_PATH>:<GUEST_PATH>."`
 }
 
-func (i *InstallCmd) InstallOpts(ctx context.Context, user string) (*service.InstallOpts, error) {
-	ctx, span := trace.NewSpan(ctx, "InstallCmd.InstallOpts")
-	defer span.End()
-
-	span.SetAttributes(attribute.Bool("host", len(i.Host) > 0))
-
-	for _, host := range i.Host {
-		if err := validateHostFlag(host); err != nil {
-			return nil, err
-		}
-	}
-
-	supportMinio, err := service.SupportMinio()
-	if err != nil {
-		return nil, err
-	}
-
-	if supportMinio {
-		pterm.Warning.Println("Found MinIO physical volume. Consider migrating it to local storage (see project docs)")
-	}
-
-	enablePsql17, err := service.EnablePsql17()
-	if err != nil {
-		return nil, err
-	}
-
-	if !enablePsql17 {
-		pterm.Warning.Println("Psql 13 detected. Consider upgrading to 17")
-	}
-
-	opts := &service.InstallOpts{
-		HelmChartVersion: i.ChartVersion,
-		AirbyteChartLoc:  helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
-		Secrets:          i.Secret,
-		Hosts:            i.Host,
-		LocalStorage:     !supportMinio,
-		EnablePsql17:     enablePsql17,
-		DockerServer:     i.DockerServer,
-		DockerUser:       i.DockerUsername,
-		DockerPass:       i.DockerPassword,
-		DockerEmail:      i.DockerEmail,
-		NoBrowser:        i.NoBrowser,
-	}
-
-	valuesOpts := helm.ValuesOpts{
-		ValuesFile:      i.Values,
-		InsecureCookies: i.InsecureCookies,
-		LowResourceMode: i.LowResourceMode,
-		DisableAuth:     i.DisableAuth,
-		LocalStorage:    !supportMinio,
-		EnablePsql17:    enablePsql17,
-	}
-
-	if opts.DockerAuth() {
-		valuesOpts.ImagePullSecret = common.DockerAuthSecretName
-	}
-
-	// only override the empty telUser if the tel.User returns a non-nil (uuid.Nil) value.
-	if user != "" {
-		valuesOpts.TelemetryUser = user
-	}
-
-	valuesYAML, err := helm.BuildAirbyteValues(ctx, valuesOpts)
-	if err != nil {
-		return nil, err
-	}
-	opts.HelmValuesYaml = valuesYAML
-
-	return opts, nil
-}
-
 func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
 	ctx, span := trace.NewSpan(ctx, "local install")
 	defer span.End()
@@ -175,7 +104,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		// Overrides Helm chart images.
 		overrideImages := []string{}
 
-		opts, err := i.InstallOpts(ctx, telClient.User())
+		opts, err := i.installOpts(ctx, telClient.User())
 		if err != nil {
 			return err
 		}
@@ -210,4 +139,75 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 		)
 		return nil
 	})
+}
+
+func (i *InstallCmd) installOpts(ctx context.Context, user string) (*service.InstallOpts, error) {
+	ctx, span := trace.NewSpan(ctx, "InstallCmd.InstallOpts")
+	defer span.End()
+
+	span.SetAttributes(attribute.Bool("host", len(i.Host) > 0))
+
+	for _, host := range i.Host {
+		if err := validateHostFlag(host); err != nil {
+			return nil, err
+		}
+	}
+
+	supportMinio, err := service.SupportMinio()
+	if err != nil {
+		return nil, err
+	}
+
+	if supportMinio {
+		pterm.Warning.Println("Found MinIO physical volume. Consider migrating it to local storage (see project docs)")
+	}
+
+	enablePsql17, err := service.EnablePsql17()
+	if err != nil {
+		return nil, err
+	}
+
+	if !enablePsql17 {
+		pterm.Warning.Println("Psql 13 detected. Consider upgrading to 17")
+	}
+
+	opts := &service.InstallOpts{
+		HelmChartVersion: i.ChartVersion,
+		AirbyteChartLoc:  helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
+		Secrets:          i.Secret,
+		Hosts:            i.Host,
+		LocalStorage:     !supportMinio,
+		EnablePsql17:     enablePsql17,
+		DockerServer:     i.DockerServer,
+		DockerUser:       i.DockerUsername,
+		DockerPass:       i.DockerPassword,
+		DockerEmail:      i.DockerEmail,
+		NoBrowser:        i.NoBrowser,
+	}
+
+	valuesOpts := helm.ValuesOpts{
+		ValuesFile:      i.Values,
+		InsecureCookies: i.InsecureCookies,
+		LowResourceMode: i.LowResourceMode,
+		DisableAuth:     i.DisableAuth,
+		LocalStorage:    !supportMinio,
+		EnablePsql17:    enablePsql17,
+	}
+
+	if opts.DockerAuth() {
+		valuesOpts.ImagePullSecret = common.DockerAuthSecretName
+	}
+
+	// only override the empty telUser if the tel.User returns a non-nil (uuid.Nil) value.
+	if user != "" {
+		valuesOpts.TelemetryUser = user
+	}
+
+	valuesYAML, err := helm.BuildAirbyteValues(ctx, valuesOpts)
+	if err != nil {
+		return nil, err
+	}
+	opts.HelmValuesYaml = valuesYAML
+
+	return opts, nil
 }

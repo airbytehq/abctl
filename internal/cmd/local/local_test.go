@@ -3,7 +3,6 @@ package local
 import (
 	"context"
 	"errors"
-
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,10 +33,10 @@ func TestCheckAirbyteDir(t *testing.T) {
 
 	t.Run("directory with correct permissions", func(t *testing.T) {
 		paths.Airbyte = filepath.Join(t.TempDir(), "correct-perms")
-		if err := os.MkdirAll(paths.Airbyte, 0744); err != nil {
+		if err := os.MkdirAll(paths.Airbyte, 0o744); err != nil {
 			t.Fatal("unable to create test directory", err)
 		}
-		if err := os.Chmod(paths.Airbyte, 0744); err != nil {
+		if err := os.Chmod(paths.Airbyte, 0o744); err != nil {
 			t.Fatal("unable to change permissions", err)
 		}
 		if err := checkAirbyteDir(); err != nil {
@@ -49,17 +48,17 @@ func TestCheckAirbyteDir(t *testing.T) {
 		if err != nil {
 			t.Fatal("unable to check permissions", err)
 		}
-		if d := cmp.Diff(0744, int(perms.Mode().Perm())); d != "" {
+		if d := cmp.Diff(0o744, int(perms.Mode().Perm())); d != "" {
 			t.Errorf("permissions mismatch (-want +got):\n%s", d)
 		}
 	})
 
 	t.Run("directory with higher permissions", func(t *testing.T) {
 		paths.Airbyte = filepath.Join(t.TempDir(), "correct-perms")
-		if err := os.MkdirAll(paths.Airbyte, 0777); err != nil {
+		if err := os.MkdirAll(paths.Airbyte, 0o777); err != nil {
 			t.Fatal("unable to create test directory", err)
 		}
-		if err := os.Chmod(paths.Airbyte, 0777); err != nil {
+		if err := os.Chmod(paths.Airbyte, 0o777); err != nil {
 			t.Fatal("unable to change permissions", err)
 		}
 		if err := checkAirbyteDir(); err != nil {
@@ -71,17 +70,17 @@ func TestCheckAirbyteDir(t *testing.T) {
 		if err != nil {
 			t.Fatal("unable to check permissions", err)
 		}
-		if d := cmp.Diff(0777, int(perms.Mode().Perm())); d != "" {
+		if d := cmp.Diff(0o777, int(perms.Mode().Perm())); d != "" {
 			t.Errorf("permissions mismatch (-want +got):\n%s", d)
 		}
 	})
 
 	t.Run("directory with incorrect permissions", func(t *testing.T) {
 		paths.Airbyte = filepath.Join(t.TempDir(), "incorrect-perms")
-		if err := os.MkdirAll(paths.Airbyte, 0200); err != nil {
+		if err := os.MkdirAll(paths.Airbyte, 0o200); err != nil {
 			t.Fatal("unable to create test directory", err)
 		}
-		if err := os.Chmod(paths.Airbyte, 0200); err != nil {
+		if err := os.Chmod(paths.Airbyte, 0o200); err != nil {
 			t.Fatal("unable to change permissions", err)
 		}
 		// although the permissions are incorrect, checkAirbyteDir should fix them
@@ -94,14 +93,13 @@ func TestCheckAirbyteDir(t *testing.T) {
 		if err != nil {
 			t.Fatal("unable to check permissions", err)
 		}
-		if d := cmp.Diff(0744, int(perms.Mode().Perm())); d != "" {
+		if d := cmp.Diff(0o744, int(perms.Mode().Perm())); d != "" {
 			t.Errorf("permissions mismatch (-want +got):\n%s", d)
 		}
 	})
 }
 
 func TestValues_FileDoesntExist(t *testing.T) {
-
 	var root InstallCmd
 	k, _ := kong.New(
 		&root,
@@ -120,7 +118,6 @@ func TestValues_FileDoesntExist(t *testing.T) {
 }
 
 func TestValues_BadYaml(t *testing.T) {
-
 	cmd := InstallCmd{Values: "./testdata/invalid.values.yaml"}
 	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
 	if err == nil {
@@ -160,7 +157,7 @@ func TestInstallOpts(t *testing.T) {
 		LocalStorage:    true,
 		EnablePsql17:    true,
 	}
-	opts, err := cmd.InstallOpts(context.Background(), "test-user")
+	opts, err := cmd.installOpts(context.Background(), "test-user")
 	if err != nil {
 		t.Fatal(err)
 	}
