@@ -119,7 +119,7 @@ func TestValues_FileDoesntExist(t *testing.T) {
 
 func TestValues_BadYaml(t *testing.T) {
 	cmd := InstallCmd{Values: "./testdata/invalid.values.yaml"}
-	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+	err := cmd.Run(context.Background(), k8s.TestProvider, nil, telemetry.NoopClient{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -131,7 +131,7 @@ func TestValues_BadYaml(t *testing.T) {
 
 func TestInvalidHostFlag_IpAddr(t *testing.T) {
 	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4"}}
-	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+	err := cmd.Run(context.Background(), k8s.TestProvider, nil, telemetry.NoopClient{})
 	if !errors.Is(err, abctl.ErrIpAddressForHostFlag) {
 		t.Errorf("expected ErrIpAddressForHostFlag but got %v", err)
 	}
@@ -139,7 +139,7 @@ func TestInvalidHostFlag_IpAddr(t *testing.T) {
 
 func TestInvalidHostFlag_IpAddrWithPort(t *testing.T) {
 	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4:8000"}}
-	err := cmd.Run(context.Background(), k8s.TestProvider, telemetry.NoopClient{})
+	err := cmd.Run(context.Background(), k8s.TestProvider, nil, telemetry.NoopClient{})
 	if !errors.Is(err, abctl.ErrInvalidHostFlag) {
 		t.Errorf("expected ErrInvalidHostFlag but got %v", err)
 	}

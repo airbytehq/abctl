@@ -34,7 +34,7 @@ type InstallCmd struct {
 }
 
 // Run executes the install command which creates the Kind cluster and installs the Airbyte service.
-func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient telemetry.Client) error {
+func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, newSvcMgrClients SvcMgrClientFactory, telClient telemetry.Client) error {
 	ctx, span := trace.NewSpan(ctx, "local install")
 	defer span.End()
 
@@ -115,7 +115,18 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, telClient t
 			overrideImages = append(overrideImages, "airbyte/db:"+helm.Psql17AirbyteTag)
 		}
 
+		// Load the required service manager clients.
+		// TODO(bernielomax): The Helm client will eventually be dependency-injected
+		// into the build values function to support querying the Helm chart for
+		// version compatibility operations.
+		k8sClient, helmClient, err := newSvcMgrClients(provider.Kubeconfig, provider.Context)
+		if err != nil {
+			return err
+		}
+
 		svcMgr, err := service.NewManager(provider,
+			service.WithK8sClient(k8sClient),
+			service.WithHelmClient(helmClient),
 			service.WithPortHTTP(i.Port),
 			service.WithTelemetryClient(telClient),
 			service.WithSpinner(spinner),

@@ -27,5 +27,6 @@ type Cmd struct {
 
 func (c *Cmd) BeforeApply(_ context.Context, kCtx *kong.Context) error {
 	kCtx.BindTo(k8s.DefaultProvider, (*k8s.Provider)(nil))
+	kCtx.BindTo(local.DefaultSvcMgrClientFactory, (*local.SvcMgrClientFactory)(nil))
 	return nil
 }
