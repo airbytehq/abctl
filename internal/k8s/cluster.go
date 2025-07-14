@@ -36,10 +36,10 @@ type Cluster interface {
 }
 
 // interface sanity check
-var _ Cluster = (*kindCluster)(nil)
+var _ Cluster = (*KindCluster)(nil)
 
-// kindCluster is a Cluster implementation for kind (https://kind.sigs.k8s.io/).
-type kindCluster struct {
+// KindCluster is a Cluster implementation for kind (https://kind.sigs.k8s.io/).
+type KindCluster struct {
 	// p is the kind provider, not the abctl provider
 	p *cluster.Provider
 	// kubeconfig is the full path to the kubeconfig file kind is using
@@ -52,14 +52,14 @@ type kindCluster struct {
 // that we're currently using (e.g. https://github.com/kubernetes-sigs/kind/releases/tag/v0.25.0)
 const k8sVersion = "v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f"
 
-func (k *kindCluster) Create(ctx context.Context, port int, extraMounts []ExtraVolumeMount) error {
-	ctx, span := trace.NewSpan(ctx, "kindCluster.Create")
+func (k *KindCluster) Create(ctx context.Context, port int, extraMounts []ExtraVolumeMount) error {
+	ctx, span := trace.NewSpan(ctx, "KindCluster.Create")
 	defer span.End()
 	// Create the data directory before the cluster does to ensure that it's owned by the correct user.
 	// If the cluster creates it and docker is running as root, it's possible that root will own this directory
 	// which will cause minio and postgres to break.
 	pterm.Debug.Println(fmt.Sprintf("Creating data directory '%s'", paths.Data))
-	if err := os.MkdirAll(paths.Data, 0766); err != nil {
+	if err := os.MkdirAll(paths.Data, 0o766); err != nil {
 		pterm.Error.Println(fmt.Sprintf("Error creating data directory '%s'", paths.Data))
 		return fmt.Errorf("unable to create directory '%s': %w", paths.Data, err)
 	}
@@ -89,8 +89,8 @@ func (k *kindCluster) Create(ctx context.Context, port int, extraMounts []ExtraV
 	return nil
 }
 
-func (k *kindCluster) Delete(ctx context.Context) error {
-	_, span := trace.NewSpan(ctx, "kindCluster.Delete")
+func (k *KindCluster) Delete(ctx context.Context) error {
+	_, span := trace.NewSpan(ctx, "KindCluster.Delete")
 	defer span.End()
 	if err := k.p.Delete(k.clusterName, k.kubeconfig); err != nil {
 		return fmt.Errorf("unable to delete kind cluster: %w", formatKindErr(err))
@@ -99,8 +99,8 @@ func (k *kindCluster) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (k *kindCluster) Exists(ctx context.Context) bool {
-	_, span := trace.NewSpan(ctx, "kindCluster.exists")
+func (k *KindCluster) Exists(ctx context.Context) bool {
+	_, span := trace.NewSpan(ctx, "KindCluster.exists")
 	defer span.End()
 
 	clusters, _ := k.p.List()
@@ -116,8 +116,8 @@ func (k *kindCluster) Exists(ctx context.Context) bool {
 // LoadImages pulls images from Docker Hub, and loads them into the kind cluster.
 // This is a best-effort optimization, which is why it doesn't return an error.
 // It's possible that only some images will be loaded.
-func (k *kindCluster) LoadImages(ctx context.Context, dockerClient docker.Client, images []string) {
-	ctx, span := trace.NewSpan(ctx, "kindCluster.LoadImages")
+func (k *KindCluster) LoadImages(ctx context.Context, dockerClient docker.Client, images []string) {
+	ctx, span := trace.NewSpan(ctx, "KindCluster.LoadImages")
 	defer span.End()
 
 	span.SetAttributes(attribute.Int("total_images", len(images)))

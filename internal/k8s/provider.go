@@ -30,7 +30,7 @@ func (p Provider) Cluster(ctx context.Context) (Cluster, error) {
 	_, span := trace.NewSpan(ctx, "Provider.Cluster")
 	defer span.End()
 
-	if err := os.MkdirAll(filepath.Dir(p.Kubeconfig), 0766); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p.Kubeconfig), 0o766); err != nil {
 		return nil, fmt.Errorf("unable to create directory %s: %v", p.Kubeconfig, err)
 	}
 
@@ -39,15 +39,17 @@ func (p Provider) Cluster(ctx context.Context) (Cluster, error) {
 		pterm.Debug.Printfln("failed to export kube config: %s", err)
 	}
 
-	return &kindCluster{
+	return &KindCluster{
 		p:           kindProvider,
 		kubeconfig:  p.Kubeconfig,
 		clusterName: p.ClusterName,
 	}, nil
 }
 
-var _ log.Logger = (*kindLogger)(nil)
-var _ log.InfoLogger = (*kindLogger)(nil)
+var (
+	_ log.Logger     = (*kindLogger)(nil)
+	_ log.InfoLogger = (*kindLogger)(nil)
+)
 
 // kindLogger implements the k8s logger interfaces.
 // Necessarily in order to capture kind specify logging for debug purposes
