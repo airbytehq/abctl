@@ -155,7 +155,7 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, newSvcMgrCl
 }
 
 func (i *InstallCmd) installOpts(ctx context.Context, user string) (*service.InstallOpts, error) {
-	ctx, span := trace.NewSpan(ctx, "InstallCmd.InstallOpts")
+	ctx, span := trace.NewSpan(ctx, "InstallCmd.installOpts")
 	defer span.End()
 
 	span.SetAttributes(attribute.Bool("host", len(i.Host) > 0))
