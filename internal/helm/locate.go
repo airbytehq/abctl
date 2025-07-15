@@ -57,7 +57,7 @@ func LocateLatestAirbyteChart(chartVersion, chartFlag string) string {
 	// which forces Helm to resolve the chart over HTTP and ignore local directories.
 	// If the locator fails, fall back to the original helm behavior.
 	if chartVersion == "" {
-		if url, err := getLatestAirbyteChartUrlFromRepoIndex(common.AirbyteRepoName, common.AirbyteRepoURL); err == nil {
+		if url, _, err := GetLatestAirbyteChartUrlFromRepoIndex(common.AirbyteRepoName, common.AirbyteRepoURLv1); err == nil {
 			pterm.Debug.Printf("determined latest airbyte chart url: %s\n", url)
 			return url
 		} else {
@@ -68,32 +68,35 @@ func LocateLatestAirbyteChart(chartVersion, chartFlag string) string {
 	return common.AirbyteChartName
 }
 
-func getLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, error) {
+// GetLatestAirbyteChartUrlFromRepoIndex fetches the latest stable Airbyte Helm chart URL and version
+// from the given Helm repository index. Returns the chart download URL, the chart version, and an error if any.
+// Only stable (non-prerelease) versions are considered.
+func GetLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, string, error) {
 	chartRepository, err := defaultNewChartRepo(&repo.Entry{
 		Name: repoName,
 		URL:  repoUrl,
 	}, getter.All(cli.New()))
 	if err != nil {
-		return "", fmt.Errorf("unable to access repo index: %w", err)
+		return "", "", fmt.Errorf("unable to access repo index: %w", err)
 	}
 
 	idxPath, err := chartRepository.DownloadIndexFile()
 	if err != nil {
-		return "", fmt.Errorf("unable to download index file: %w", err)
+		return "", "", fmt.Errorf("unable to download index file: %w", err)
 	}
 
 	idx, err := defaultLoadIndexFile(idxPath)
 	if err != nil {
-		return "", fmt.Errorf("unable to load index file (%s): %w", idxPath, err)
+		return "", "", fmt.Errorf("unable to load index file (%s): %w", idxPath, err)
 	}
 
 	entries, ok := idx.Entries["airbyte"]
 	if !ok {
-		return "", fmt.Errorf("no entry for airbyte in repo index")
+		return "", "", fmt.Errorf("no entry for airbyte in repo index")
 	}
 
 	if len(entries) == 0 {
-		return "", errors.New("no chart version found")
+		return "", "", errors.New("no chart version found")
 	}
 
 	var latest *repo.ChartVersion
@@ -111,12 +114,12 @@ func getLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, er
 	}
 
 	if latest == nil {
-		return "", fmt.Errorf("no valid version of airbyte chart found in repo index")
+		return "", "", fmt.Errorf("no valid version of airbyte chart found in repo index")
 	}
 
 	if len(latest.URLs) != 1 {
-		return "", fmt.Errorf("unexpected number of URLs - %d", len(latest.URLs))
+		return "", "", fmt.Errorf("unexpected number of URLs - %d", len(latest.URLs))
 	}
 
-	return common.AirbyteRepoURL + "/" + latest.URLs[0], nil
+	return repoUrl + "/" + latest.URLs[0], latest.Version, nil
 }
