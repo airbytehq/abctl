@@ -42,7 +42,7 @@ func TestCommand_Install_HappyPath(t *testing.T) {
 	helm.EXPECT().AddOrUpdateChartRepo(gomock.Any()).DoAndReturn(func(entry repo.Entry) error {
 		switch entry.Name {
 		case common.AirbyteRepoName:
-			if d := cmp.Diff(common.AirbyteRepoURL, entry.URL); d != "" {
+			if d := cmp.Diff(common.AirbyteRepoURLv1, entry.URL); d != "" {
 				t.Error("chart url mismatch", d)
 			}
 		case common.NginxRepoName:

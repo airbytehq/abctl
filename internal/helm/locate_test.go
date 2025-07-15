@@ -41,7 +41,7 @@ func TestLocate(t *testing.T) {
 					URLs:     []string{"example.test"},
 				}},
 			},
-			exp: common.AirbyteRepoURL + "/example.test",
+			exp: common.AirbyteRepoURLv1 + "/example.test",
 		},
 		{
 			name: "one non-release entry",
@@ -92,7 +92,7 @@ func TestLocate(t *testing.T) {
 					},
 				},
 			},
-			exp: common.AirbyteRepoURL + "/good.test",
+			exp: common.AirbyteRepoURLv1 + "/good.test",
 		},
 	}
 
