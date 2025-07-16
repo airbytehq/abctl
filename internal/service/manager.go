@@ -28,6 +28,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// ManagerClientFactory creates and returns the Kubernetes and Helm clients
+// needed by the service manager.
+type ManagerClientFactory func(kubeConfig, kubeContext string) (k8s.Client, goHelm.Client, error)
+
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -235,4 +239,20 @@ func EnablePsql17() (bool, error) {
 	}
 
 	return false, nil
+}
+
+// DefaultManagerClientFactory initializes and returns the default Kubernetes
+// and Helm clients for the service manager.
+func DefaultManagerClientFactory(kubeConfig, kubeContext string) (k8s.Client, goHelm.Client, error) {
+	kubeClient, err := DefaultK8s(kubeConfig, kubeContext)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize the kubernetes client: %w", err)
+	}
+
+	helmClient, err := helm.New(kubeConfig, kubeContext, common.AirbyteNamespace)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize the helm client: %w", err)
+	}
+
+	return kubeClient, helmClient, nil
 }
