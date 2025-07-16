@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/airbytehq/abctl/internal/trace"
 	"github.com/pterm/pterm"
@@ -99,7 +100,7 @@ var (
 	DefaultProvider = Provider{
 		Name:        Kind,
 		ClusterName: "airbyte-abctl",
-		Context:     "kind-airbyte-abctl",
+		Context:     common.AirbyteKubeContext,
 		Kubeconfig:  paths.Kubeconfig,
 	}
 

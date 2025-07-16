@@ -8,6 +8,8 @@ import (
 
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/helm"
+	"github.com/airbytehq/abctl/internal/paths"
+	"github.com/airbytehq/abctl/internal/service"
 	"github.com/airbytehq/abctl/internal/trace"
 )
 
@@ -17,17 +19,18 @@ type ManifestCmd struct {
 	Values       string `type:"existingfile" help:"An Airbyte helm chart values file to configure helm."`
 }
 
-func (c *ManifestCmd) Run(ctx context.Context) error {
+func (c *ManifestCmd) Run(ctx context.Context, newSvcMgrClients service.ManagerClientFactory) error {
 	ctx, span := trace.NewSpan(ctx, "images manifest")
 	defer span.End()
 
-	// TODO (bernielomax): Replace with service manager client factory.
-	client, err := goHelm.New(helm.ClientOptions(common.AirbyteNamespace))
+	// Load the required service manager clients. We only need the Helm client
+	// for image manifest operations.
+	_, helmClient, err := newSvcMgrClients(paths.Kubeconfig, common.AirbyteKubeContext)
 	if err != nil {
 		return err
 	}
 
-	images, err := c.findAirbyteImages(ctx, client)
+	images, err := c.findAirbyteImages(ctx, helmClient)
 	if err != nil {
 		return err
 	}
