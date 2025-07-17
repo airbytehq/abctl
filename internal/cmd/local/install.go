@@ -34,7 +34,7 @@ type InstallCmd struct {
 }
 
 // Run executes the install command which creates the Kind cluster and installs the Airbyte service.
-func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, newSvcMgrClients SvcMgrClientFactory, telClient telemetry.Client) error {
+func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, newSvcMgrClients service.ManagerClientFactory, telClient telemetry.Client) error {
 	ctx, span := trace.NewSpan(ctx, "local install")
 	defer span.End()
 
