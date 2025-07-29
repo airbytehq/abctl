@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/airbytehq/abctl/internal/common"
-	"github.com/pterm/pterm"
 	"golang.org/x/mod/semver"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/getter"
@@ -40,33 +38,6 @@ var defaultNewChartRepo newChartRepo = func(cfg *repo.Entry, getters getter.Prov
 // It simply wraps the repo.LoadIndexFile function.
 // This variable should only be modified for testing purposes.
 var defaultLoadIndexFile loadIndexFile = repo.LoadIndexFile
-
-func LocateLatestAirbyteChart(chartVersion, chartFlag string) string {
-	pterm.Debug.Printf("getting helm chart %q with version %q\n", common.AirbyteChartName, chartVersion)
-
-	// If the --chart flag was given, use that.
-	if chartFlag != "" {
-		return chartFlag
-	}
-
-	// Helm will consider a local directory path named "airbyte/airbyte" to be a chart repo,
-	// but it might not be, which causes errors like "Chart.yaml file is missing".
-	// This trips up plenty of people, see: https://github.com/helm/helm/issues/7862
-	//
-	// Here we avoid that problem by figuring out the full URL of the airbyte chart,
-	// which forces Helm to resolve the chart over HTTP and ignore local directories.
-	// If the locator fails, fall back to the original helm behavior.
-	if chartVersion == "" {
-		if url, _, err := GetLatestAirbyteChartUrlFromRepoIndex(common.AirbyteRepoName, common.AirbyteRepoURLv1); err == nil {
-			pterm.Debug.Printf("determined latest airbyte chart url: %s\n", url)
-			return url
-		} else {
-			pterm.Debug.Printf("error determining latest airbyte chart, falling back to default behavior: %s\n", err)
-		}
-	}
-
-	return common.AirbyteChartName
-}
 
 // GetLatestAirbyteChartUrlFromRepoIndex fetches the latest stable Airbyte Helm chart URL and version
 // from the given Helm repository index. Returns the chart download URL, the chart version, and an error if any.
