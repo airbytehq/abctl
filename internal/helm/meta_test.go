@@ -68,7 +68,7 @@ func TestGetMetadataForRef(t *testing.T) {
 func TestGetMetadataForURL(t *testing.T) {
 	t.Parallel()
 
-	// Serve a fake .tgz (invalid, but for loader.LoadArchive error path)
+	// Serve a valid chart archive with Chart.yaml for testing URL-based chart resolution
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "notfound") {
 			w.WriteHeader(http.StatusNotFound)
