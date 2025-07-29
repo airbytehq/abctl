@@ -13,7 +13,6 @@ import (
 
 	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/airbyte"
-	"github.com/airbytehq/abctl/internal/cmd/images"
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/docker"
 	"github.com/airbytehq/abctl/internal/helm"
@@ -92,7 +91,7 @@ func (m *Manager) persistentVolume(ctx context.Context, namespace, name string) 
 		path := filepath.Join(paths.Data, name)
 
 		pterm.Debug.Println(fmt.Sprintf("Creating directory '%s'", path))
-		if err := os.MkdirAll(path, 0766); err != nil {
+		if err := os.MkdirAll(path, 0o766); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Unable to create directory '%s'", name))
 			return fmt.Errorf("unable to create persistent volume '%s': %w", name, err)
 		}
@@ -114,7 +113,7 @@ func (m *Manager) persistentVolume(ctx context.Context, namespace, name string) 
 		// Due to the postgres uid/gid issue mentioned above, 0775 or 0755 would not allow the postgres image
 		// access to the persisted volume directory.
 		pterm.Debug.Println(fmt.Sprintf("Updating permissions for '%s'", path))
-		if err := os.Chmod(path, 0777); err != nil {
+		if err := os.Chmod(path, 0o777); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Unable to set permissions for '%s'", path))
 			return fmt.Errorf("unable to set permissions for '%s': %w", path, err)
 		}
@@ -160,7 +159,7 @@ func (m *Manager) PrepImages(ctx context.Context, cluster k8s.Cluster, opts *Ins
 		pterm.Info.Printfln("Patching image %s", image)
 	}
 
-	manifest, err := images.FindImagesFromChart(opts.HelmValuesYaml, opts.AirbyteChartLoc, opts.HelmChartVersion)
+	manifest, err := helm.FindImagesFromChart(m.helm, opts.HelmValuesYaml, opts.AirbyteChartLoc, opts.HelmChartVersion)
 	if err != nil {
 		pterm.Debug.Printfln("error building image manifest: %s", err)
 		return
