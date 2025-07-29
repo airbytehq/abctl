@@ -10,6 +10,7 @@ import (
 	"github.com/airbytehq/abctl/internal/service"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
+	goHelm "github.com/mittwald/go-helm-client"
 	"github.com/pterm/pterm"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -103,6 +104,18 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, newSvcMgrCl
 			pterm.Success.Printfln("Cluster '%s' created", provider.ClusterName)
 		}
 
+		// Load the required service manager clients.
+		k8sClient, helmClient, err := newSvcMgrClients(provider.Kubeconfig, provider.Context)
+		if err != nil {
+			return err
+		}
+
+		// Determine and set defaults for chart flags.
+		err = i.setDefaultChartFlags(helmClient)
+		if err != nil {
+			return fmt.Errorf("failed to set chart defaults: %w", err)
+		}
+
 		// Overrides Helm chart images.
 		overrideImages := []string{}
 
@@ -113,15 +126,6 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, newSvcMgrCl
 
 		if opts.EnablePsql17 {
 			overrideImages = append(overrideImages, "airbyte/db:"+helm.Psql17AirbyteTag)
-		}
-
-		// Load the required service manager clients.
-		// TODO(bernielomax): The Helm client will eventually be dependency-injected
-		// into the build values function to support querying the Helm chart for
-		// version compatibility operations.
-		k8sClient, helmClient, err := newSvcMgrClients(provider.Kubeconfig, provider.Context)
-		if err != nil {
-			return err
 		}
 
 		svcMgr, err := service.NewManager(provider,
@@ -186,7 +190,7 @@ func (i *InstallCmd) installOpts(ctx context.Context, user string) (*service.Ins
 
 	opts := &service.InstallOpts{
 		HelmChartVersion: i.ChartVersion,
-		AirbyteChartLoc:  helm.LocateLatestAirbyteChart(i.ChartVersion, i.Chart),
+		AirbyteChartLoc:  i.Chart,
 		Secrets:          i.Secret,
 		Hosts:            i.Host,
 		LocalStorage:     !supportMinio,
@@ -216,11 +220,26 @@ func (i *InstallCmd) installOpts(ctx context.Context, user string) (*service.Ins
 		valuesOpts.TelemetryUser = user
 	}
 
-	valuesYAML, err := helm.BuildAirbyteValues(ctx, valuesOpts)
+	// Build the values.yaml file for the Airbyte chart.
+	valuesYAML, err := helm.BuildAirbyteValues(ctx, valuesOpts, i.ChartVersion)
 	if err != nil {
 		return nil, err
 	}
+
 	opts.HelmValuesYaml = valuesYAML
 
 	return opts, nil
+}
+
+func (i *InstallCmd) setDefaultChartFlags(helmClient goHelm.Client) error {
+	resolver := helm.NewChartResolver(helmClient)
+	resolvedChart, resolvedVersion, err := resolver.ResolveChartReference(i.Chart, i.ChartVersion)
+	if err != nil {
+		return fmt.Errorf("failed to resolve chart flags: %w", err)
+	}
+
+	i.Chart = resolvedChart
+	i.ChartVersion = resolvedVersion
+
+	return nil
 }
