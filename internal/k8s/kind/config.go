@@ -47,7 +47,14 @@ func DefaultConfig() *Config {
 	kubeadmConfigPatch := `kind: InitConfiguration
 nodeRegistration:
   kubeletExtraArgs:
-    node-labels: "ingress-ready=true"`
+    node-labels: "ingress-ready=true"
+preKubeadmCommands:
+  - mkdir -p /var/local-path-provisioner/airbyte-volume-db
+  - mkdir -p /var/local-path-provisioner/airbyte-local-pv  
+  - mkdir -p /var/local-path-provisioner/airbyte-minio-pv
+  - chmod 755 /var/local-path-provisioner/airbyte-volume-db
+  - chmod 755 /var/local-path-provisioner/airbyte-local-pv
+  - chmod 755 /var/local-path-provisioner/airbyte-minio-pv`
 
 	cfg := &Config{
 		Kind:       "Cluster",
@@ -58,8 +65,10 @@ nodeRegistration:
 				KubeadmConfigPatches: []string{kubeadmConfigPatch},
 				ExtraMounts: []Mount{
 					{
-						HostPath:      paths.Data,
-						ContainerPath: "/var/local-path-provisioner",
+						HostPath:       paths.Data,
+						ContainerPath:  "/var/local-path-provisioner",
+						SelinuxRelabel: true,  // Enable SELinux relabeling for rootless compatibility
+						Propagation:    "Bidirectional", // Use bidirectional for better rootless support
 					},
 				},
 				ExtraPortMappings: []PortMapping{

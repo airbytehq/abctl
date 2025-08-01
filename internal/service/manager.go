@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/common"
+	containerruntime "github.com/airbytehq/abctl/internal/container"
 	"github.com/airbytehq/abctl/internal/docker"
 	"github.com/airbytehq/abctl/internal/helm"
 	"github.com/airbytehq/abctl/internal/k8s/kind"
@@ -41,8 +43,9 @@ type BrowserLauncher func(url string) error
 
 // Manager for the Abctl service.
 type Manager struct {
-	provider k8s.Provider
-	docker   *docker.Docker
+	provider        k8s.Provider
+	docker          *docker.Docker          // Deprecated: for backward compatibility
+	containerRuntime *containerruntime.ContainerRuntime // New container runtime abstraction
 
 	http     HTTPClient
 	helm     goHelm.Client
@@ -60,6 +63,13 @@ type Option func(*Manager)
 func WithDockerClient(client *docker.Docker) Option {
 	return func(m *Manager) {
 		m.docker = client
+	}
+}
+
+// WithContainerRuntime defines the container runtime for this manager.
+func WithContainerRuntime(runtime *containerruntime.ContainerRuntime) Option {
+	return func(m *Manager) {
+		m.containerRuntime = runtime
 	}
 }
 
@@ -169,6 +179,21 @@ func NewManager(provider k8s.Provider, opts ...Option) (*Manager, error) {
 		m.launcher = browser.OpenURL
 	}
 
+	// initialize container runtime if not defined (prioritize containerRuntime over docker)
+	if m.containerRuntime == nil && m.docker == nil {
+		var err error
+		if m.containerRuntime, err = containerruntime.New(context.Background()); err != nil {
+			return nil, fmt.Errorf("unable to initialize container runtime: %w", err)
+		}
+	}
+
+	// for backward compatibility, create docker client from container runtime if needed
+	if m.docker == nil && m.containerRuntime != nil {
+		m.docker = &docker.Docker{
+			Client: m.containerRuntime.Client,
+		}
+	}
+
 	// fetch k8s version information
 	{
 		k8sVersion, err := m.k8s.ServerVersionGet()
@@ -180,6 +205,15 @@ func NewManager(provider k8s.Provider, opts ...Option) (*Manager, error) {
 
 	// set provider version
 	m.tel.Attr("provider", provider.Name)
+
+	// set container runtime telemetry attributes
+	if m.containerRuntime != nil {
+		m.tel.Attr("container_runtime", m.containerRuntime.Type.String())
+		if version, err := m.containerRuntime.Version(context.Background()); err == nil {
+			m.tel.Attr("container_runtime_version", version.Version)
+			m.tel.Attr("container_runtime_arch", version.Arch)
+		}
+	}
 
 	return m, nil
 }

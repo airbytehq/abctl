@@ -2,27 +2,21 @@ package docker
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"os/exec"
-	"runtime"
 
-	"github.com/airbytehq/abctl/internal/abctl"
-	"github.com/airbytehq/abctl/internal/paths"
+	containerruntime "github.com/airbytehq/abctl/internal/container"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pterm/pterm"
-	"go.opentelemetry.io/otel/sdk/trace"
 )
 
 // Version contains al the version information that is being tracked.
+// Deprecated: Use containerruntime.Version instead
 type Version struct {
 	// Version is the platform version
 	Version string
@@ -33,6 +27,7 @@ type Version struct {
 }
 
 // Client interface for testing purposes. Includes only the methods used by the underlying docker package.
+// Deprecated: Use containerruntime.Client instead
 type Client interface {
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (container.CreateResponse, error)
 	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
@@ -54,121 +49,56 @@ type Client interface {
 	Info(ctx context.Context) (system.Info, error)
 }
 
-var _ Client = (*client.Client)(nil)
-
-// Docker for handling communication with the docker processes.
+// Docker for handling communication with container runtimes.
 // Can be created with default settings by calling New or with a custom Client by manually instantiating this type.
+// Deprecated: Use containerruntime.ContainerRuntime instead for new code
 type Docker struct {
 	Client Client
+	runtime *containerruntime.ContainerRuntime
 }
 
 // New returns a new Docker type with a default Client implementation.
+// This now uses the container runtime abstraction and supports both Docker and Podman.
 func New(ctx context.Context) (*Docker, error) {
-	// convert the client.NewClientWithOpts to a newPing function
-	f := func(opts ...client.Opt) (pinger, error) {
-		var p pinger
-		var err error
-		p, err = client.NewClientWithOpts(opts...)
-		if err != nil {
-			return nil, err
-		}
-		return p, nil
-	}
-
-	return newWithOptions(ctx, f, runtime.GOOS)
-}
-
-// newPing exists for testing purposes.
-// This allows a mock docker client (client.Client) to be injected for tests
-type newPing func(...client.Opt) (pinger, error)
-
-// pinger interface for testing purposes.
-// Adds the Ping method to the Client interface which is used by the New function.
-type pinger interface {
-	Client
-	Ping(ctx context.Context) (types.Ping, error)
-}
-
-var _ pinger = (*client.Client)(nil)
-
-// newWithOptions allows for the docker client to be injected for testing purposes.
-func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker, error) {
-
-	var potentialHosts []string
-
-	// The best guess at the docker host comes from the "docker context inspect" command,
-	// which describes the current context in detail.
-	if out, err := exec.Command("docker", "context", "inspect").Output(); err == nil {
-		var data []struct {
-			Endpoints struct {
-				Docker struct {
-					Host string
-				} `json:"docker"`
-			}
-		}
-		if err := json.Unmarshal(out, &data); err == nil {
-			if len(data) > 0 && data[0].Endpoints.Docker.Host != "" {
-				potentialHosts = append(potentialHosts, data[0].Endpoints.Docker.Host)
-			}
-		}
-	}
-
-	// If the code above fails, then fall back to some educated guesses.
-	// Unfortunately, these can easily be wrong if the user is using a non-standard
-	// docker context, or if we've missed any common installation configs here.
-	switch goos {
-	case "darwin":
-		potentialHosts = append(potentialHosts,
-			"unix:///var/run/docker.sock",
-			fmt.Sprintf("unix://%s/.docker/run/docker.sock", paths.UserHome),
-		)
-	case "windows":
-		potentialHosts = append(potentialHosts, "npipe:////./pipe/docker_engine")
-	default:
-		potentialHosts = append(potentialHosts,
-			"unix:///var/run/docker.sock",
-			fmt.Sprintf("unix://%s/.docker/desktop/docker-cli.sock", paths.UserHome),
-		)
-	}
-
-	// Do not sample Docker traces. Dockers Net/HTTP client has Otel instrumentation enabled.
-	// URL's and other fields may contain PII, or sensitive information.
-	noopTraceProvider := trace.NewTracerProvider(
-		trace.WithSampler(trace.NeverSample()),
-	)
-
-	dockerOpts := []client.Opt{client.FromEnv, client.WithAPIVersionNegotiation(), client.WithTraceProvider(noopTraceProvider)}
-
-	for _, host := range potentialHosts {
-		dockerCli, err := createAndPing(ctx, newPing, host, dockerOpts)
-		if err != nil {
-			pterm.Debug.Printfln("error connecting to docker host %s: %s", host, err)
-		} else {
-			return &Docker{Client: dockerCli}, nil
-		}
-	}
-
-	return nil, fmt.Errorf("%w: unable to create docker client", abctl.ErrDocker)
-}
-
-// createAndPing attempts to create a docker client and ping it to ensure we can communicate
-func createAndPing(ctx context.Context, newPing newPing, host string, opts []client.Opt) (Client, error) {
-	// Pass client.WithHost first to ensure it runs prior to the client.FromEnv call.
-	// We want the DOCKER_HOST to be used if it has been specified, overriding our host.
-	cli, err := newPing(append([]client.Opt{client.WithHost(host)}, opts...)...)
+	runtime, err := containerruntime.New(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create docker client: %w", err)
+		return nil, err
 	}
 
-	if _, err := cli.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("unable to ping docker client: %w", err)
-	}
-
-	return cli, nil
+	return &Docker{
+		Client:  runtime.Client,
+		runtime: runtime,
+	}, nil
 }
 
-// Version returns the version information from the underlying docker process.
+// NewWithConfig creates a new Docker instance with specific container runtime configuration
+func NewWithConfig(ctx context.Context, config *containerruntime.Config) (*Docker, error) {
+	runtime, err := containerruntime.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Docker{
+		Client:  runtime.Client,
+		runtime: runtime,
+	}, nil
+}
+
+// Version returns the version information from the underlying container runtime.
 func (d *Docker) Version(ctx context.Context) (Version, error) {
+	if d.runtime != nil {
+		ver, err := d.runtime.Version(ctx)
+		if err != nil {
+			return Version{}, err
+		}
+		return Version{
+			Version:  ver.Version,
+			Arch:     ver.Arch,
+			Platform: ver.Platform,
+		}, nil
+	}
+
+	// Fallback for backward compatibility
 	ver, err := d.Client.ServerVersion(ctx)
 	if err != nil {
 		return Version{}, fmt.Errorf("unable to determine server version: %w", err)
@@ -179,4 +109,20 @@ func (d *Docker) Version(ctx context.Context) (Version, error) {
 		Arch:     ver.Arch,
 		Platform: ver.Platform.Name,
 	}, nil
+}
+
+// RuntimeType returns the type of container runtime being used
+func (d *Docker) RuntimeType() containerruntime.Runtime {
+	if d.runtime != nil {
+		return d.runtime.Type
+	}
+	return containerruntime.Docker // Default assumption for backward compatibility
+}
+
+// IsRootless returns true if the container runtime is running in rootless mode
+func (d *Docker) IsRootless() bool {
+	if d.runtime != nil {
+		return d.runtime.IsRootless()
+	}
+	return false // Conservative default
 }
