@@ -45,11 +45,29 @@ func (c *ManifestCmd) Run(ctx context.Context, newSvcMgrClients service.ManagerC
 func (c *ManifestCmd) findAirbyteImages(ctx context.Context, helmClient goHelm.Client) ([]string, error) {
 	valuesYaml, err := helm.BuildAirbyteValues(ctx, helm.ValuesOpts{
 		ValuesFile: c.Values,
-	})
+	}, c.ChartVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	airbyteChartLoc := helm.LocateLatestAirbyteChart(c.ChartVersion, c.Chart)
-	return helm.FindImagesFromChart(helmClient, valuesYaml, airbyteChartLoc, c.ChartVersion)
+	// Determine and set defaults for chart flags.
+	err = c.setDefaultChartFlags(helmClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set chart flag defaults: %w", err)
+	}
+
+	return helm.FindImagesFromChart(helmClient, valuesYaml, c.Chart, c.ChartVersion)
+}
+
+func (c *ManifestCmd) setDefaultChartFlags(helmClient goHelm.Client) error {
+	resolver := helm.NewChartResolver(helmClient)
+	resolvedChart, resolvedVersion, err := resolver.ResolveChartReference(c.Chart, c.ChartVersion)
+	if err != nil {
+		return fmt.Errorf("failed to resolve chart flags: %w", err)
+	}
+
+	c.Chart = resolvedChart
+	c.ChartVersion = resolvedVersion
+
+	return nil
 }

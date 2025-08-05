@@ -17,9 +17,14 @@ import (
 )
 
 func FindImagesFromChart(client goHelm.Client, valuesYaml, chartName, chartVersion string) ([]string, error) {
+	repoURL := common.AirbyteRepoURLv1
+	if ChartIsV2Plus(chartVersion) {
+		repoURL = common.AirbyteRepoURLv2
+	}
+
 	err := client.AddOrUpdateChartRepo(repo.Entry{
 		Name: common.AirbyteRepoName,
-		URL:  common.AirbyteRepoURL,
+		URL:  repoURL,
 	})
 	if err != nil {
 		return nil, err

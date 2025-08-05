@@ -255,7 +255,7 @@ func (m *Manager) Install(ctx context.Context, opts *InstallOpts) error {
 	if err := m.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     common.AirbyteRepoName,
-		repoURL:      common.AirbyteRepoURL,
+		repoURL:      common.AirbyteRepoURLv1,
 		chartName:    common.AirbyteChartName,
 		chartRelease: common.AirbyteChartRelease,
 		chartVersion: opts.HelmChartVersion,
