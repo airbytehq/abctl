@@ -308,7 +308,7 @@ func (m *Manager) Install(ctx context.Context, opts *InstallOpts) error {
 		return fmt.Errorf("unable to install nginx chart: %w", err)
 	}
 
-	if err := m.handleIngress(ctx, opts.Hosts); err != nil {
+	if err := m.handleIngress(ctx, opts.HelmChartVersion, opts.Hosts); err != nil {
 		return err
 	}
 	watchStop()
@@ -384,14 +384,14 @@ func (m *Manager) diagnoseAirbyteChartFailure(ctx context.Context, chartErr erro
 	return chartErr
 }
 
-func (m *Manager) handleIngress(ctx context.Context, hosts []string) error {
+func (m *Manager) handleIngress(ctx context.Context, chartVersion string, hosts []string) error {
 	ctx, span := trace.NewSpan(ctx, "command.handleIngress")
 	defer span.End()
 	m.spinner.UpdateText("Checking for existing Ingress")
 
 	if m.k8s.IngressExists(ctx, common.AirbyteNamespace, common.AirbyteIngress) {
 		pterm.Success.Println("Found existing Ingress")
-		if err := m.k8s.IngressUpdate(ctx, common.AirbyteNamespace, k8s.Ingress(hosts)); err != nil {
+		if err := m.k8s.IngressUpdate(ctx, common.AirbyteNamespace, k8s.Ingress(chartVersion, hosts)); err != nil {
 			pterm.Error.Printfln("Unable to update existing Ingress")
 			return fmt.Errorf("unable to update existing ingress: %w", err)
 		}
@@ -400,7 +400,7 @@ func (m *Manager) handleIngress(ctx context.Context, hosts []string) error {
 	}
 
 	pterm.Info.Println("No existing Ingress found, creating one")
-	if err := m.k8s.IngressCreate(ctx, common.AirbyteNamespace, k8s.Ingress(hosts)); err != nil {
+	if err := m.k8s.IngressCreate(ctx, common.AirbyteNamespace, k8s.Ingress(chartVersion, hosts)); err != nil {
 		pterm.Error.Println("Unable to create ingress")
 		return fmt.Errorf("unable to create ingress: %w", err)
 	}
