@@ -1,9 +1,11 @@
 package dataplane
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/airbytehq/abctl/internal/auth/oidc"
 	"github.com/pterm/pterm"
 )
 
@@ -39,5 +41,20 @@ func (c *CreateCmd) Run() error {
 	
 	pterm.Info.Printf("Using OIDC server at: %s\n", oidcServer)
 
+	// Perform OIDC authentication
+	ctx := context.Background()
+	if err := oidc.Login(ctx, baseURL, oidcServer); err != nil {
+		return fmt.Errorf("failed to authenticate: %w", err)
+	}
+	
+	// Get authenticated client for future API calls
+	client, err := oidc.GetAuthenticatedClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get authenticated client: %w", err)
+	}
+	
+	// Example: You can now use the client to make authenticated API calls
+	pterm.Info.Printf("Successfully authenticated. Ready to make API calls to %s\n", client.GetCredentials().BaseURL)
+	
 	return nil
 }
