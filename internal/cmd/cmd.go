@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 
+	"github.com/airbytehq/abctl/internal/cmd/dataplane"
 	"github.com/airbytehq/abctl/internal/cmd/images"
 	"github.com/airbytehq/abctl/internal/cmd/local"
 	"github.com/airbytehq/abctl/internal/cmd/version"
@@ -20,10 +21,11 @@ func (v verbose) BeforeApply() error {
 }
 
 type Cmd struct {
-	Local   local.Cmd   `cmd:"" help:"Manage the local Airbyte installation."`
-	Images  images.Cmd  `cmd:"" help:"Manage images used by Airbyte and abctl."`
-	Version version.Cmd `cmd:"" help:"Display version information."`
-	Verbose verbose     `short:"v" help:"Enable verbose output."`
+	Dataplane dataplane.Cmd `cmd:"" help:"Manage the Airbyte dataplane."`
+	Local     local.Cmd     `cmd:"" help:"Manage the local Airbyte installation."`
+	Images    images.Cmd    `cmd:"" help:"Manage images used by Airbyte and abctl."`
+	Version   version.Cmd   `cmd:"" help:"Display version information."`
+	Verbose   verbose       `short:"v" help:"Enable verbose output."`
 }
 
 func (c *Cmd) BeforeApply(_ context.Context, kCtx *kong.Context) error {
