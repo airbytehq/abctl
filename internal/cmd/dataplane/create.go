@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/airbytehq/abctl/internal/api"
 	"github.com/airbytehq/abctl/internal/auth/oidc"
 	"github.com/pterm/pterm"
 )
@@ -47,14 +48,112 @@ func (c *CreateCmd) Run() error {
 		return fmt.Errorf("failed to authenticate: %w", err)
 	}
 	
-	// Get authenticated client for future API calls
-	client, err := oidc.GetAuthenticatedClient(ctx)
+	// Get authenticated client for API calls
+	authClient, err := oidc.GetAuthenticatedClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get authenticated client: %w", err)
 	}
 	
-	// Example: You can now use the client to make authenticated API calls
-	pterm.Info.Printf("Successfully authenticated. Ready to make API calls to %s\n", client.GetCredentials().BaseURL)
+	// Create API client
+	apiClient := api.NewClient(baseURL, authClient)
+	
+	// Prompt for organization ID
+	pterm.Info.Println("\nNow let's create a data plane configuration.")
+	organizationIDPrompt := "Enter your Organization ID (UUID)"
+	organizationID, _ := pterm.DefaultInteractiveTextInput.Show(organizationIDPrompt)
+	organizationID = strings.TrimSpace(organizationID)
+	
+	if organizationID == "" {
+		return fmt.Errorf("organization ID is required")
+	}
+	
+	// Ask if user wants to create a new region or use existing
+	useExistingRegion := false
+	regionSelectPrompt := pterm.DefaultInteractiveSelect.
+		WithOptions([]string{"Create new region", "Use existing region"}).
+		WithDefaultText("Would you like to create a new region or use an existing one?")
+	
+	regionChoice, _ := regionSelectPrompt.Show()
+	useExistingRegion = (regionChoice == "Use existing region")
+	
+	var regionID string
+	
+	if useExistingRegion {
+		// List existing regions
+		pterm.Info.Println("Fetching existing regions...")
+		regions, err := apiClient.ListRegions(ctx, organizationID)
+		if err != nil {
+			return fmt.Errorf("failed to list regions: %w", err)
+		}
+		
+		if len(regions) == 0 {
+			pterm.Warning.Println("No existing regions found. Creating a new region...")
+			useExistingRegion = false
+		} else {
+			// Show region selection
+			regionOptions := make([]string, len(regions))
+			regionMap := make(map[string]string)
+			for i, region := range regions {
+				regionOptions[i] = fmt.Sprintf("%s (ID: %s)", region.Name, region.ID)
+				regionMap[regionOptions[i]] = region.ID
+			}
+			
+			regionSelectPrompt := pterm.DefaultInteractiveSelect.
+				WithOptions(regionOptions).
+				WithDefaultText("Select a region")
+			
+			selectedRegion, _ := regionSelectPrompt.Show()
+			regionID = regionMap[selectedRegion]
+		}
+	}
+	
+	if !useExistingRegion {
+		// Create new region
+		regionNamePrompt := "Enter a name for the new region"
+		regionName, _ := pterm.DefaultInteractiveTextInput.Show(regionNamePrompt)
+		regionName = strings.TrimSpace(regionName)
+		
+		if regionName == "" {
+			return fmt.Errorf("region name is required")
+		}
+		
+		pterm.Info.Printf("Creating region '%s'...\n", regionName)
+		region, err := apiClient.CreateRegion(ctx, &api.CreateRegionRequest{
+			Name:           regionName,
+			OrganizationID: organizationID,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create region: %w", err)
+		}
+		
+		regionID = region.ID
+		pterm.Success.Printf("Region created successfully! ID: %s\n", regionID)
+	}
+	
+	// Create data plane
+	dataPlaneNamePrompt := "Enter a name for the data plane"
+	dataPlaneName, _ := pterm.DefaultInteractiveTextInput.Show(dataPlaneNamePrompt)
+	dataPlaneName = strings.TrimSpace(dataPlaneName)
+	
+	if dataPlaneName == "" {
+		return fmt.Errorf("data plane name is required")
+	}
+	
+	pterm.Info.Printf("Creating data plane '%s'...\n", dataPlaneName)
+	dataPlane, err := apiClient.CreateDataPlane(ctx, &api.CreateDataPlaneRequest{
+		Name:     dataPlaneName,
+		RegionID: regionID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create data plane: %w", err)
+	}
+	
+	pterm.Success.Printf("Data plane created successfully!\n")
+	pterm.Info.Printf("Data Plane ID: %s\n", dataPlane.ID)
+	pterm.Info.Printf("Region ID: %s\n", regionID)
+	
+	// Save configuration for future use
+	pterm.Info.Println("\nYour data plane has been created. You can now use it to configure workspaces.")
 	
 	return nil
 }
