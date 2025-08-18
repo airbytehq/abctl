@@ -19,19 +19,26 @@ type CreateDataPlaneRequest struct {
 	RegionID string `json:"regionId"`
 }
 
+// CreateDataPlaneResponse represents the response from creating a data plane
+type CreateDataPlaneResponse struct {
+	DataPlaneID  string `json:"dataplaneId"`
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+}
+
 // CreateDataPlane creates a new data plane
-func (c *Client) CreateDataPlane(ctx context.Context, req *CreateDataPlaneRequest) (*DataPlane, error) {
+func (c *Client) CreateDataPlane(ctx context.Context, req *CreateDataPlaneRequest) (*CreateDataPlaneResponse, error) {
 	resp, err := c.doRequest(ctx, "POST", "dataplanes", req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create data plane: %w", err)
 	}
 	
-	var dataPlane DataPlane
-	if err := parseResponse(resp, &dataPlane); err != nil {
+	var response CreateDataPlaneResponse
+	if err := parseResponse(resp, &response); err != nil {
 		return nil, err
 	}
 	
-	return &dataPlane, nil
+	return &response, nil
 }
 
 // ListDataPlanes lists all data planes

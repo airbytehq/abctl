@@ -31,7 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -40,6 +40,16 @@ const (
 	pvcLocal = "airbyte-storage-pvc"
 	pvcPsql  = "airbyte-volume-db-airbyte-db-0"
 )
+
+// DataPlaneConfig holds dataplane configuration for installation
+type DataPlaneConfig struct {
+	ClientID       string
+	ClientSecret   string
+	DataPlaneID    string
+	RegionID       string
+	OrganizationID string
+	AirbyteURL     string
+}
 
 type InstallOpts struct {
 	HelmChartVersion string
@@ -56,6 +66,12 @@ type InstallOpts struct {
 	DockerEmail  string
 
 	NoBrowser bool
+	
+	// Namespace to install into (defaults to common.AirbyteNamespace)
+	Namespace string
+	
+	// DataPlane configuration for connecting to a remote dataplane
+	DataPlane *DataPlaneConfig
 }
 
 func (i *InstallOpts) DockerAuth() bool {
@@ -176,53 +192,64 @@ func (m *Manager) Install(ctx context.Context, opts *InstallOpts) error {
 	ctx, span := trace.NewSpan(ctx, "command.Install")
 	defer span.End()
 
+	// Determine which namespace to use
+	namespace := opts.Namespace
+	if namespace == "" {
+		namespace = common.AirbyteNamespace
+	}
+
 	// Provide a child context to the watcher so that it can shut it down early to ensure the watcher cleanly shutdown.
 	ctxWatch, watchStop := context.WithCancel(ctx)
 	defer watchStop()
 	go m.watchEvents(ctxWatch)
 
-	if !m.k8s.NamespaceExists(ctx, common.AirbyteNamespace) {
-		m.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", common.AirbyteNamespace))
-		if err := m.k8s.NamespaceCreate(ctx, common.AirbyteNamespace); err != nil {
-			pterm.Error.Println(fmt.Sprintf("Unable to create namespace '%s'", common.AirbyteNamespace))
+	if !m.k8s.NamespaceExists(ctx, namespace) {
+		m.spinner.UpdateText(fmt.Sprintf("Creating namespace '%s'", namespace))
+		if err := m.k8s.NamespaceCreate(ctx, namespace); err != nil {
+			pterm.Error.Println(fmt.Sprintf("Unable to create namespace '%s'", namespace))
 			return fmt.Errorf("unable to create airbyte namespace: %w", err)
 		}
-		pterm.Info.Println(fmt.Sprintf("Namespace '%s' created", common.AirbyteNamespace))
+		pterm.Info.Println(fmt.Sprintf("Namespace '%s' created", namespace))
 	} else {
-		pterm.Info.Printfln("Namespace '%s' already exists", common.AirbyteNamespace)
+		pterm.Info.Printfln("Namespace '%s' already exists", namespace)
 	}
 
-	// Storage volumes.
-	if opts.LocalStorage {
-		if err := m.persistentVolume(ctx, common.AirbyteNamespace, paths.PvLocal); err != nil {
+	// Skip persistent volumes for dataplane mode
+	if opts.DataPlane == nil {
+		// Storage volumes.
+		if opts.LocalStorage {
+			if err := m.persistentVolume(ctx, common.AirbyteNamespace, paths.PvLocal); err != nil {
+				return err
+			}
+
+			if err := m.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcLocal, paths.PvLocal); err != nil {
+				return err
+			}
+		} else {
+			if err := m.persistentVolume(ctx, common.AirbyteNamespace, paths.PvMinio); err != nil {
+				return err
+			}
+
+			if err := m.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcMinio, paths.PvMinio); err != nil {
+				return err
+			}
+		}
+
+		// PSQL volumes.
+		if err := m.persistentVolume(ctx, common.AirbyteNamespace, paths.PvPsql); err != nil {
 			return err
 		}
 
-		if err := m.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcLocal, paths.PvLocal); err != nil {
+		if err := m.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcPsql, paths.PvPsql); err != nil {
 			return err
 		}
 	} else {
-		if err := m.persistentVolume(ctx, common.AirbyteNamespace, paths.PvMinio); err != nil {
-			return err
-		}
-
-		if err := m.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcMinio, paths.PvMinio); err != nil {
-			return err
-		}
-	}
-
-	// PSQL volumes.
-	if err := m.persistentVolume(ctx, common.AirbyteNamespace, paths.PvPsql); err != nil {
-		return err
-	}
-
-	if err := m.persistentVolumeClaim(ctx, common.AirbyteNamespace, pvcPsql, paths.PvPsql); err != nil {
-		return err
+		pterm.Info.Println("Skipping persistent volume creation - using dataplane mode")
 	}
 
 	if opts.DockerAuth() {
 		pterm.Debug.Println(fmt.Sprintf("Creating '%s' secret", common.DockerAuthSecretName))
-		if err := m.handleDockerSecret(ctx, opts.DockerServer, opts.DockerUser, opts.DockerPass, opts.DockerEmail); err != nil {
+		if err := m.handleDockerSecret(ctx, namespace, opts.DockerServer, opts.DockerUser, opts.DockerPass, opts.DockerEmail); err != nil {
 			pterm.Debug.Println(fmt.Sprintf("Unable to create '%s' secret", common.DockerAuthSecretName))
 			return fmt.Errorf("unable to create '%s' secret: %w", common.DockerAuthSecretName, err)
 		}
@@ -242,7 +269,7 @@ func (m *Manager) Install(ctx context.Context, opts *InstallOpts) error {
 			pterm.Error.Println(fmt.Sprintf("Unable to unmarshal secret file '%s': %s", secretFile, err))
 			return fmt.Errorf("unable to unmarshal secret file '%s': %w", secretFile, err)
 		}
-		secret.ObjectMeta.Namespace = common.AirbyteNamespace
+		secret.ObjectMeta.Namespace = namespace
 
 		if err := m.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
 			pterm.Error.Println(fmt.Sprintf("Unable to create secret from file '%s'", secretFile))
@@ -252,6 +279,23 @@ func (m *Manager) Install(ctx context.Context, opts *InstallOpts) error {
 		pterm.Success.Println(fmt.Sprintf("Secret from '%s' created or updated", secretFile))
 	}
 
+	// Build final values YAML with dataplane configuration if provided
+	finalValuesYAML := opts.HelmValuesYaml
+	if opts.DataPlane != nil {
+		dataplaneValues := buildDataPlaneValues(opts.DataPlane)
+		if opts.HelmValuesYaml != "" {
+			// Merge dataplane values with existing values
+			mergedValues, err := mergeYAMLValues(opts.HelmValuesYaml, dataplaneValues)
+			if err != nil {
+				return fmt.Errorf("failed to merge dataplane values: %w", err)
+			}
+			finalValuesYAML = mergedValues
+		} else {
+			finalValuesYAML = dataplaneValues
+		}
+		pterm.Debug.Printfln("Using dataplane configuration with client ID: %s", opts.DataPlane.ClientID)
+	}
+	
 	if err := m.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     common.AirbyteRepoName,
@@ -260,8 +304,8 @@ func (m *Manager) Install(ctx context.Context, opts *InstallOpts) error {
 		chartRelease: common.AirbyteChartRelease,
 		chartVersion: opts.HelmChartVersion,
 		chartLoc:     opts.AirbyteChartLoc,
-		namespace:    common.AirbyteNamespace,
-		valuesYAML:   opts.HelmValuesYaml,
+		namespace:    namespace,
+		valuesYAML:   finalValuesYAML,
 	}); err != nil {
 		// if trace.SpanError isn't called here, the logs attached
 		// in the diagnoseAirbyteChartFailure method are lost
@@ -270,23 +314,25 @@ func (m *Manager) Install(ctx context.Context, opts *InstallOpts) error {
 		return trace.SpanError(span, err)
 	}
 
-	nginxValues, err := helm.BuildNginxValues(m.portHTTP)
-	if err != nil {
-		return err
-	}
-	pterm.Debug.Printfln("nginx values:\n%s", nginxValues)
+	// Skip nginx installation when using dataplane mode
+	if opts.DataPlane == nil {
+		nginxValues, err := helm.BuildNginxValues(m.portHTTP)
+		if err != nil {
+			return err
+		}
+		pterm.Debug.Printfln("nginx values:\n%s", nginxValues)
 
-	if err := m.handleChart(ctx, chartRequest{
-		name:           "nginx",
-		uninstallFirst: true,
-		repoName:       common.NginxRepoName,
-		repoURL:        common.NginxRepoURL,
-		chartName:      common.NginxChartName,
-		chartLoc:       common.NginxChartName,
-		chartRelease:   common.NginxChartRelease,
-		namespace:      common.NginxNamespace,
-		valuesYAML:     nginxValues,
-	}); err != nil {
+		if err := m.handleChart(ctx, chartRequest{
+			name:           "nginx",
+			uninstallFirst: true,
+			repoName:       common.NginxRepoName,
+			repoURL:        common.NginxRepoURL,
+			chartName:      common.NginxChartName,
+			chartLoc:       common.NginxChartName,
+			chartRelease:   common.NginxChartRelease,
+			namespace:      common.NginxNamespace,
+			valuesYAML:     nginxValues,
+		}); err != nil {
 		// If we timed out, there is a good chance it's due to an unavailable port, check if this is the case.
 		// As the kubernetes client doesn't return usable error types, have to check for a specific string value.
 		if strings.Contains(err.Error(), "client rate limiter Wait returned an error") {
@@ -308,10 +354,20 @@ func (m *Manager) Install(ctx context.Context, opts *InstallOpts) error {
 		return fmt.Errorf("unable to install nginx chart: %w", err)
 	}
 
-	if err := m.handleIngress(ctx, opts.HelmChartVersion, opts.Hosts); err != nil {
-		return err
+		if err := m.handleIngress(ctx, opts.HelmChartVersion, opts.Hosts); err != nil {
+			return err
+		}
+	} else {
+		pterm.Info.Println("Skipping nginx installation - using dataplane mode")
 	}
 	watchStop()
+
+	// Skip ingress verification and browser opening when using dataplane mode
+	if opts.DataPlane != nil {
+		pterm.Success.Println("Airbyte workload launcher installed successfully for dataplane mode!")
+		pterm.Info.Println("The workload launcher will connect to your configured dataplane.")
+		return nil
+	}
 
 	// verify ingress using localhost
 	url := fmt.Sprintf("http://localhost:%d", m.portHTTP)
@@ -561,7 +617,7 @@ func (m *Manager) handleEvent(ctx context.Context, e *eventsv1.Event) {
 	}
 }
 
-func (m *Manager) handleDockerSecret(ctx context.Context, server, user, pass, email string) error {
+func (m *Manager) handleDockerSecret(ctx context.Context, namespace, server, user, pass, email string) error {
 	secretBody, err := docker.Secret(server, user, pass, email)
 	if err != nil {
 		pterm.Error.Println("Unable to create docker secret")
@@ -571,7 +627,7 @@ func (m *Manager) handleDockerSecret(ctx context.Context, server, user, pass, em
 	secret := corev1.Secret{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: common.AirbyteNamespace,
+			Namespace: namespace,
 			Name:      common.DockerAuthSecretName,
 		},
 		Data: map[string][]byte{corev1.DockerConfigJsonKey: secretBody},
@@ -583,6 +639,30 @@ func (m *Manager) handleDockerSecret(ctx context.Context, server, user, pass, em
 		return fmt.Errorf("unable to create docker-auth secret: %w", err)
 	}
 	pterm.Success.Println("Docker-Auth secret created")
+	return nil
+}
+
+func (m *Manager) HandleAuthSecret(ctx context.Context, namespace, clientID, clientSecret string) error {
+	secret := corev1.Secret{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "airbyte-dataplane-creds",
+		},
+		Data: map[string][]byte{
+			"dataplane-client-id":     []byte(clientID),
+			"dataplane-client-secret": []byte(clientSecret),
+			"sa.json":                 []byte("{}"), // Dummy service account JSON for volume mount
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+
+	if err := m.k8s.SecretCreateOrUpdate(ctx, secret); err != nil {
+		pterm.Error.Println("Unable to create auth secret")
+		return fmt.Errorf("unable to create auth secret: %w", err)
+	}
+
+	pterm.Success.Println("Auth secret created")
 	return nil
 }
 
@@ -848,4 +928,130 @@ func determineHelmChartAction(helm goHelm.Client, chart *chart.Chart, releaseNam
 	))
 
 	return none
+}
+
+// buildDataPlaneValues creates Helm values YAML for dataplane configuration
+// This configures Airbyte to use a remote dataplane with only workload launcher enabled
+func buildDataPlaneValues(config *DataPlaneConfig) string {
+	// Build values that:
+	// 1. Enable only the workload launcher
+	// 2. Disable all other components
+	// 3. Configure dataplane credentials
+	values := fmt.Sprintf(`
+# Dataplane configuration
+global:
+  dataplane:
+    enabled: true
+    clientId: "%s"
+    clientSecret: "%s"
+  airbyteUrl: "%s"
+  cluster:
+    type: "data-plane"
+  workloads:
+    containerOrchestrator:
+      dataPlane:
+        secretName: "airbyte-dataplane-creds"
+        secretKey: "sa.json"
+  env_vars:
+    AIRBYTE_SERVER_HOST: "%s"
+
+# Enable only workload launcher
+workloadLauncher:
+  enabled: true
+  controlPlane:
+    tokenEndpoint: "%s"
+  dataPlane:
+    secretName: "airbyte-dataplane-creds"
+    clientIdSecretKey: "dataplane-client-id"
+    clientSecretSecretKey: "dataplane-client-secret"
+    clientId: "%s"
+    clientSecret: "%s"
+  env_vars:
+    AIRBYTE_SERVER_HOST: "%s"
+
+# Disable all other components
+webapp:
+  enabled: false
+server:
+  enabled: false
+worker:
+  enabled: false
+airbyte-bootloader:
+  enabled: false
+temporal:
+  enabled: false
+postgresql:
+  enabled: false
+postgresql-v2:
+  enabled: false
+minio:
+  enabled: false
+keycloak:
+  enabled: false
+keycloak-setup:
+  enabled: false
+connector-builder-server:
+  enabled: false
+metrics:
+  enabled: false
+pod-sweeper:
+  enabled: false
+cron:
+  enabled: false
+`, config.ClientID, config.ClientSecret, config.AirbyteURL, config.AirbyteURL, config.AirbyteURL, config.ClientID, config.ClientSecret, config.AirbyteURL)
+	
+	return values
+}
+
+// mergeYAMLValues merges two YAML strings, with values2 taking precedence
+func mergeYAMLValues(values1, values2 string) (string, error) {
+	// Parse first YAML
+	var map1 map[string]interface{}
+	if err := yaml.Unmarshal([]byte(values1), &map1); err != nil {
+		return "", fmt.Errorf("failed to parse first values YAML: %w", err)
+	}
+	
+	// Parse second YAML
+	var map2 map[string]interface{}
+	if err := yaml.Unmarshal([]byte(values2), &map2); err != nil {
+		return "", fmt.Errorf("failed to parse second values YAML: %w", err)
+	}
+	
+	// Merge maps (map2 takes precedence)
+	merged := mergeMaps(map1, map2)
+	
+	// Convert back to YAML
+	result, err := yaml.Marshal(merged)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal merged values: %w", err)
+	}
+	
+	return string(result), nil
+}
+
+// mergeMaps recursively merges two maps, with map2 taking precedence
+func mergeMaps(map1, map2 map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+	
+	// Copy all from map1
+	for k, v := range map1 {
+		result[k] = v
+	}
+	
+	// Merge or override with map2
+	for k, v2 := range map2 {
+		if v1, exists := result[k]; exists {
+			// If both are maps, merge recursively
+			if m1, ok1 := v1.(map[string]interface{}); ok1 {
+				if m2, ok2 := v2.(map[string]interface{}); ok2 {
+					result[k] = mergeMaps(m1, m2)
+					continue
+				}
+			}
+		}
+		// Otherwise, map2 value takes precedence
+		result[k] = v2
+	}
+	
+	return result
 }

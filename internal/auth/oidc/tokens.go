@@ -14,6 +14,16 @@ type TokenResponse struct {
 	IDToken      string `json:"id_token,omitempty"`
 }
 
+// DataPlaneInfo holds dataplane-specific credentials
+type DataPlaneInfo struct {
+	DataPlaneID    string `json:"dataplane_id"`
+	ClientID       string `json:"client_id"`
+	ClientSecret   string `json:"client_secret"`
+	RegionID       string `json:"region_id"`
+	Name           string `json:"name"`
+	OrganizationID string `json:"organization_id"`
+}
+
 // Credentials holds authentication credentials
 type Credentials struct {
 	AccessToken  string    `json:"access_token"`
@@ -23,6 +33,7 @@ type Credentials struct {
 	IDToken      string    `json:"id_token,omitempty"`
 	BaseURL      string    `json:"base_url"`
 	OIDCServer   string    `json:"oidc_server"`
+	DataPlane    *DataPlaneInfo `json:"dataplane,omitempty"`
 }
 
 // IsExpired checks if the access token is expired

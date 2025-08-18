@@ -80,3 +80,18 @@ func DeleteCredentials() error {
 	
 	return nil
 }
+
+// SaveDataPlaneInfo adds dataplane information to existing credentials
+func SaveDataPlaneInfo(dataplaneInfo *DataPlaneInfo) error {
+	// Load existing credentials
+	creds, err := LoadCredentials()
+	if err != nil {
+		return fmt.Errorf("failed to load existing credentials: %w", err)
+	}
+	
+	// Add dataplane information
+	creds.DataPlane = dataplaneInfo
+	
+	// Save updated credentials
+	return SaveCredentials(creds)
+}
