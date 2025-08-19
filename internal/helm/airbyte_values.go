@@ -168,7 +168,7 @@ func buildAirbyteValuesV2(ctx context.Context, opts ValuesOpts) (string, error) 
 
 	if opts.InsecureCookies {
 		// Boolean is a string value in the v1 Helm chart.
-		vals = append(vals, `global.auth.cookieSecureSetting="false"`)
+		vals = append(vals, `global.auth.security.cookieSecureSetting="false"`)
 	}
 
 	fileVals, err := maps.FromYAMLFile(opts.ValuesFile)
