@@ -244,7 +244,8 @@ connectorBuilderServer:
     enabled: false
 global:
     auth:
-        cookieSecureSetting: '"false"'
+        security:
+            cookieSecureSetting: '"false"'
         enabled: true
     env_vars:
         AIRBYTE_INSTALLATION_ID: test-user
