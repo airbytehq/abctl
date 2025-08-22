@@ -1095,3 +1095,202 @@ func TestDefaultK8sClient_LogsGet(t *testing.T) {
 		t.Errorf("Unexpected diff (-want, +got): %s", d)
 	}
 }
+
+func TestDefaultK8sClient_ConfigMapGet(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		expected := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-configmap",
+				Namespace: testNamespace,
+			},
+			Data: map[string]string{
+				"key1": "value1",
+				"key2": "value2",
+			},
+		}
+
+		cs := fake.NewSimpleClientset()
+		cs.PrependReactor("get", "configmaps", func(action testingk8s.Action) (handled bool, ret runtime.Object, err error) {
+			return true, expected, nil
+		})
+
+		cli := &DefaultK8sClient{ClientSet: cs}
+		actual, err := cli.ConfigMapGet(context.Background(), testNamespace, "test-configmap")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(expected, actual); diff != "" {
+			t.Errorf("Unexpected configmap (-want, +got) = %v", diff)
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		cs := fake.NewSimpleClientset()
+		cs.PrependReactor("get", "configmaps", func(action testingk8s.Action) (handled bool, ret runtime.Object, err error) {
+			return true, nil, errTest
+		})
+
+		cli := &DefaultK8sClient{ClientSet: cs}
+		_, err := cli.ConfigMapGet(context.Background(), testNamespace, "test-configmap")
+		if d := cmp.Diff(errTest, err, cmpopts.EquateErrors()); d != "" {
+			t.Errorf("Unexpected error (-want, +got) = %v", d)
+		}
+	})
+}
+
+func TestDefaultK8sClient_ConfigMapCreate(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		testConfigMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-configmap",
+				Namespace: testNamespace,
+			},
+			Data: map[string]string{
+				"key1": "value1",
+			},
+		}
+
+		cs := fake.NewSimpleClientset()
+		cs.PrependReactor("create", "configmaps", func(action testingk8s.Action) (handled bool, ret runtime.Object, err error) {
+			return true, testConfigMap, nil
+		})
+
+		cli := &DefaultK8sClient{ClientSet: cs}
+		err := cli.ConfigMapCreate(context.Background(), testConfigMap)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		testConfigMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-configmap",
+				Namespace: testNamespace,
+			},
+		}
+
+		cs := fake.NewSimpleClientset()
+		cs.PrependReactor("create", "configmaps", func(action testingk8s.Action) (handled bool, ret runtime.Object, err error) {
+			return true, nil, errTest
+		})
+
+		cli := &DefaultK8sClient{ClientSet: cs}
+		err := cli.ConfigMapCreate(context.Background(), testConfigMap)
+		if d := cmp.Diff(errTest, err, cmpopts.EquateErrors()); d != "" {
+			t.Errorf("Unexpected error (-want, +got) = %v", d)
+		}
+	})
+}
+
+func TestDefaultK8sClient_ConfigMapUpdate(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		testConfigMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-configmap",
+				Namespace: testNamespace,
+			},
+			Data: map[string]string{
+				"key1": "updated-value",
+			},
+		}
+
+		cs := fake.NewSimpleClientset()
+		cs.PrependReactor("update", "configmaps", func(action testingk8s.Action) (handled bool, ret runtime.Object, err error) {
+			return true, testConfigMap, nil
+		})
+
+		cli := &DefaultK8sClient{ClientSet: cs}
+		err := cli.ConfigMapUpdate(context.Background(), testConfigMap)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		testConfigMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-configmap",
+				Namespace: testNamespace,
+			},
+		}
+
+		cs := fake.NewSimpleClientset()
+		cs.PrependReactor("update", "configmaps", func(action testingk8s.Action) (handled bool, ret runtime.Object, err error) {
+			return true, nil, errTest
+		})
+
+		cli := &DefaultK8sClient{ClientSet: cs}
+		err := cli.ConfigMapUpdate(context.Background(), testConfigMap)
+		if d := cmp.Diff(errTest, err, cmpopts.EquateErrors()); d != "" {
+			t.Errorf("Unexpected error (-want, +got) = %v", d)
+		}
+	})
+}
+
+func TestDefaultK8sClient_ConfigMapList(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		expectedConfigMaps := &corev1.ConfigMapList{
+			Items: []corev1.ConfigMap{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-configmap-1",
+						Namespace: testNamespace,
+						Labels: map[string]string{
+							"airbyte": "templates",
+						},
+					},
+					Data: map[string]string{
+						"key1": "value1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-configmap-2",
+						Namespace: testNamespace,
+						Labels: map[string]string{
+							"app": "other",
+						},
+					},
+					Data: map[string]string{
+						"key2": "value2",
+					},
+				},
+			},
+		}
+
+		cs := fake.NewSimpleClientset()
+		cs.PrependReactor("list", "configmaps", func(action testingk8s.Action) (handled bool, ret runtime.Object, err error) {
+			listAction, ok := action.(testingk8s.ListAction)
+			if !ok {
+				return true, nil, fmt.Errorf("unexpected action type: %T", action)
+			}
+			if d := cmp.Diff(testNamespace, listAction.GetNamespace()); d != "" {
+				return true, nil, fmt.Errorf("unexpected namespace: %s", d)
+			}
+			return true, expectedConfigMaps, nil
+		})
+
+		cli := &DefaultK8sClient{ClientSet: cs}
+		actual, err := cli.ConfigMapList(context.Background(), testNamespace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(expectedConfigMaps, actual); diff != "" {
+			t.Errorf("Unexpected configmap list (-want, +got) = %v", diff)
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		cs := fake.NewSimpleClientset()
+		cs.PrependReactor("list", "configmaps", func(action testingk8s.Action) (handled bool, ret runtime.Object, err error) {
+			return true, nil, errTest
+		})
+
+		cli := &DefaultK8sClient{ClientSet: cs}
+		_, err := cli.ConfigMapList(context.Background(), testNamespace)
+		if d := cmp.Diff(errTest, err, cmpopts.EquateErrors()); d != "" {
+			t.Errorf("Unexpected error (-want, +got) = %v", d)
+		}
+	})
+}
