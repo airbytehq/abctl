@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/airbytehq/abctl/internal/cmd/images"
+	initcmd "github.com/airbytehq/abctl/internal/cmd/init"
 	"github.com/airbytehq/abctl/internal/cmd/local"
 	"github.com/airbytehq/abctl/internal/cmd/version"
 	"github.com/airbytehq/abctl/internal/k8s"
@@ -20,6 +21,7 @@ func (v verbose) BeforeApply() error {
 }
 
 type Cmd struct {
+	Init    initcmd.Cmd `cmd:"" help:"Initialize abctl configuration from existing Airbyte installation."`
 	Local   local.Cmd   `cmd:"" help:"Manage the local Airbyte installation."`
 	Images  images.Cmd  `cmd:"" help:"Manage images used by Airbyte and abctl."`
 	Version version.Cmd `cmd:"" help:"Display version information."`
