@@ -1,8 +1,9 @@
-package init
+package config
 
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/airbytehq/abctl/internal/k8s"
@@ -12,18 +13,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Cmd represents the init command
-type Cmd struct {
-	Namespace     string `flag:"" short:"n" help:"Target c.Namespace (default: current kubeconfig context)."`
+// InitCmd represents the init command
+type InitCmd struct {
+	Namespace     string `flag:"" short:"n" help:"Target namespace (default: current kubeconfig context)."`
 	Force         bool   `flag:"" help:"Overwrite existing abctl ConfigMap."`
-	FromConfigmap string `flag:"" help:"Source ConfigMap name (default: auto-detect via airbyte=templates label)."`
+	FromConfigmap string `flag:"" help:"Source ConfigMap name (default: auto-detect via -airbyte-env suffix)."`
 }
 
 // Run executes the init command
-func (c *Cmd) Run(ctx context.Context, provider k8s.Provider) error {
+func (c *InitCmd) Run(ctx context.Context, provider k8s.Provider) error {
 	pterm.Info.Println("Initializing abctl configuration...")
 
-	pterm.Info.Printf("Using c.Namespace: %s\n", c.Namespace)
+	pterm.Info.Printf("Using namespace: %s\n", c.Namespace)
 	pterm.Debug.Printf("Provider kubeconfig: %s\n", provider.Kubeconfig)
 	pterm.Debug.Printf("Provider context: %s\n", provider.Context)
 
@@ -46,7 +47,7 @@ func (c *Cmd) Run(ctx context.Context, provider k8s.Provider) error {
 	pterm.Info.Printf("Reading from ConfigMap: %s\n", sourceConfigMapName)
 
 	// Read the source ConfigMap
-	pterm.Debug.Printf("Attempting to get ConfigMap: c.Namespace=%s, name=%s\n", c.Namespace, sourceConfigMapName)
+	pterm.Debug.Printf("Attempting to get ConfigMap: namespace=%s, name=%s\n", c.Namespace, sourceConfigMapName)
 	sourceConfigMap, err := k8sClient.ConfigMapGet(ctx, c.Namespace, sourceConfigMapName)
 	if err != nil {
 		return fmt.Errorf("failed to read ConfigMap %s/%s: %w", c.Namespace, sourceConfigMapName, err)
@@ -68,7 +69,7 @@ func (c *Cmd) Run(ctx context.Context, provider k8s.Provider) error {
 	const abctlConfigMapName = "abctl"
 	_, err = k8sClient.ConfigMapGet(ctx, c.Namespace, abctlConfigMapName)
 	if err == nil && !c.Force {
-		return fmt.Errorf("abctl ConfigMap already exists in c.Namespace %s, use --force to overwrite", c.Namespace)
+		return fmt.Errorf("abctl ConfigMap already exists in namespace %s, use --force to overwrite", c.Namespace)
 	}
 
 	// Create abctl ConfigMap
@@ -95,12 +96,12 @@ func (c *Cmd) Run(ctx context.Context, provider k8s.Provider) error {
 			if updateErr := k8sClient.ConfigMapUpdate(ctx, abctlConfigMap); updateErr != nil {
 				return fmt.Errorf("failed to create or update abctl ConfigMap: %w", updateErr)
 			}
-			pterm.Success.Printf("Updated abctl ConfigMap in c.Namespace %s\n", c.Namespace)
+			pterm.Success.Printf("Updated abctl ConfigMap in namespace %s\n", c.Namespace)
 		} else {
 			return fmt.Errorf("failed to create abctl ConfigMap: %w", err)
 		}
 	} else {
-		pterm.Success.Printf("Created abctl ConfigMap in c.Namespace %s\n", c.Namespace)
+		pterm.Success.Printf("Created abctl ConfigMap in namespace %s\n", c.Namespace)
 	}
 
 	pterm.Info.Println("Configuration initialization completed successfully")
@@ -117,7 +118,7 @@ func findAirbyteEnvConfigMap(ctx context.Context, k8sClient k8s.Client, namespac
 
 	const suffix = "-airbyte-env"
 	for _, cm := range configMaps.Items {
-		if len(cm.Name) >= len(suffix) && cm.Name[len(cm.Name)-len(suffix):] == suffix {
+		if strings.HasSuffix(cm.Name, suffix) {
 			return cm.Name, nil
 		}
 	}
