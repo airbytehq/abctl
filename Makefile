@@ -24,6 +24,7 @@ vet:
 .PHONY: mocks
 mocks:
 	mockgen --source $(GOPATH)/pkg/mod/github.com/mittwald/go-helm-client@v0.12.15/interface.go -destination internal/helm/mock/mock.go -package mock
+	mockgen --source internal/http/client.go -destination internal/http/mock/mock.go -package mock
 
 .PHONY: tools
 tools:
