@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 
+	"github.com/airbytehq/abctl/internal/cmd/auth"
 	"github.com/airbytehq/abctl/internal/cmd/config"
 	"github.com/airbytehq/abctl/internal/cmd/images"
 	"github.com/airbytehq/abctl/internal/cmd/local"
@@ -21,6 +22,7 @@ func (v verbose) BeforeApply() error {
 }
 
 type Cmd struct {
+	Auth    auth.Cmd    `cmd:"" help:"Authenticate with Airbyte."`
 	Config  config.Cmd  `cmd:"" help:"Manage abctl configuration."`
 	Local   local.Cmd   `cmd:"" help:"Manage the local Airbyte installation."`
 	Images  images.Cmd  `cmd:"" help:"Manage images used by Airbyte and abctl."`
