@@ -38,6 +38,10 @@ type MockClient struct {
 	FnLogsGet                     func(ctx context.Context, namespace string, name string) (string, error)
 	FnStreamPodLogs               func(ctx context.Context, namespace, podName string, since time.Time) (io.ReadCloser, error)
 	FnPodList                     func(ctx context.Context, namespace string) (*corev1.PodList, error)
+	FnConfigMapGet                func(ctx context.Context, namespace, name string) (*corev1.ConfigMap, error)
+	FnConfigMapList               func(ctx context.Context, namespace string) (*corev1.ConfigMapList, error)
+	FnConfigMapCreate             func(ctx context.Context, configMap *corev1.ConfigMap) error
+	FnConfigMapUpdate             func(ctx context.Context, configMap *corev1.ConfigMap) error
 }
 
 func (m *MockClient) DeploymentList(ctx context.Context, namespace string) (*v1.DeploymentList, error) {
@@ -99,12 +103,14 @@ func (m *MockClient) PersistentVolumeCreate(ctx context.Context, namespace, name
 	}
 	return nil
 }
+
 func (m *MockClient) PersistentVolumeExists(ctx context.Context, namespace, name string) bool {
 	if m.FnPersistentVolumeExists != nil {
 		return m.FnPersistentVolumeExists(ctx, namespace, name)
 	}
 	return true
 }
+
 func (m *MockClient) PersistentVolumeDelete(ctx context.Context, namespace, name string) error {
 	if m.FnPersistentVolumeDelete != nil {
 		return m.FnPersistentVolumeDelete(ctx, namespace, name)
@@ -118,12 +124,14 @@ func (m *MockClient) PersistentVolumeClaimCreate(ctx context.Context, namespace,
 	}
 	return nil
 }
+
 func (m *MockClient) PersistentVolumeClaimExists(ctx context.Context, namespace, name, volumeName string) bool {
 	if m.FnPersistentVolumeClaimExists != nil {
 		return m.FnPersistentVolumeClaimExists(ctx, namespace, name, volumeName)
 	}
 	return true
 }
+
 func (m *MockClient) PersistentVolumeClaimDelete(ctx context.Context, namespace, name, volumeName string) error {
 	if m.FnPersistentVolumeClaimDelete != nil {
 		return m.FnPersistentVolumeClaimDelete(ctx, namespace, name, volumeName)
@@ -192,4 +200,32 @@ func (m *MockClient) PodList(ctx context.Context, namespace string) (*corev1.Pod
 		return &corev1.PodList{}, nil
 	}
 	return m.FnPodList(ctx, namespace)
+}
+
+func (m *MockClient) ConfigMapGet(ctx context.Context, namespace, name string) (*corev1.ConfigMap, error) {
+	if m.FnConfigMapGet == nil {
+		return &corev1.ConfigMap{}, nil
+	}
+	return m.FnConfigMapGet(ctx, namespace, name)
+}
+
+func (m *MockClient) ConfigMapList(ctx context.Context, namespace string) (*corev1.ConfigMapList, error) {
+	if m.FnConfigMapList == nil {
+		return &corev1.ConfigMapList{}, nil
+	}
+	return m.FnConfigMapList(ctx, namespace)
+}
+
+func (m *MockClient) ConfigMapCreate(ctx context.Context, configMap *corev1.ConfigMap) error {
+	if m.FnConfigMapCreate == nil {
+		return nil
+	}
+	return m.FnConfigMapCreate(ctx, configMap)
+}
+
+func (m *MockClient) ConfigMapUpdate(ctx context.Context, configMap *corev1.ConfigMap) error {
+	if m.FnConfigMapUpdate == nil {
+		return nil
+	}
+	return m.FnConfigMapUpdate(ctx, configMap)
 }

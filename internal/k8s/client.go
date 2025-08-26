@@ -61,6 +61,15 @@ type Client interface {
 	SecretDeleteCollection(ctx context.Context, namespace, _type string) error
 	SecretGet(ctx context.Context, namespace, name string) (*corev1.Secret, error)
 
+	// ConfigMapGet retrieves a ConfigMap by name
+	ConfigMapGet(ctx context.Context, namespace, name string) (*corev1.ConfigMap, error)
+	// ConfigMapList lists ConfigMaps in a namespace
+	ConfigMapList(ctx context.Context, namespace string) (*corev1.ConfigMapList, error)
+	// ConfigMapCreate creates a new ConfigMap
+	ConfigMapCreate(ctx context.Context, configMap *corev1.ConfigMap) error
+	// ConfigMapUpdate updates an existing ConfigMap
+	ConfigMapUpdate(ctx context.Context, configMap *corev1.ConfigMap) error
+
 	ServiceGet(ctx context.Context, namespace, name string) (*corev1.Service, error)
 
 	StreamPodLogs(ctx context.Context, namespace string, podName string, since time.Time) (io.ReadCloser, error)
@@ -335,4 +344,25 @@ func (d *DefaultK8sClient) StreamPodLogs(ctx context.Context, namespace string, 
 
 func (d *DefaultK8sClient) PodList(ctx context.Context, namespace string) (*corev1.PodList, error) {
 	return d.ClientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+}
+
+// ConfigMapGet retrieves a ConfigMap by name
+func (d *DefaultK8sClient) ConfigMapGet(ctx context.Context, namespace, name string) (*corev1.ConfigMap, error) {
+	return d.ClientSet.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
+// ConfigMapCreate creates a new ConfigMap
+func (d *DefaultK8sClient) ConfigMapCreate(ctx context.Context, configMap *corev1.ConfigMap) error {
+	_, err := d.ClientSet.CoreV1().ConfigMaps(configMap.Namespace).Create(ctx, configMap, metav1.CreateOptions{})
+	return err
+}
+
+// ConfigMapUpdate updates an existing ConfigMap
+func (d *DefaultK8sClient) ConfigMapUpdate(ctx context.Context, configMap *corev1.ConfigMap) error {
+	_, err := d.ClientSet.CoreV1().ConfigMaps(configMap.Namespace).Update(ctx, configMap, metav1.UpdateOptions{})
+	return err
+}
+
+func (d *DefaultK8sClient) ConfigMapList(ctx context.Context, namespace string) (*corev1.ConfigMapList, error) {
+	return d.ClientSet.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{})
 }

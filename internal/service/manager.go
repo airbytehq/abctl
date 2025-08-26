@@ -187,8 +187,18 @@ func NewManager(provider k8s.Provider, opts ...Option) (*Manager, error) {
 // DefaultK8s returns the default k8s client
 func DefaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	rest.SetDefaultWarningHandler(k8s.Logger{})
+	
+	// Use default loading rules if kubecfg is empty
+	var loadingRules *clientcmd.ClientConfigLoadingRules
+	if kubecfg == "" {
+		// This will use KUBECONFIG env var or default ~/.kube/config
+		loadingRules = clientcmd.NewDefaultClientConfigLoadingRules()
+	} else {
+		loadingRules = &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg}
+	}
+	
 	k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
+		loadingRules,
 		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
 	)
 
