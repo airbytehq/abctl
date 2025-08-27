@@ -44,11 +44,7 @@ func (c *Client) Do(req *stdhttp.Request) (*stdhttp.Response, error) {
 
 	// Add authorization header
 	c.mu.RLock()
-	tokenType := c.credentials.TokenType
-	if tokenType == "" {
-		tokenType = "Bearer" // Default token type
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("%s %s", tokenType, c.credentials.AccessToken))
+	req.Header.Set("Authorization", fmt.Sprintf("%s %s", c.credentials.TokenType, c.credentials.AccessToken))
 	c.mu.RUnlock()
 
 	// Make the request
@@ -73,7 +69,7 @@ func (c *Client) Do(req *stdhttp.Request) (*stdhttp.Response, error) {
 
 		// Retry the request with new token
 		c.mu.RLock()
-		req.Header.Set("Authorization", fmt.Sprintf("%s %s", tokenType, c.credentials.AccessToken))
+		req.Header.Set("Authorization", fmt.Sprintf("%s %s", c.credentials.TokenType, c.credentials.AccessToken))
 		c.mu.RUnlock()
 
 		return c.httpClient.Do(req)
@@ -129,6 +125,8 @@ func (c *Client) ensureValidToken(ctx context.Context) error {
 	}
 	if tokens.TokenType != "" {
 		c.credentials.TokenType = tokens.TokenType
+	} else {
+		c.credentials.TokenType = "Bearer" // Default to Bearer if not specified
 	}
 
 	// Update expiration

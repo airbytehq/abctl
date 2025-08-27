@@ -159,10 +159,15 @@ func (f *Flow) exchangeCode(ctx context.Context, code string) (*Credentials, err
 		expiresAt = expiresAt.Add(time.Hour)
 	}
 
+	tokenType := tokens.TokenType
+	if tokenType == "" {
+		tokenType = "Bearer" // Default to Bearer if not specified
+	}
+	
 	return &Credentials{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
-		TokenType:    tokens.TokenType,
+		TokenType:    tokenType,
 		ExpiresAt:    expiresAt,
 	}, nil
 }
