@@ -29,7 +29,7 @@ type Credentials struct {
 
 // IsExpired checks if the access token has expired
 func (c *Credentials) IsExpired() bool {
-	// Add 1 minute buffer to account for clock skew
+	// Consider expired 1 minute early to account for clock skew
 	return time.Now().After(c.ExpiresAt.Add(-1 * time.Minute))
 }
 
