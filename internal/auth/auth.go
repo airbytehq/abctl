@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	stdhttp "net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/airbytehq/abctl/internal/http"
 )
 
 // TokenResponse represents an OAuth2 token response
@@ -61,21 +63,18 @@ func DiscoverProvider(ctx context.Context, issuerURL string) (*Provider, error) 
 	// Construct well-known URL
 	wellKnownURL := fmt.Sprintf("%s/.well-known/openid-configuration", issuerURL)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", wellKnownURL, nil)
+	req, err := stdhttp.NewRequestWithContext(ctx, "GET", wellKnownURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discovery request: %w", err)
 	}
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch provider configuration: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != stdhttp.StatusOK {
 		return nil, fmt.Errorf("discovery failed with status %d", resp.StatusCode)
 	}
 
@@ -113,23 +112,20 @@ func RefreshAccessToken(ctx context.Context, provider *Provider, clientID, refre
 
 func doTokenRequest(ctx context.Context, endpoint string, data url.Values) (*TokenResponse, error) {
 	body := strings.NewReader(data.Encode())
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, body)
+	req, err := stdhttp.NewRequestWithContext(ctx, "POST", endpoint, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create token request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("token request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != stdhttp.StatusOK {
 		var errResp struct {
 			Error            string `json:"error"`
 			ErrorDescription string `json:"error_description"`

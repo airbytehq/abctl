@@ -3,9 +3,11 @@ package auth
 import (
 	"context"
 	"fmt"
-	"net/http"
+	stdhttp "net/http"
 	"sync"
 	"time"
+
+	"github.com/airbytehq/abctl/internal/http"
 )
 
 // Client provides an HTTP client with automatic token management.
@@ -13,7 +15,7 @@ import (
 // The mutex (mu) protects credentials during refresh operations when
 // multiple API calls might trigger refresh simultaneously.
 type Client struct {
-	httpClient  *http.Client
+	httpClient  *stdhttp.Client
 	provider    *Provider
 	clientID    string
 	credentials *Credentials
@@ -34,7 +36,7 @@ func NewClient(provider *Provider, clientID string, credentials *Credentials) *C
 // Do performs an authenticated HTTP request with automatic token refresh.
 // Thread-safe and handles concurrent requests. If token is expired,
 // it will refresh once and retry the request.
-func (c *Client) Do(req *http.Request) (*http.Response, error) {
+func (c *Client) Do(req *stdhttp.Request) (*stdhttp.Response, error) {
 	// Ensure we have a valid token
 	if err := c.ensureValidToken(req.Context()); err != nil {
 		return nil, fmt.Errorf("failed to get valid token: %w", err)
@@ -56,7 +58,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	}
 
 	// If we get a 401, try refreshing the token once
-	if resp.StatusCode == http.StatusUnauthorized {
+	if resp.StatusCode == stdhttp.StatusUnauthorized {
 		resp.Body.Close()
 
 		// Force refresh by marking token as expired
