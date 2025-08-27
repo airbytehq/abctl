@@ -130,7 +130,9 @@ func doTokenRequest(ctx context.Context, endpoint string, data url.Values) (*Tok
 			Error            string `json:"error"`
 			ErrorDescription string `json:"error_description"`
 		}
-		json.NewDecoder(resp.Body).Decode(&errResp)
+		if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
+			return nil, fmt.Errorf("failed to decode error response for status code %d: %w", resp.StatusCode, err)
+		}
 		return nil, fmt.Errorf("token request failed: %s - %s", errResp.Error, errResp.ErrorDescription)
 	}
 
