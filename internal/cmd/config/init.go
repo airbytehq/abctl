@@ -24,6 +24,15 @@ type InitCmd struct {
 func (c *InitCmd) Run(ctx context.Context, provider k8s.Provider) error {
 	pterm.Info.Println("Initializing abctl configuration...")
 
+	// Use current namespace from kubeconfig if not specified
+	if c.Namespace == "" {
+		ns, err := k8s.GetCurrentNamespace()
+		if err != nil {
+			return fmt.Errorf("failed to get current namespace: %w", err)
+		}
+		c.Namespace = ns
+	}
+
 	pterm.Info.Printf("Using namespace: %s\n", c.Namespace)
 	pterm.Debug.Printf("Provider kubeconfig: %s\n", provider.Kubeconfig)
 	pterm.Debug.Printf("Provider context: %s\n", provider.Context)

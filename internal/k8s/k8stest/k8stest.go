@@ -9,6 +9,7 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -30,6 +31,7 @@ type MockClient struct {
 	FnPersistentVolumeClaimExists func(ctx context.Context, namespace, name, volumeName string) bool
 	FnPersistentVolumeClaimDelete func(ctx context.Context, namespace, name, volumeName string) error
 	FnSecretCreateOrUpdate        func(ctx context.Context, secret corev1.Secret) error
+	FnSecretPatch                 func(ctx context.Context, namespace, name string, patchData []byte, patchType types.PatchType) error
 	FnSecretDeleteCollection      func(ctx context.Context, namespace, _type string) error
 	FnSecretGet                   func(ctx context.Context, namespace, name string) (*corev1.Secret, error)
 	FnServerVersionGet            func() (string, error)
@@ -142,6 +144,14 @@ func (m *MockClient) PersistentVolumeClaimDelete(ctx context.Context, namespace,
 func (m *MockClient) SecretCreateOrUpdate(ctx context.Context, secret corev1.Secret) error {
 	if m.FnSecretCreateOrUpdate != nil {
 		return m.FnSecretCreateOrUpdate(ctx, secret)
+	}
+
+	return nil
+}
+
+func (m *MockClient) SecretPatch(ctx context.Context, namespace, name string, patchData []byte, patchType types.PatchType) error {
+	if m.FnSecretPatch != nil {
+		return m.FnSecretPatch(ctx, namespace, name, patchData, patchType)
 	}
 
 	return nil
