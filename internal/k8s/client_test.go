@@ -1294,3 +1294,71 @@ func TestDefaultK8sClient_ConfigMapList(t *testing.T) {
 		}
 	})
 }
+
+func TestDefaultK8sClient_SecretPatch(t *testing.T) {
+	testSecretName := "test-secret"
+	testPatchData := []byte(`{"data":{"credentials":null}}`)
+	testPatchType := types.StrategicMergePatchType
+
+	t.Run("happy path", func(t *testing.T) {
+		cs := fake.NewSimpleClientset()
+		cs.PrependReactor("patch", "secrets", func(action testingk8s.Action) (bool, runtime.Object, error) {
+			patchAction, ok := action.(testingk8s.PatchAction)
+			if !ok {
+				return true, nil, fmt.Errorf("unexpected action type: %T", action)
+			}
+			if d := cmp.Diff(testNamespace, patchAction.GetNamespace()); d != "" {
+				return true, nil, fmt.Errorf("unexpected namespace: %s", d)
+			}
+			if d := cmp.Diff(testSecretName, patchAction.GetName()); d != "" {
+				return true, nil, fmt.Errorf("unexpected secret name: %s", d)
+			}
+			if d := cmp.Diff(testPatchType, patchAction.GetPatchType()); d != "" {
+				return true, nil, fmt.Errorf("unexpected patch type: %s", d)
+			}
+			if d := cmp.Diff(testPatchData, patchAction.GetPatch()); d != "" {
+				return true, nil, fmt.Errorf("unexpected patch data: %s", d)
+			}
+			
+			// Validate patch JSON structure
+			var patchObj map[string]any
+			if err := json.Unmarshal(patchAction.GetPatch(), &patchObj); err != nil {
+				return true, nil, fmt.Errorf("invalid patch JSON: %w", err)
+			}
+			// Verify it has the expected structure for removing credentials
+			if data, ok := patchObj["data"].(map[string]any); !ok {
+				return true, nil, fmt.Errorf("patch missing data field")
+			} else if creds := data["credentials"]; creds != nil {
+				return true, nil, fmt.Errorf("expected credentials to be null, got %v", creds)
+			}
+			
+			// Return the patched secret
+			return true, &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testSecretName,
+					Namespace: testNamespace,
+				},
+				Data: map[string][]byte{}, // Empty data after patch
+			}, nil
+		})
+
+		cli := &DefaultK8sClient{ClientSet: cs}
+		err := cli.SecretPatch(context.Background(), testNamespace, testSecretName, testPatchData, testPatchType)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		cs := fake.NewSimpleClientset()
+		cs.PrependReactor("patch", "secrets", func(action testingk8s.Action) (bool, runtime.Object, error) {
+			return true, nil, errTest
+		})
+
+		cli := &DefaultK8sClient{ClientSet: cs}
+		err := cli.SecretPatch(context.Background(), testNamespace, testSecretName, testPatchData, testPatchType)
+		if d := cmp.Diff(errTest, err, cmpopts.EquateErrors()); d != "" {
+			t.Errorf("unexpected error (-want, +got) = %v", d)
+		}
+	})
+}

@@ -2,12 +2,14 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/airbytehq/abctl/internal/k8s"
 	"github.com/airbytehq/abctl/internal/service"
 	"github.com/pterm/pterm"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // LogoutCmd handles logout and credential cleanup
@@ -49,10 +51,19 @@ func (c *LogoutCmd) Run(ctx context.Context, provider k8s.Provider) error {
 		return fmt.Errorf("failed to check for credentials: %w", err)
 	}
 	
-	// Delete the auth secret by type (this will delete all Opaque secrets, but in practice
-	// this namespace should only contain the abctl-auth secret for auth purposes)
-	if err := k8sClient.SecretDeleteCollection(ctx, c.Namespace, "Opaque"); err != nil {
-		return fmt.Errorf("failed to delete credentials: %w", err)
+	// Surgically remove just the "credentials" key from the secret data
+	patch := map[string]interface{}{
+		"data": map[string]interface{}{
+			"credentials": nil,
+		},
+	}
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return fmt.Errorf("failed to create patch: %w", err)
+	}
+	
+	if err := k8sClient.SecretPatch(ctx, c.Namespace, "abctl-auth", patchBytes, types.StrategicMergePatchType); err != nil {
+		return fmt.Errorf("failed to remove credentials: %w", err)
 	}
 	
 	pterm.Success.Printf("Successfully logged out. Credentials removed from namespace %s.\n", c.Namespace)

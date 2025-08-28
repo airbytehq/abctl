@@ -56,6 +56,7 @@ type Client interface {
 	PodList(ctx context.Context, namespace string) (*corev1.PodList, error)
 
 	SecretCreateOrUpdate(ctx context.Context, secret corev1.Secret) error
+	SecretPatch(ctx context.Context, namespace, name string, patchData []byte, patchType types.PatchType) error
 	// SecretDeleteCollection deletes multiple secrets.
 	// Note this takes a `type` and not a `name`.  All secrets matching this type will be removed.
 	SecretDeleteCollection(ctx context.Context, namespace, _type string) error
@@ -286,6 +287,11 @@ func (d *DefaultK8sClient) SecretCreateOrUpdate(ctx context.Context, secret core
 	}
 
 	return fmt.Errorf("unexpected error while handling the secret %s: %w", name, err)
+}
+
+func (d *DefaultK8sClient) SecretPatch(ctx context.Context, namespace, name string, patchData []byte, patchType types.PatchType) error {
+	_, err := d.ClientSet.CoreV1().Secrets(namespace).Patch(ctx, name, patchType, patchData, metav1.PatchOptions{})
+	return err
 }
 
 func (d *DefaultK8sClient) SecretDeleteCollection(ctx context.Context, namespace, _type string) error {
