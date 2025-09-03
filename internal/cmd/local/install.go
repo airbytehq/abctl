@@ -185,7 +185,7 @@ func (i *InstallCmd) installOpts(ctx context.Context, user string) (*service.Ins
 	}
 
 	if !enablePsql17 {
-		pterm.Warning.Println("Psql 13 detected. Consider upgrading to 17")
+		pterm.Warning.Println("PostgreSQL 13 detected. Consider upgrading to PostgreSQL 17")
 	}
 
 	opts := &service.InstallOpts{
