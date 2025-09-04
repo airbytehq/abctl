@@ -2,14 +2,11 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"time"
 
-	"github.com/airbytehq/abctl/internal/k8s"
-	"github.com/airbytehq/abctl/internal/service"
-	"github.com/pterm/pterm"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	"github.com/airbytehq/abctl/internal/airbox"
+	"github.com/airbytehq/abctl/internal/ui"
 )
 
 // LogoutCmd handles logout and credential cleanup
@@ -18,54 +15,31 @@ type LogoutCmd struct {
 }
 
 // Run executes the logout command
-func (c *LogoutCmd) Run(ctx context.Context, provider k8s.Provider) error {
-	pterm.Info.Println("Logging out...")
-	
-	// Resolve namespace if not provided
-	if c.Namespace == "" {
-		var err error
-		c.Namespace, err = k8s.GetCurrentNamespace()
-		if err != nil {
-			return fmt.Errorf("failed to get namespace from current context: %w", err)
-		}
-		pterm.Debug.Printf("Using namespace from current context: %s\n", c.Namespace)
-	}
-	
-	// Create k8s client using standard kubeconfig resolution
-	k8sClient, err := service.DefaultK8s("", "")
+func (c *LogoutCmd) Run(ctx context.Context, cfg airbox.ConfigProvider, ui ui.Provider) error {
+	ui.Title("Logging out of Airbyte")
+
+	// Load airbox config
+	abCfg, err := cfg.Load()
 	if err != nil {
-		return fmt.Errorf("failed to create k8s client: %w", err)
+		return fmt.Errorf("failed to load airbox config: %w", err)
 	}
-	
-	// Check if abctl is initialized
-	if err := k8s.IsAbctlInitialized(ctx, k8sClient, c.Namespace); err != nil {
-		return err
+
+	// Check if user credentials exist
+	if abCfg.Credentials == nil {
+		return fmt.Errorf("not logged in - no credentials found")
 	}
-	
-	// Check if auth secret exists first
-	_, err = k8sClient.SecretGet(ctx, c.Namespace, "abctl-auth")
-	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			return fmt.Errorf("not logged in: secret \"abctl-auth\" not found in namespace %s", c.Namespace)
-		}
-		return fmt.Errorf("failed to check for credentials: %w", err)
+
+	// Clear only the tokens, keep user identity intact
+	abCfg.Credentials.AccessToken = ""
+	abCfg.Credentials.RefreshToken = ""
+	abCfg.Credentials.ExpiresAt = time.Time{}
+
+	// Save updated config
+	if err := cfg.Save(abCfg); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
 	}
-	
-	// Surgically remove just the "credentials" key from the secret data
-	patch := map[string]interface{}{
-		"data": map[string]interface{}{
-			"credentials": nil,
-		},
-	}
-	patchBytes, err := json.Marshal(patch)
-	if err != nil {
-		return fmt.Errorf("failed to create patch: %w", err)
-	}
-	
-	if err := k8sClient.SecretPatch(ctx, c.Namespace, "abctl-auth", patchBytes, types.StrategicMergePatchType); err != nil {
-		return fmt.Errorf("failed to remove credentials: %w", err)
-	}
-	
-	pterm.Success.Printf("Successfully logged out. Credentials removed from namespace %s.\n", c.Namespace)
+
+	ui.ShowSuccess("Successfully logged out!")
+	ui.NewLine()
 	return nil
 }

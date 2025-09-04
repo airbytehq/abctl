@@ -1,22 +1,17 @@
 package api
 
 import (
-	"net/http"
+	"github.com/airbytehq/abctl/internal/http"
 )
 
 // Client handles Control Plane API operations
 type Client struct {
-	http HTTPDoer
-}
-
-// HTTPDoer interface for making HTTP requests
-type HTTPDoer interface {
-	Do(req *http.Request) (*http.Response, error)
+	http http.HTTPDoer
 }
 
 // NewClient creates a new API client
-func NewClient(http HTTPDoer) *Client {
+func NewClient(httpDoer http.HTTPDoer) *Client {
 	return &Client{
-		http: http,
+		http: httpDoer,
 	}
 }

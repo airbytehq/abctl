@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	stdhttp "net/http"
 	"net/url"
 	"strings"
@@ -59,7 +60,12 @@ type Provider struct {
 }
 
 // DiscoverProvider fetches OIDC provider configuration from well-known endpoint
-func DiscoverProvider(ctx context.Context, issuerURL string) (*Provider, error) {
+func DiscoverProvider(ctx context.Context, issuerURL string, client http.HTTPDoer) (*Provider, error) {
+	return DiscoverProviderWithClient(ctx, issuerURL, client)
+}
+
+// DiscoverProviderWithClient fetches OIDC provider configuration using the provided HTTP client
+func DiscoverProviderWithClient(ctx context.Context, issuerURL string, client http.HTTPDoer) (*Provider, error) {
 	// Construct well-known URL
 	wellKnownURL := fmt.Sprintf("%s/.well-known/openid-configuration", issuerURL)
 
@@ -68,7 +74,7 @@ func DiscoverProvider(ctx context.Context, issuerURL string) (*Provider, error) 
 		return nil, fmt.Errorf("failed to create discovery request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch provider configuration: %w", err)
 	}
@@ -78,16 +84,27 @@ func DiscoverProvider(ctx context.Context, issuerURL string) (*Provider, error) 
 		return nil, fmt.Errorf("discovery failed with status %d", resp.StatusCode)
 	}
 
+	// Read response body for better error reporting
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read provider configuration response: %w", err)
+	}
+
 	var provider Provider
-	if err := json.NewDecoder(resp.Body).Decode(&provider); err != nil {
-		return nil, fmt.Errorf("failed to decode provider configuration: %w", err)
+	if err := json.Unmarshal(body, &provider); err != nil {
+		// Show first 500 characters of response to help debug
+		preview := string(body)
+		if len(preview) > 500 {
+			preview = preview[:500] + "..."
+		}
+		return nil, fmt.Errorf("failed to decode provider configuration: %w\nReceived response: %s", err, preview)
 	}
 
 	return &provider, nil
 }
 
 // ExchangeCodeForTokens exchanges an authorization code for tokens
-func ExchangeCodeForTokens(ctx context.Context, provider *Provider, clientID, code, redirectURI, codeVerifier string) (*TokenResponse, error) {
+func ExchangeCodeForTokens(ctx context.Context, provider *Provider, clientID, code, redirectURI, codeVerifier string, client http.HTTPDoer) (*TokenResponse, error) {
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("client_id", clientID)
@@ -97,20 +114,20 @@ func ExchangeCodeForTokens(ctx context.Context, provider *Provider, clientID, co
 		data.Set("code_verifier", codeVerifier)
 	}
 
-	return doTokenRequest(ctx, provider.TokenEndpoint, data)
+	return doTokenRequest(ctx, provider.TokenEndpoint, data, client)
 }
 
 // RefreshAccessToken uses a refresh token to get a new access token
-func RefreshAccessToken(ctx context.Context, provider *Provider, clientID, refreshToken string) (*TokenResponse, error) {
+func RefreshAccessToken(ctx context.Context, provider *Provider, clientID, refreshToken string, client http.HTTPDoer) (*TokenResponse, error) {
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
 	data.Set("client_id", clientID)
 	data.Set("refresh_token", refreshToken)
 
-	return doTokenRequest(ctx, provider.TokenEndpoint, data)
+	return doTokenRequest(ctx, provider.TokenEndpoint, data, client)
 }
 
-func doTokenRequest(ctx context.Context, endpoint string, data url.Values) (*TokenResponse, error) {
+func doTokenRequest(ctx context.Context, endpoint string, data url.Values, client http.HTTPDoer) (*TokenResponse, error) {
 	body := strings.NewReader(data.Encode())
 	req, err := stdhttp.NewRequestWithContext(ctx, "POST", endpoint, body)
 	if err != nil {
@@ -119,7 +136,7 @@ func doTokenRequest(ctx context.Context, endpoint string, data url.Values) (*Tok
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("token request failed: %w", err)
 	}

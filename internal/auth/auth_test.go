@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -20,22 +21,22 @@ func TestCredentials_IsExpired(t *testing.T) {
 		want      bool
 	}{
 		{
-			name:      "not expired - future time",
+			name:      "not expired future time",
 			expiresAt: time.Now().Add(2 * time.Hour),
 			want:      false,
 		},
 		{
-			name:      "expired - past time",
+			name:      "expired past time",
 			expiresAt: time.Now().Add(-2 * time.Hour),
 			want:      true,
 		},
 		{
-			name:      "not expired - within buffer window",
+			name:      "not expired within buffer",
 			expiresAt: time.Now().Add(30 * time.Second),
 			want:      true, // Should be true because of 1-minute buffer
 		},
 		{
-			name:      "not expired - just outside buffer window",
+			name:      "not expired outside buffer",
 			expiresAt: time.Now().Add(90 * time.Second),
 			want:      false,
 		},
@@ -171,7 +172,7 @@ func TestDiscoverProvider(t *testing.T) {
 			}))
 			defer server.Close()
 
-			provider, err := DiscoverProvider(context.Background(), server.URL)
+			provider, err := DiscoverProvider(context.Background(), server.URL, http.DefaultClient)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errContains != "" {
@@ -224,7 +225,7 @@ func TestExchangeCodeForTokens(t *testing.T) {
 			},
 		},
 		{
-			name:         "token exchange without refresh token",
+			name:         "no refresh token",
 			code:         "test-code",
 			redirectURI:  "http://localhost:51004/callback",
 			codeVerifier: "",
@@ -255,7 +256,7 @@ func TestExchangeCodeForTokens(t *testing.T) {
 			errContains: "invalid_grant - Invalid authorization code",
 		},
 		{
-			name:         "token exchange returns invalid JSON",
+			name:         "invalid JSON",
 			code:         "test-code",
 			redirectURI:  "http://localhost:51004/callback",
 			responseCode: http.StatusOK,
@@ -305,6 +306,7 @@ func TestExchangeCodeForTokens(t *testing.T) {
 				tt.code,
 				tt.redirectURI,
 				tt.codeVerifier,
+				http.DefaultClient,
 			)
 
 			if tt.wantErr {
@@ -322,6 +324,70 @@ func TestExchangeCodeForTokens(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDiscoverProviderHTTPError(t *testing.T) {
+	// Test HTTP client error
+	mockClient := &errorHTTPClient{err: fmt.Errorf("network error")}
+
+	provider, err := DiscoverProviderWithClient(context.Background(), "https://auth.example.com", mockClient)
+
+	assert.Error(t, err)
+	assert.Nil(t, provider)
+	assert.Contains(t, err.Error(), "failed to fetch provider configuration")
+	assert.Contains(t, err.Error(), "network error")
+}
+
+func TestDiscoverProviderInvalidRequest(t *testing.T) {
+	// Test with invalid URL to trigger request creation error
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	provider, err := DiscoverProviderWithClient(ctx, "://invalid-url", http.DefaultClient)
+
+	assert.Error(t, err)
+	assert.Nil(t, provider)
+	assert.Contains(t, err.Error(), "failed to create discovery request")
+}
+
+func TestDoTokenRequestHTTPError(t *testing.T) {
+	// Test HTTP client error in doTokenRequest
+	mockClient := &errorHTTPClient{err: fmt.Errorf("connection refused")}
+
+	data := url.Values{}
+	data.Set("grant_type", "authorization_code")
+
+	resp, err := doTokenRequest(context.Background(), "https://auth.example.com/token", data, mockClient)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "token request failed")
+	assert.Contains(t, err.Error(), "connection refused")
+}
+
+func TestDoTokenRequestInvalidContext(t *testing.T) {
+	// Test with canceled context to trigger request creation error
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	data := url.Values{}
+	data.Set("grant_type", "authorization_code")
+
+	// Use invalid URL to ensure NewRequestWithContext fails
+	resp, err := doTokenRequest(ctx, "://invalid-url", data, http.DefaultClient)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Contains(t, err.Error(), "failed to create token request")
+}
+
+// errorHTTPClient is a mock that always returns an error
+type errorHTTPClient struct {
+	err error
+}
+
+func (c *errorHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	return nil, c.err
 }
 
 func TestRefreshAccessToken(t *testing.T) {
@@ -353,7 +419,7 @@ func TestRefreshAccessToken(t *testing.T) {
 			},
 		},
 		{
-			name:         "refresh without new refresh token",
+			name:         "no new refresh token",
 			refreshToken: "test-refresh-token",
 			responseCode: http.StatusOK,
 			responseBody: map[string]interface{}{
@@ -412,6 +478,7 @@ func TestRefreshAccessToken(t *testing.T) {
 				provider,
 				"test-client",
 				tt.refreshToken,
+				http.DefaultClient,
 			)
 
 			if tt.wantErr {
@@ -445,7 +512,7 @@ func TestDoTokenRequest(t *testing.T) {
 		data := url.Values{}
 		data.Set("grant_type", "authorization_code")
 
-		tokens, err := doTokenRequest(ctx, server.URL, data)
+		tokens, err := doTokenRequest(ctx, server.URL, data, http.DefaultClient)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "context canceled")
 		assert.Nil(t, tokens)
@@ -464,7 +531,7 @@ func TestDoTokenRequest(t *testing.T) {
 		data := url.Values{}
 		data.Set("grant_type", "authorization_code")
 
-		tokens, err := doTokenRequest(context.Background(), server.URL, data)
+		tokens, err := doTokenRequest(context.Background(), server.URL, data, http.DefaultClient)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "server_error")
 		assert.Nil(t, tokens)

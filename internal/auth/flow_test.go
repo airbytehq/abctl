@@ -1,10 +1,16 @@
 package auth
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,12 +23,12 @@ func TestNewFlow(t *testing.T) {
 		TokenEndpoint:         "https://auth.example.com/token",
 	}
 
-	flow := NewFlow(provider, "test-client", 8085)
+	flow := NewFlow(provider, "test-client", 8085, http.DefaultClient)
 
 	assert.NotNil(t, flow)
-	assert.Equal(t, provider, flow.Provider)
-	assert.Equal(t, "test-client", flow.ClientID)
-	assert.Equal(t, 8085, flow.RedirectPort)
+	assert.Equal(t, provider, flow.provider)
+	assert.Equal(t, "test-client", flow.clientID)
+	assert.Equal(t, 8085, flow.redirectPort)
 	assert.NotEmpty(t, flow.state)
 	assert.NotEmpty(t, flow.codeVerifier)
 
@@ -127,7 +133,7 @@ func TestFlow_BuildAuthURL(t *testing.T) {
 		validate     func(*testing.T, string)
 	}{
 		{
-			name: "builds correct auth URL with all parameters",
+			name: "builds auth URL",
 			provider: &Provider{
 				AuthorizationEndpoint: "https://auth.example.com/authorize",
 			},
@@ -159,7 +165,7 @@ func TestFlow_BuildAuthURL(t *testing.T) {
 			},
 		},
 		{
-			name: "handles authorization endpoint with existing query params",
+			name: "existing query params",
 			provider: &Provider{
 				AuthorizationEndpoint: "https://auth.example.com/authorize?tenant=default",
 			},
@@ -193,9 +199,9 @@ func TestFlow_BuildAuthURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			flow := &Flow{
-				Provider:     tt.provider,
-				ClientID:     tt.clientID,
-				RedirectPort: tt.redirectPort,
+				provider:     tt.provider,
+				clientID:     tt.clientID,
+				redirectPort: tt.redirectPort,
 				state:        tt.state,
 				codeVerifier: tt.codeVerifier,
 			}
@@ -241,13 +247,13 @@ func TestAuthURLParameters(t *testing.T) {
 		expected map[string]string
 	}{
 		{
-			name: "all required OAuth parameters present",
+			name: "OAuth parameters present",
 			flow: &Flow{
-				Provider: &Provider{
+				provider: &Provider{
 					AuthorizationEndpoint: "https://auth.example.com/authorize",
 				},
-				ClientID:     "my-client",
-				RedirectPort: 8085,
+				clientID:     "my-client",
+				redirectPort: 8085,
 				state:        "state-123",
 				codeVerifier: "verifier-456",
 			},
@@ -294,11 +300,11 @@ func TestCallbackPath(t *testing.T) {
 
 	// Verify it's used in buildAuthURL
 	flow := &Flow{
-		Provider: &Provider{
+		provider: &Provider{
 			AuthorizationEndpoint: "https://auth.example.com/authorize",
 		},
-		ClientID:     "test",
-		RedirectPort: 12345,
+		clientID:     "test",
+		redirectPort: 12345,
 		state:        "test",
 		codeVerifier: "test",
 	}
@@ -346,11 +352,6 @@ func TestDefaultConstants(t *testing.T) {
 		expected interface{}
 	}{
 		{
-			name:     "DefaultClientID",
-			got:      DefaultClientID,
-			expected: "abctl",
-		},
-		{
 			name:     "CallbackPath",
 			got:      CallbackPath,
 			expected: "/callback",
@@ -367,11 +368,11 @@ func TestDefaultConstants(t *testing.T) {
 func TestURLEncoding(t *testing.T) {
 	t.Run("redirect URI properly encoded in auth URL", func(t *testing.T) {
 		flow := &Flow{
-			Provider: &Provider{
+			provider: &Provider{
 				AuthorizationEndpoint: "https://auth.example.com/authorize",
 			},
-			ClientID:     "test",
-			RedirectPort: 8085,
+			clientID:     "test",
+			redirectPort: 8085,
 			state:        "test",
 			codeVerifier: "test",
 		}
@@ -393,11 +394,11 @@ func TestURLEncoding(t *testing.T) {
 
 	t.Run("scope properly encoded", func(t *testing.T) {
 		flow := &Flow{
-			Provider: &Provider{
+			provider: &Provider{
 				AuthorizationEndpoint: "https://auth.example.com/authorize",
 			},
-			ClientID:     "test",
-			RedirectPort: 8085,
+			clientID:     "test",
+			redirectPort: 8085,
 			state:        "test",
 			codeVerifier: "test",
 		}
@@ -413,4 +414,574 @@ func TestURLEncoding(t *testing.T) {
 		scope := u.Query().Get("scope")
 		assert.Equal(t, "openid profile email offline_access", scope)
 	})
+}
+
+func TestFlowGetAuthURL(t *testing.T) {
+	provider := &Provider{
+		AuthorizationEndpoint: "https://auth.example.com/authorize",
+	}
+
+	flow := NewFlow(provider, "test-client", 8085, nil)
+
+	authURL := flow.GetAuthURL()
+	assert.NotEmpty(t, authURL)
+	assert.Contains(t, authURL, "https://auth.example.com/authorize")
+	assert.Contains(t, authURL, "client_id=test-client")
+	assert.Contains(t, authURL, "redirect_uri=http%3A%2F%2Flocalhost%3A8085%2Fcallback")
+}
+
+func TestWithStateGenerator(t *testing.T) {
+	tests := []struct {
+		name      string
+		generator func() string
+		expected  string
+	}{
+		{
+			name:      "custom state",
+			generator: func() string { return "custom-test-state" },
+			expected:  "custom-test-state",
+		},
+		{
+			name:      "fixed state",
+			generator: func() string { return "fixed-state-123" },
+			expected:  "fixed-state-123",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &Provider{
+				AuthorizationEndpoint: "https://auth.example.com/authorize",
+			}
+
+			flow := NewFlow(provider, "test-client", 8085, nil, WithStateGenerator(tt.generator))
+
+			assert.Equal(t, tt.expected, flow.state)
+
+			// Verify it's used in auth URL
+			authURL := flow.GetAuthURL()
+			assert.Contains(t, authURL, "state="+tt.expected)
+		})
+	}
+}
+
+
+func TestFlowExchangeCode(t *testing.T) {
+	tests := []struct {
+		name                string
+		code                string
+		serverStatus        int
+		serverBody          string
+		expectedError       string
+		expectedAccessToken string
+		expectedRefreshToken string
+		expectedTokenType   string
+		expectedExpiresIn   int
+	}{
+		{
+			name:                "success",
+			code:                "valid-code",
+			serverStatus:        http.StatusOK,
+			serverBody: `{
+				"access_token": "new-access-token",
+				"refresh_token": "new-refresh-token",
+				"token_type": "Bearer",
+				"expires_in": 7200
+			}`,
+			expectedAccessToken:  "new-access-token",
+			expectedRefreshToken: "new-refresh-token",
+			expectedTokenType:    "Bearer",
+			expectedExpiresIn:    7200,
+		},
+		{
+			name:          "invalid response",
+			code:          "bad-code",
+			serverStatus:  http.StatusBadRequest,
+			serverBody:    `{"error": "invalid_grant"}`,
+			expectedError: "failed to exchange code for tokens",
+		},
+		{
+			name:          "malformed json",
+			code:          "code",
+			serverStatus:  http.StatusOK,
+			serverBody:    `{invalid json}`,
+			expectedError: "invalid character",
+		},
+		{
+			name:         "default expires in",
+			code:         "valid-code",
+			serverStatus: http.StatusOK,
+			serverBody: `{
+				"access_token": "token-no-expiry",
+				"refresh_token": "refresh-no-expiry",
+				"token_type": "Bearer"
+			}`,
+			expectedAccessToken:  "token-no-expiry",
+			expectedRefreshToken: "refresh-no-expiry",
+			expectedTokenType:    "Bearer",
+			expectedExpiresIn:    3600, // Default 1 hour
+		},
+		{
+			name:         "default token type",
+			code:         "valid-code",
+			serverStatus: http.StatusOK,
+			serverBody: `{
+				"access_token": "token-no-type",
+				"refresh_token": "refresh-no-type",
+				"expires_in": 3600
+			}`,
+			expectedAccessToken:  "token-no-type",
+			expectedRefreshToken: "refresh-no-type",
+			expectedTokenType:    "Bearer", // Should default to Bearer
+			expectedExpiresIn:    3600,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Verify request
+				assert.Equal(t, "POST", r.Method)
+				assert.Equal(t, "application/x-www-form-urlencoded", r.Header.Get("Content-Type"))
+
+				// Parse form
+				err := r.ParseForm()
+				require.NoError(t, err)
+
+				assert.Equal(t, "authorization_code", r.Form.Get("grant_type"))
+				assert.Equal(t, tt.code, r.Form.Get("code"))
+				assert.Equal(t, "test-client", r.Form.Get("client_id"))
+				assert.NotEmpty(t, r.Form.Get("code_verifier"))
+
+				// Send response
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.serverStatus)
+				fmt.Fprint(w, tt.serverBody)
+			}))
+			defer server.Close()
+
+			provider := &Provider{
+				TokenEndpoint: server.URL,
+			}
+
+			flow := &Flow{
+				provider:     provider,
+				clientID:     "test-client",
+				redirectPort: 8085,
+				httpClient:   http.DefaultClient,
+				state:        "test-state",
+				codeVerifier: "test-verifier",
+			}
+
+			creds, err := flow.exchangeCode(context.Background(), tt.code)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, creds)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, creds)
+
+				assert.Equal(t, tt.expectedAccessToken, creds.AccessToken)
+				assert.Equal(t, tt.expectedRefreshToken, creds.RefreshToken)
+				assert.Equal(t, tt.expectedTokenType, creds.TokenType)
+				
+				// Check expiry time
+				expectedExpiry := time.Now().Add(time.Duration(tt.expectedExpiresIn) * time.Second)
+				assert.WithinDuration(t, expectedExpiry, creds.ExpiresAt, 5*time.Second)
+			}
+		})
+	}
+}
+
+func TestFlow_StartCallbackServer(t *testing.T) {
+	tests := []struct {
+		name          string
+		port          int
+		expectedError string
+	}{
+		{
+			name: "success",
+			port: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &Provider{
+				AuthorizationEndpoint: "https://auth.example.com/authorize",
+				TokenEndpoint:        "https://auth.example.com/token",
+			}
+
+			flow := NewFlow(provider, "test-client", tt.port, http.DefaultClient)
+
+			listener, err := flow.StartCallbackServer()
+			
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, listener)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, listener)
+				
+				// Verify listener is working
+				addr := listener.Addr().String()
+				assert.NotEmpty(t, addr)
+				
+				listener.Close()
+			}
+		})
+	}
+}
+
+func TestFlow_SendAuthRequest(t *testing.T) {
+	tests := []struct {
+		name          string
+		skipBrowser   bool
+		setupServer   func() *httptest.Server
+		expectedError string
+	}{
+		{
+			name:        "success browser",
+			skipBrowser: false,
+			setupServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(200)
+					w.Write([]byte("OK"))
+				}))
+			},
+		},
+		{
+			name:        "success skip",
+			skipBrowser: true,
+			setupServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// Verify the request is for authorization
+					assert.Contains(t, r.URL.String(), "client_id=test-client")
+					assert.Contains(t, r.URL.String(), "response_type=code")
+					w.WriteHeader(200)
+					w.Write([]byte("OK"))
+				}))
+			},
+		},
+		{
+			name:        "http error",
+			skipBrowser: true,
+			setupServer: func() *httptest.Server {
+				// Return a server that's immediately closed to simulate connection failure
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(200)
+				}))
+				server.Close() // Close immediately to cause connection error
+				return server
+			},
+			expectedError: "failed to send auth request",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := tt.setupServer()
+			if tt.expectedError == "" {
+				defer server.Close()
+			}
+
+			provider := &Provider{
+				AuthorizationEndpoint: server.URL + "/authorize",
+				TokenEndpoint:        server.URL + "/token",
+			}
+
+			flow := NewFlow(provider, "test-client", 8080, http.DefaultClient)
+			flow.SkipBrowser = true
+
+			err := flow.SendAuthRequest()
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestFlow_WaitForCallback_ThreeStep(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupServer   func() *httptest.Server
+		sendCallback  func(port int, state string)
+		timeout       time.Duration
+		expectedError string
+	}{
+		{
+			name: "success",
+			setupServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(200)
+					w.Write([]byte(`{"access_token": "test-token", "refresh_token": "test-refresh", "expires_in": 3600, "token_type": "Bearer"}`))
+				}))
+			},
+			sendCallback: func(port int, state string) {
+				time.Sleep(50 * time.Millisecond) // Small delay to ensure server is ready
+				callbackURL := fmt.Sprintf("http://localhost:%d/callback?code=test-code&state=%s", port, state)
+				resp, err := http.Get(callbackURL)
+				if err == nil && resp != nil {
+					resp.Body.Close()
+				}
+			},
+			timeout: 2 * time.Second,
+		},
+		{
+			name: "timeout",
+			setupServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(200)
+				}))
+			},
+			sendCallback: func(port int, state string) {
+				// Don't send callback - will timeout
+			},
+			timeout:       100 * time.Millisecond,
+			expectedError: "authentication timeout",
+		},
+		{
+			name: "bad state",
+			setupServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(200)
+				}))
+			},
+			sendCallback: func(port int, state string) {
+				time.Sleep(50 * time.Millisecond)
+				callbackURL := fmt.Sprintf("http://localhost:%d/callback?code=test-code&state=wrong-state", port)
+				resp, err := http.Get(callbackURL)
+				if err == nil && resp != nil {
+					resp.Body.Close()
+				}
+			},
+			timeout:       1 * time.Second,
+			expectedError: "invalid state parameter",
+		},
+		{
+			name: "context timeout",
+			setupServer: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(200)
+				}))
+			},
+			sendCallback: func(port int, state string) {
+				// Don't send callback
+			},
+			timeout:       5 * time.Second,
+			expectedError: "context deadline exceeded",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := tt.setupServer()
+			defer server.Close()
+
+			provider := &Provider{
+				AuthorizationEndpoint: server.URL + "/authorize",
+				TokenEndpoint:        server.URL + "/token",
+			}
+
+			// Find a free port
+			tempListener, err := net.Listen("tcp", "localhost:0")
+			require.NoError(t, err)
+			port := tempListener.Addr().(*net.TCPAddr).Port
+			tempListener.Close()
+
+			flow := NewFlow(provider, "test-client", port, http.DefaultClient)
+			flow.Timeout = tt.timeout
+
+			// Step 1: Start callback server
+			listener, err := flow.StartCallbackServer()
+			require.NoError(t, err)
+			defer listener.Close()
+
+			ctx := context.Background()
+			if tt.name == "context timeout" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 50*time.Millisecond)
+				defer cancel()
+			}
+
+			// Start callback in goroutine
+			go tt.sendCallback(port, flow.state)
+
+			// Step 3: Wait for callback
+			credentials, err := flow.WaitForCallback(ctx, listener)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, credentials)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, credentials)
+				assert.Equal(t, "test-token", credentials.AccessToken)
+				assert.Equal(t, "test-refresh", credentials.RefreshToken)
+			}
+		})
+	}
+}
+
+func TestFlow_Integration(t *testing.T) {
+	// Integration test of the full 3-step flow
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/authorize":
+			// Mock OAuth provider receiving auth request
+			w.WriteHeader(200)
+			w.Write([]byte("Authorization in progress"))
+			
+			// Send callback async (like a real OAuth provider would)
+			go func() {
+				time.Sleep(100 * time.Millisecond)
+				callbackURL := r.URL.Query().Get("redirect_uri")
+				state := r.URL.Query().Get("state")
+				
+				fullURL := callbackURL + "?code=integration-code&state=" + state
+				resp, err := http.Get(fullURL)
+				if err == nil && resp != nil {
+					resp.Body.Close()
+				}
+			}()
+			
+		case "/token":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			w.Write([]byte(`{"access_token": "integration-token", "refresh_token": "integration-refresh", "expires_in": 3600, "token_type": "Bearer"}`))
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer server.Close()
+
+	provider := &Provider{
+		AuthorizationEndpoint: server.URL + "/authorize",
+		TokenEndpoint:        server.URL + "/token",
+	}
+
+	flow := NewFlow(provider, "test-client", 0, http.DefaultClient)
+	flow.SkipBrowser = true
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Step 1: Start callback server
+	listener, err := flow.StartCallbackServer()
+	require.NoError(t, err)
+	defer listener.Close()
+
+	// Update flow port to match actual listener
+	actualPort := listener.Addr().(*net.TCPAddr).Port
+	flow.redirectPort = actualPort
+
+	// Step 2: Send auth request
+	err = flow.SendAuthRequest()
+	require.NoError(t, err)
+
+	// Step 3: Wait for callback
+	credentials, err := flow.WaitForCallback(ctx, listener)
+	require.NoError(t, err)
+	assert.NotNil(t, credentials)
+	assert.Equal(t, "integration-token", credentials.AccessToken)
+	assert.Equal(t, "integration-refresh", credentials.RefreshToken)
+}
+
+func TestFlowHandleCallback(t *testing.T) {
+	tests := []struct {
+		name          string
+		requestPath   string
+		requestQuery  string
+		expectedCode  string
+		expectedError string
+		simulateError bool
+	}{
+		{
+			name:         "success",
+			requestPath:  "/callback",
+			requestQuery: "code=auth-code-123&state=test-state",
+			expectedCode: "auth-code-123",
+		},
+		{
+			name:          "wrong state",
+			requestPath:   "/callback",
+			requestQuery:  "code=auth-code&state=wrong-state",
+			expectedError: "invalid state parameter",
+		},
+		{
+			name:          "missing code",
+			requestPath:   "/callback",
+			requestQuery:  "state=test-state",
+			expectedError: "no authorization code received",
+		},
+		{
+			name:          "oauth error",
+			requestPath:   "/callback",
+			requestQuery:  "error=access_denied&error_description=User+denied+access&state=test-state",
+			expectedError: "authentication error: access_denied",
+		},
+		{
+			name:          "wrong path",
+			requestPath:   "/wrong",
+			requestQuery:  "code=auth-code&state=test-state",
+			expectedError: "no code received",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flow := &Flow{
+				state: "test-state",
+			}
+
+			// Create test server that will accept the callback connection
+			listener, err := net.Listen("tcp", "localhost:0")
+			require.NoError(t, err)
+			defer listener.Close()
+
+			codeChan := make(chan string, 1)
+			errChan := make(chan error, 1)
+
+			// Start callback handler
+			go flow.handleCallback(listener, codeChan, errChan)
+
+			// Give it time to start
+			time.Sleep(50 * time.Millisecond)
+
+			// Make callback request
+			callbackURL := fmt.Sprintf("http://%s%s?%s", listener.Addr().String(), tt.requestPath, tt.requestQuery)
+			resp, err := http.Get(callbackURL)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			// Check result
+			select {
+			case code := <-codeChan:
+				if tt.expectedError != "" {
+					t.Errorf("expected error but got code: %s", code)
+				} else {
+					assert.Equal(t, tt.expectedCode, code)
+				}
+			case err := <-errChan:
+				if tt.expectedError != "" {
+					assert.Contains(t, err.Error(), tt.expectedError)
+				} else {
+					t.Errorf("unexpected error: %v", err)
+				}
+			case <-time.After(time.Second):
+				if !tt.simulateError && tt.expectedError == "" {
+					t.Error("timeout waiting for callback")
+				}
+			}
+		})
+	}
 }
