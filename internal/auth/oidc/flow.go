@@ -30,13 +30,13 @@ func NewAuthFlow(provider *ProviderConfig, clientID string) (*AuthFlow, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &AuthFlow{
 		Provider:      provider,
 		ClientID:      clientID,
 		PKCEChallenge: pkce,
 		State:         uuid.New().String(),
-		RedirectPort:  8080, // Default port, will find available one
+		RedirectPort:  8085, // Default port, will find available one
 	}, nil
 }
 
@@ -48,28 +48,28 @@ func (f *AuthFlow) Authenticate(ctx context.Context) (*TokenResponse, error) {
 		return nil, fmt.Errorf("failed to start callback server: %w", err)
 	}
 	defer listener.Close()
-	
+
 	// Update redirect port based on actual listener
 	addr := listener.Addr().(*net.TCPAddr)
 	f.RedirectPort = addr.Port
-	
+
 	// Build authorization URL
 	authURL := f.buildAuthorizationURL()
-	
+
 	// Open browser
 	pterm.Info.Printf("Opening browser for authentication...\n")
 	pterm.Info.Printf("If browser doesn't open, visit: %s\n", authURL)
-	
+
 	if err := browser.OpenURL(authURL); err != nil {
 		pterm.Warning.Printf("Failed to open browser: %v\n", err)
 	}
-	
+
 	// Wait for callback
 	codeChan := make(chan string, 1)
 	errChan := make(chan error, 1)
-	
+
 	go f.handleCallback(listener, codeChan, errChan)
-	
+
 	select {
 	case code := <-codeChan:
 		// Exchange code for tokens
@@ -85,7 +85,7 @@ func (f *AuthFlow) Authenticate(ctx context.Context) (*TokenResponse, error) {
 
 func (f *AuthFlow) buildAuthorizationURL() string {
 	redirectURI := fmt.Sprintf("http://localhost:%d/callback", f.RedirectPort)
-	
+
 	params := url.Values{}
 	params.Set("client_id", f.ClientID)
 	params.Set("response_type", "code")
@@ -93,8 +93,8 @@ func (f *AuthFlow) buildAuthorizationURL() string {
 	params.Set("state", f.State)
 	params.Set("code_challenge", f.PKCEChallenge.Challenge)
 	params.Set("code_challenge_method", f.PKCEChallenge.Method)
-	params.Set("scope", "openid profile email offline_access")
-	
+	params.Set("scope", "openid")
+
 	return fmt.Sprintf("%s?%s", f.Provider.AuthorizationEndpoint, params.Encode())
 }
 
@@ -113,7 +113,7 @@ func (f *AuthFlow) startCallbackServer() (net.Listener, error) {
 
 func (f *AuthFlow) handleCallback(listener net.Listener, codeChan chan<- string, errChan chan<- error) {
 	mux := http.NewServeMux()
-	
+
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		// Check state
 		state := r.URL.Query().Get("state")
@@ -122,7 +122,7 @@ func (f *AuthFlow) handleCallback(listener net.Listener, codeChan chan<- string,
 			http.Error(w, "Invalid state", http.StatusBadRequest)
 			return
 		}
-		
+
 		// Check for error
 		if errParam := r.URL.Query().Get("error"); errParam != "" {
 			errDesc := r.URL.Query().Get("error_description")
@@ -130,7 +130,7 @@ func (f *AuthFlow) handleCallback(listener net.Listener, codeChan chan<- string,
 			http.Error(w, "Authentication failed", http.StatusBadRequest)
 			return
 		}
-		
+
 		// Get authorization code
 		code := r.URL.Query().Get("code")
 		if code == "" {
@@ -138,7 +138,7 @@ func (f *AuthFlow) handleCallback(listener net.Listener, codeChan chan<- string,
 			http.Error(w, "No code received", http.StatusBadRequest)
 			return
 		}
-		
+
 		// Send success response
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprintf(w, `
@@ -150,18 +150,18 @@ func (f *AuthFlow) handleCallback(listener net.Listener, codeChan chan<- string,
 			</body>
 			</html>
 		`)
-		
+
 		// Send code to channel
 		codeChan <- code
 	})
-	
+
 	server := &http.Server{Handler: mux}
 	_ = server.Serve(listener)
 }
 
 func (f *AuthFlow) exchangeCodeForTokens(ctx context.Context, code string) (*TokenResponse, error) {
 	redirectURI := fmt.Sprintf("http://localhost:%d/callback", f.RedirectPort)
-	
+
 	// Build form data
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
@@ -169,29 +169,29 @@ func (f *AuthFlow) exchangeCodeForTokens(ctx context.Context, code string) (*Tok
 	data.Set("redirect_uri", redirectURI)
 	data.Set("client_id", f.ClientID)
 	data.Set("code_verifier", f.PKCEChallenge.Verifier)
-	
+
 	req, err := http.NewRequestWithContext(ctx, "POST", f.Provider.TokenEndpoint, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create token request: %w", err)
 	}
-	
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange code: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("token exchange failed: status %d", resp.StatusCode)
 	}
-	
+
 	var tokens TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
 		return nil, fmt.Errorf("failed to decode token response: %w", err)
 	}
-	
+
 	return &tokens, nil
 }
 
@@ -201,28 +201,28 @@ func RefreshToken(ctx context.Context, provider *ProviderConfig, clientID, refre
 	data.Set("grant_type", "refresh_token")
 	data.Set("refresh_token", refreshToken)
 	data.Set("client_id", clientID)
-	
+
 	req, err := http.NewRequestWithContext(ctx, "POST", provider.TokenEndpoint, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create refresh request: %w", err)
 	}
-	
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to refresh token: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("token refresh failed: status %d", resp.StatusCode)
 	}
-	
+
 	var tokens TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokens); err != nil {
 		return nil, fmt.Errorf("failed to decode refresh response: %w", err)
 	}
-	
+
 	return &tokens, nil
 }
