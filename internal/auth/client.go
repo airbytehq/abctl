@@ -10,26 +10,44 @@ import (
 	"github.com/airbytehq/abctl/internal/http"
 )
 
+// ErrNoUpdateHook is returned when no update hook is provided
+var ErrNoUpdateHook = fmt.Errorf("no credentials update hook")
+
+// CredentialsUpdateHook is called when credentials are refreshed
+type CredentialsUpdateHook func(credentials *Credentials) error
+
 // Client provides an HTTP client with automatic token management.
 // Thread-safe for concurrent use by multiple goroutines/services.
 // The mutex (mu) protects credentials during refresh operations when
 // multiple API calls might trigger refresh simultaneously.
 type Client struct {
-	httpClient  *stdhttp.Client
+	httpClient  http.HTTPDoer
 	provider    *Provider
 	clientID    string
 	credentials *Credentials
+	updateHook  CredentialsUpdateHook
 	mu          sync.RWMutex // Protects credentials for concurrent access
 }
 
 // NewClient creates a new authenticated HTTP client.
 // Designed for reuse across multiple services making concurrent API calls.
-func NewClient(provider *Provider, clientID string, credentials *Credentials) *Client {
+// If updateHook is nil, uses default hook that returns ErrNoUpdateHook.
+func NewClient(
+	provider *Provider,
+	clientID string,
+	credentials *Credentials,
+	httpDoer http.HTTPDoer,
+	updateHook CredentialsUpdateHook,
+) *Client {
+	if updateHook == nil {
+		updateHook = func(*Credentials) error { return ErrNoUpdateHook }
+	}
 	return &Client{
-		httpClient:  http.DefaultClient,
+		httpClient:  httpDoer,
 		provider:    provider,
 		clientID:    clientID,
 		credentials: credentials,
+		updateHook:  updateHook,
 	}
 }
 
@@ -100,7 +118,7 @@ func (c *Client) ensureValidToken(ctx context.Context) error {
 	}
 
 	if !hasRefresh {
-		return fmt.Errorf("access token expired and no refresh token available")
+		return fmt.Errorf("not authenticated - please run 'airbox auth login' first")
 	}
 
 	// Acquire write lock and double-check
@@ -113,7 +131,7 @@ func (c *Client) ensureValidToken(ctx context.Context) error {
 	}
 
 	// Refresh the token
-	tokens, err := RefreshAccessToken(ctx, c.provider, c.clientID, c.credentials.RefreshToken)
+	tokens, err := RefreshAccessToken(ctx, c.provider, c.clientID, c.credentials.RefreshToken, c.httpClient)
 	if err != nil {
 		return fmt.Errorf("token refresh failed: %w", err)
 	}
@@ -132,6 +150,11 @@ func (c *Client) ensureValidToken(ctx context.Context) error {
 	// Update expiration
 	if tokens.ExpiresIn > 0 {
 		c.credentials.ExpiresAt = time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
+	}
+
+	// Call update hook with refreshed credentials
+	if err := c.updateHook(c.credentials); err != nil {
+		return fmt.Errorf("credentials update hook failed: %w", err)
 	}
 
 	return nil

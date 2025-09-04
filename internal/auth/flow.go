@@ -4,25 +4,23 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"net"
-	"net/http"
+	stdhttp "net/http"
 	"net/url"
 	"time"
 
+	"github.com/airbytehq/abctl/internal/http"
 	"github.com/cli/browser"
 	"github.com/google/uuid"
-	"github.com/pterm/pterm"
 )
 
 //go:embed success.html
 var successHTML string
 
 const (
-	// DefaultClientID is the default OAuth client ID for public clients
-	DefaultClientID = "abctl"
 	// CallbackPath is the OAuth callback path
 	CallbackPath = "/callback"
 )
@@ -32,46 +30,101 @@ const (
 // while maintaining a timeout. This pattern is necessary because we need to
 // serve HTTP callbacks while the main thread waits for authentication to complete.
 type Flow struct {
-	Provider     *Provider
-	ClientID     string
-	RedirectPort int
+	provider     *Provider
+	clientID     string
+	redirectPort int
+	SkipBrowser  bool          // Skip browser opening for tests
+	Timeout      time.Duration // Configurable timeout (default 5 minutes)
+	httpClient   http.HTTPDoer
 	codeVerifier string
 	state        string
 }
 
-// NewFlow creates a new OAuth flow with PKCE.
-// The flow is designed to be reusable across different service contexts.
-func NewFlow(provider *Provider, clientID string, callbackPort int) *Flow {
-	return &Flow{
-		Provider:     provider,
-		ClientID:     clientID,
-		RedirectPort: callbackPort,
-		state:        uuid.New().String(),
-		codeVerifier: generateCodeVerifier(),
+// FlowOption is used to configure the flow object.
+type FlowOption func(f *Flow)
+
+// StateGenerator is a function that generates the OAuth state parameter for CSRF protection.
+type StateGenerator func() string
+
+// WithStateGenerator is an option used to override the state generation for authentication.
+func WithStateGenerator(g StateGenerator) FlowOption {
+	return func(f *Flow) {
+		f.state = g()
 	}
 }
 
-// Authenticate performs the OAuth flow and returns credentials.
-// Uses goroutines and channels to handle the OAuth callback asynchronously
-// because we need to run an HTTP server for the callback while also
-// enforcing a timeout on the overall authentication process.
-func (f *Flow) Authenticate(ctx context.Context) (*Credentials, error) {
-	// Start callback server on fixed port
-	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", f.RedirectPort))
+// NewFlow creates a new OAuth flow with PKCE.
+// The flow is designed to be reusable across different service contexts.
+func NewFlow(provider *Provider, clientID string, callbackPort int, httpClient http.HTTPDoer, opts ...FlowOption) *Flow {
+	flow := &Flow{
+		provider:     provider,
+		clientID:     clientID,
+		redirectPort: callbackPort,
+		Timeout:      5 * time.Minute, // Default timeout
+		httpClient:   httpClient,
+		state:        "", // Set by options or DefaultStateGenerator
+		codeVerifier: generateCodeVerifier(),
+	}
+
+	// Apply any flow options
+	for _, opt := range opts {
+		if opt != nil {
+			opt(flow)
+		}
+	}
+
+	// If no state generator was provided via options, use default
+	if flow.state == "" {
+		flow.state = DefaultStateGenerator()
+	}
+
+	return flow
+}
+
+// GetAuthURL returns the authorization URL for manual browser opening
+func (f *Flow) GetAuthURL() string {
+	return f.buildAuthURL()
+}
+
+// StartCallbackServer starts the OAuth callback server
+func (f *Flow) StartCallbackServer() (net.Listener, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", f.redirectPort))
 	if err != nil {
-		return nil, fmt.Errorf("failed to start callback server on port %d: %w", f.RedirectPort, err)
+		return nil, fmt.Errorf("failed to start callback server on port %d: %w", f.redirectPort, err)
 	}
-	defer listener.Close()
+	return listener, nil
+}
 
-	// Build and open authorization URL
+// SendAuthRequest opens browser with auth URL
+func (f *Flow) SendAuthRequest() error {
 	authURL := f.buildAuthURL()
-	pterm.Info.Printf("Opening browser for authentication...\n")
-	pterm.Info.Printf("If browser doesn't open, visit: %s\n", authURL)
-
-	if err := browser.OpenURL(authURL); err != nil {
-		pterm.Warning.Printf("Could not open browser automatically: %v\n", err)
+	if !f.SkipBrowser {
+		browser.OpenURL(authURL)
 	}
 
+	// Also make HTTP request for tests
+	u, err := url.Parse(authURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse auth URL: %w", err)
+	}
+
+	resp, err := f.httpClient.Do(&stdhttp.Request{
+		Method: "GET",
+		URL:    u,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to send auth request: %w", err)
+	}
+
+	if resp != nil {
+		resp.Body.Close()
+	}
+
+	return nil
+}
+
+// WaitForCallback waits for OAuth callback and returns credentials
+func (f *Flow) WaitForCallback(ctx context.Context, listener net.Listener) (*Credentials, error) {
 	// Wait for callback
 	codeChan := make(chan string, 1)
 	errChan := make(chan error, 1)
@@ -86,17 +139,17 @@ func (f *Flow) Authenticate(ctx context.Context) (*Credentials, error) {
 		return nil, err
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case <-time.After(5 * time.Minute):
-		return nil, fmt.Errorf("authentication timeout after 5 minutes")
+	case <-time.After(f.Timeout):
+		return nil, fmt.Errorf("authentication timeout after %v", f.Timeout)
 	}
 }
 
 func (f *Flow) buildAuthURL() string {
-	redirectURI := fmt.Sprintf("http://localhost:%d%s", f.RedirectPort, CallbackPath)
+	redirectURI := fmt.Sprintf("http://localhost:%d%s", f.redirectPort, CallbackPath)
 	codeChallenge := generateCodeChallenge(f.codeVerifier)
 
 	params := url.Values{}
-	params.Set("client_id", f.ClientID)
+	params.Set("client_id", f.clientID)
 	params.Set("response_type", "code")
 	params.Set("redirect_uri", redirectURI)
 	params.Set("state", f.state)
@@ -104,17 +157,17 @@ func (f *Flow) buildAuthURL() string {
 	params.Set("code_challenge_method", "S256")
 	params.Set("scope", "openid profile email offline_access")
 
-	return fmt.Sprintf("%s?%s", f.Provider.AuthorizationEndpoint, params.Encode())
+	return fmt.Sprintf("%s?%s", f.provider.AuthorizationEndpoint, params.Encode())
 }
 
 func (f *Flow) handleCallback(listener net.Listener, codeChan chan<- string, errChan chan<- error) {
-	mux := http.NewServeMux()
+	mux := stdhttp.NewServeMux()
 
-	mux.HandleFunc(CallbackPath, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(CallbackPath, func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		// Validate state
 		if state := r.URL.Query().Get("state"); state != f.state {
 			errChan <- fmt.Errorf("invalid state parameter")
-			http.Error(w, "Invalid state", http.StatusBadRequest)
+			stdhttp.Error(w, "Invalid state", stdhttp.StatusBadRequest)
 			return
 		}
 
@@ -122,7 +175,7 @@ func (f *Flow) handleCallback(listener net.Listener, codeChan chan<- string, err
 		if errParam := r.URL.Query().Get("error"); errParam != "" {
 			errDesc := r.URL.Query().Get("error_description")
 			errChan <- fmt.Errorf("authentication error: %s - %s", errParam, errDesc)
-			http.Error(w, "Authentication failed", http.StatusBadRequest)
+			stdhttp.Error(w, "Authentication failed", stdhttp.StatusBadRequest)
 			return
 		}
 
@@ -130,7 +183,7 @@ func (f *Flow) handleCallback(listener net.Listener, codeChan chan<- string, err
 		code := r.URL.Query().Get("code")
 		if code == "" {
 			errChan <- fmt.Errorf("no authorization code received")
-			http.Error(w, "No code received", http.StatusBadRequest)
+			stdhttp.Error(w, "No code received", stdhttp.StatusBadRequest)
 			return
 		}
 
@@ -142,14 +195,14 @@ func (f *Flow) handleCallback(listener net.Listener, codeChan chan<- string, err
 		codeChan <- code
 	})
 
-	server := &http.Server{Handler: mux}
+	server := &stdhttp.Server{Handler: mux}
 	server.Serve(listener)
 }
 
 func (f *Flow) exchangeCode(ctx context.Context, code string) (*Credentials, error) {
-	redirectURI := fmt.Sprintf("http://localhost:%d%s", f.RedirectPort, CallbackPath)
+	redirectURI := fmt.Sprintf("http://localhost:%d%s", f.redirectPort, CallbackPath)
 
-	tokens, err := ExchangeCodeForTokens(ctx, f.Provider, f.ClientID, code, redirectURI, f.codeVerifier)
+	tokens, err := ExchangeCodeForTokens(ctx, f.provider, f.clientID, code, redirectURI, f.codeVerifier, f.httpClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange code for tokens: %w", err)
 	}
@@ -167,7 +220,7 @@ func (f *Flow) exchangeCode(ctx context.Context, code string) (*Credentials, err
 	if tokenType == "" {
 		tokenType = "Bearer" // Default to Bearer if not specified
 	}
-	
+
 	return &Credentials{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
@@ -177,6 +230,11 @@ func (f *Flow) exchangeCode(ctx context.Context, code string) (*Credentials, err
 }
 
 // PKCE helpers
+
+// DefaultStateGenerator generates a secure random OAuth state parameter for CSRF protection.
+func DefaultStateGenerator() string {
+	return uuid.New().String()
+}
 
 func generateCodeVerifier() string {
 	b := make([]byte, 32)
@@ -188,4 +246,3 @@ func generateCodeChallenge(verifier string) string {
 	hash := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
-
