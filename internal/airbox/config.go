@@ -55,7 +55,34 @@ type Context struct {
 type Credentials struct {
 	AccessToken  string    `json:"accessToken" yaml:"accessToken"`
 	RefreshToken string    `json:"refreshToken" yaml:"refreshToken"`
+	TokenType    string    `json:"tokenType" yaml:"tokenType"`
 	ExpiresAt    time.Time `json:"expiresAt" yaml:"expiresAt"`
+}
+
+// ToAuthCredentials converts airbox.Credentials to auth.Credentials
+func (c *Credentials) ToAuthCredentials() (*auth.Credentials, error) {
+	if c == nil {
+		return nil, fmt.Errorf("cannot convert nil credentials")
+	}
+	return &auth.Credentials{
+		AccessToken:  c.AccessToken,
+		RefreshToken: c.RefreshToken,
+		TokenType:    c.TokenType,
+		ExpiresAt:    c.ExpiresAt,
+	}, nil
+}
+
+// FromAuthCredentials converts auth.Credentials to airbox.Credentials
+func FromAuthCredentials(creds *auth.Credentials) (*Credentials, error) {
+	if creds == nil {
+		return nil, fmt.Errorf("cannot convert nil auth credentials")
+	}
+	return &Credentials{
+		AccessToken:  creds.AccessToken,
+		RefreshToken: creds.RefreshToken,
+		TokenType:    creds.TokenType,
+		ExpiresAt:    creds.ExpiresAt,
+	}, nil
 }
 
 // DefaultConfigPath returns the default path for airbox config
@@ -232,6 +259,13 @@ func (c *Config) IsAuthenticated() error {
 	if c.Credentials == nil || c.Credentials.AccessToken == "" {
 		return fmt.Errorf("not authenticated - please run 'airbox auth login' first")
 	}
+	authCreds, err := c.Credentials.ToAuthCredentials()
+	if err != nil {
+		return fmt.Errorf("invalid credentials: %w", err)
+	}
+	if authCreds.IsExpired() {
+		return fmt.Errorf("authentication token has expired - please run 'airbox auth login' first")
+	}
 	return nil
 }
 
@@ -247,10 +281,9 @@ func CreateCredentialsUpdateHook(cfg ConfigProvider) auth.CredentialsUpdateHook 
 		if err != nil {
 			return err
 		}
-		abCfg.Credentials = &Credentials{
-			AccessToken:  creds.AccessToken,
-			RefreshToken: creds.RefreshToken,
-			ExpiresAt:    creds.ExpiresAt,
+		abCfg.Credentials, err = FromAuthCredentials(creds)
+		if err != nil {
+			return fmt.Errorf("failed to convert credentials: %w", err)
 		}
 		return cfg.Save(abCfg)
 	}
