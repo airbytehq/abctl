@@ -5,6 +5,10 @@ ABCTL_VERSION?=dev
 build:
 	CGO_ENABLED=0 go build -trimpath -o build/ -ldflags "-w -X github.com/airbytehq/abctl/internal/build.Version=$(ABCTL_VERSION)" .
 
+.PHONY: build-new
+build-new:
+	CGO_ENABLED=0 go build -tags newcli -trimpath -o build/abctl-new -ldflags "-w -X github.com/airbytehq/abctl/internal/build.Version=$(ABCTL_VERSION)" main_new.go
+
 .PHONY: clean
 clean:
 	rm -rf build/
