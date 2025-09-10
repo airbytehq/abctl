@@ -3,134 +3,134 @@ package config
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
-	"time"
 
-	"github.com/airbytehq/abctl/internal/k8s"
-	"github.com/airbytehq/abctl/internal/service"
-	"github.com/pterm/pterm"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/airbytehq/abctl/internal/airbox"
+	"github.com/airbytehq/abctl/internal/ui"
 )
 
 // InitCmd represents the init command
 type InitCmd struct {
-	Namespace     string `flag:"" short:"n" help:"Target namespace (default: current kubeconfig context)."`
-	Force         bool   `flag:"" help:"Overwrite existing abctl ConfigMap."`
-	FromConfigmap string `flag:"" help:"Source ConfigMap name (default: auto-detect via -airbyte-env suffix)."`
+	Force bool `flag:"" help:"Overwrite existing airbox configuration."`
 }
 
 // Run executes the init command
-func (c *InitCmd) Run(ctx context.Context, provider k8s.Provider) error {
-	pterm.Info.Println("Initializing abctl configuration...")
+func (c *InitCmd) Run(ctx context.Context, cfgStore airbox.ConfigStore, ui ui.Provider) error {
+	ui.Title("Initializing airbox configuration")
 
-	// Use current namespace from kubeconfig if not specified
-	if c.Namespace == "" {
-		ns, err := k8s.GetCurrentNamespace()
-		if err != nil {
-			return fmt.Errorf("failed to get current namespace: %w", err)
-		}
-		c.Namespace = ns
+	// Check if config already exists first
+	if cfgStore.Exists() && !c.Force {
+		return fmt.Errorf("airbox configuration already exists, use --force to overwrite")
 	}
 
-	pterm.Info.Printf("Using namespace: %s\n", c.Namespace)
-	pterm.Debug.Printf("Provider kubeconfig: %s\n", provider.Kubeconfig)
-	pterm.Debug.Printf("Provider context: %s\n", provider.Context)
-
-	// Create k8s client using standard kubeconfig resolution (KUBECONFIG env var or ~/.kube/config)
-	k8sClient, err := service.DefaultK8s("", "")
+	// Prompt for edition
+	_, edition, err := ui.Select("What Airbyte control plane are you connecting to:", []string{"Enterprise Flex", "Self-Managed Enterprise"})
 	if err != nil {
-		return fmt.Errorf("failed to create k8s client: %w", err)
+		return fmt.Errorf("failed to get edition: %w", err)
 	}
 
-	// Determine source ConfigMap name
-	sourceConfigMapName := c.FromConfigmap
-	if sourceConfigMapName == "" {
-		// Find ConfigMap with -airbyte-env suffix
-		sourceConfigMapName, err = findAirbyteEnvConfigMap(ctx, k8sClient, c.Namespace)
-		if err != nil {
-			return fmt.Errorf("failed to auto-detect Airbyte ConfigMap: %w", err)
-		}
+	var abCtx *airbox.Context
+	var contextName string
+
+	switch edition {
+	case "Enterprise Flex":
+		abCtx, contextName, err = c.setupCloud(ctx, ui)
+	case "Self-Managed Enterprise":
+		abCtx, contextName, err = c.setupEnterprise(ctx, ui)
+	default:
+		return fmt.Errorf("unsupported edition: %s", edition)
 	}
 
-	pterm.Info.Printf("Reading from ConfigMap: %s\n", sourceConfigMapName)
-
-	// Read the source ConfigMap
-	pterm.Debug.Printf("Attempting to get ConfigMap: namespace=%s, name=%s\n", c.Namespace, sourceConfigMapName)
-	sourceConfigMap, err := k8sClient.ConfigMapGet(ctx, c.Namespace, sourceConfigMapName)
 	if err != nil {
-		return fmt.Errorf("failed to read ConfigMap %s/%s: %w", c.Namespace, sourceConfigMapName, err)
+		return err
 	}
 
-	pterm.Success.Printf("Found ConfigMap %s with %d keys\n", sourceConfigMapName, len(sourceConfigMap.Data))
-
-	// Extract key configuration values
-	config, err := k8s.AbctlConfigFromData(sourceConfigMap.Data)
-	if err != nil {
-		return fmt.Errorf("failed to extract configuration: %w", err)
+	// Create fresh config
+	cfg := &airbox.Config{
+		Contexts: []airbox.NamedContext{},
 	}
 
-	pterm.Info.Printf("Extracted configuration:\n")
-	pterm.Info.Printf("  Airbyte API Host: %s\n", config.AirbyteAPIHost)
-	pterm.Info.Printf("  Airbyte URL: %s\n", config.AirbyteURL)
+	// Add the context
+	cfg.AddContext(contextName, *abCtx)
 
-	// Check if abctl ConfigMap already exists
-	const abctlConfigMapName = "abctl"
-	_, err = k8sClient.ConfigMapGet(ctx, c.Namespace, abctlConfigMapName)
-	if err == nil && !c.Force {
-		return fmt.Errorf("abctl ConfigMap already exists in namespace %s, use --force to overwrite", c.Namespace)
+	// Validate the entire config structure before saving
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	// Create abctl ConfigMap
-	abctlConfigMap := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      abctlConfigMapName,
-			Namespace: c.Namespace,
-			Annotations: map[string]string{
-				"abctl.airbyte.com/initialized-from": sourceConfigMapName,
-				"abctl.airbyte.com/initialized-at":   time.Now().Format(time.RFC3339),
-			},
-		},
-		Data: map[string]string{
-			"airbyteApiHost": config.AirbyteAPIHost,
-			"airbyteURL":     config.AirbyteURL,
-			"airbyteAuthURL": config.AirbyteAuthURL,
-		},
+	// Save to local file
+	if err := cfgStore.Save(cfg); err != nil {
+		return fmt.Errorf("failed to save airbox config: %w", err)
 	}
 
-	// Create or update the ConfigMap
-	if err = k8sClient.ConfigMapCreate(ctx, abctlConfigMap); err != nil {
-		// If creation failed and --force is set, try to update
-		if c.Force {
-			if updateErr := k8sClient.ConfigMapUpdate(ctx, abctlConfigMap); updateErr != nil {
-				return fmt.Errorf("failed to create or update abctl ConfigMap: %w", updateErr)
-			}
-			pterm.Success.Printf("Updated abctl ConfigMap in namespace %s\n", c.Namespace)
-		} else {
-			return fmt.Errorf("failed to create abctl ConfigMap: %w", err)
-		}
-	} else {
-		pterm.Success.Printf("Created abctl ConfigMap in namespace %s\n", c.Namespace)
-	}
-
-	pterm.Info.Println("Configuration initialization completed successfully")
+	ui.ShowSuccess("Configuration saved successfully!")
+	ui.NewLine()
 
 	return nil
 }
 
-// findAirbyteEnvConfigMap finds a ConfigMap whose name ends with "-airbyte-env" suffix
-func findAirbyteEnvConfigMap(ctx context.Context, k8sClient k8s.Client, namespace string) (string, error) {
-	configMaps, err := k8sClient.ConfigMapList(ctx, namespace)
+// setupCloud configures for Cloud deployment with OAuth only
+func (c *InitCmd) setupCloud(ctx context.Context, ui ui.Provider) (*airbox.Context, string, error) {
+	// Initialize the context that will hold our configuration
+	abCtx := airbox.Context{
+		Edition: "cloud",
+	}
+
+	// Get cloud URLs with env var override support for testing/staging environments
+	cloudDomain := os.Getenv("AIRBYTE_CLOUD_DOMAIN")
+	if cloudDomain == "" {
+		cloudDomain = "cloud.airbyte.com"
+	}
+
+	cloudAPIDomain := os.Getenv("AIRBYTE_CLOUD_API_DOMAIN")
+	if cloudAPIDomain == "" {
+		cloudAPIDomain = "api.airbyte.com"
+	}
+
+	// Set the base URLs in our context
+	abCtx.AirbyteAPIURL = fmt.Sprintf("https://%s", cloudAPIDomain)
+	abCtx.AirbyteURL = fmt.Sprintf("https://%s", cloudDomain)
+
+	// OAuth only - load client credentials from environment
+	envCfg, err := airbox.LoadOAuthEnvConfig()
 	if err != nil {
-		return "", fmt.Errorf("failed to list ConfigMaps: %w", err)
+		return nil, "", fmt.Errorf("failed to load OAuth config: %w", err)
+	}
+	abCtx.Auth = airbox.NewAuthWithOAuth2(envCfg.ClientID, envCfg.ClientSecret)
+
+	// Use the airbyteURL as the context name
+	return &abCtx, abCtx.AirbyteURL, nil
+}
+
+// setupEnterprise configures for Enterprise edition with OAuth
+func (c *InitCmd) setupEnterprise(ctx context.Context, ui ui.Provider) (*airbox.Context, string, error) {
+	// Prompt for Airbyte URL
+	airbyteURL, err := ui.TextInput("Enter your Airbyte instance URL (e.g., https://airbyte.yourcompany.com):", "", nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get Airbyte URL: %w", err)
 	}
 
-	const suffix = "-airbyte-env"
-	for _, cm := range configMaps.Items {
-		if strings.HasSuffix(cm.Name, suffix) {
-			return cm.Name, nil
-		}
+	// Remove trailing slash if present
+	airbyteURL = strings.TrimSuffix(airbyteURL, "/")
+
+	// API host is base URL + /api
+	apiHost := airbyteURL + "/api"
+
+	// Initialize the context
+	abCtx := airbox.Context{
+		AirbyteURL:    airbyteURL,
+		AirbyteAPIURL: apiHost,
+		Edition:       "enterprise",
 	}
 
-	return "", fmt.Errorf("no ConfigMap with suffix %q found in namespace %s", suffix, namespace)
+	// OAuth only - load client credentials from environment
+	envCfg, err := airbox.LoadOAuthEnvConfig()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load OAuth config: %w", err)
+	}
+	abCtx.Auth = airbox.NewAuthWithOAuth2(envCfg.ClientID, envCfg.ClientSecret)
+
+	// Use the airbyteURL as the context name
+	return &abCtx, airbyteURL, nil
 }
