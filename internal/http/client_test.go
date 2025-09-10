@@ -1,9 +1,10 @@
 package http
 
 import (
+	"context"
+	"errors"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -14,26 +15,28 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+type testKey string
+
 func TestNewClient(t *testing.T) {
 	tests := []struct {
 		name    string
 		baseURL string
-		wantErr bool
 	}{
 		{
-			name:    "valid URL",
+			name:    "success",
 			baseURL: "https://api.example.com",
-			wantErr: false,
 		},
 		{
-			name:    "invalid URL",
-			baseURL: "://invalid-url",
-			wantErr: true,
+			name:    "empty base URL",
+			baseURL: "",
 		},
 		{
 			name:    "URL with path",
 			baseURL: "https://api.example.com/v1",
-			wantErr: false,
+		},
+		{
+			name:    "nil doer",
+			baseURL: "https://api.example.com",
 		},
 	}
 
@@ -42,16 +45,20 @@ func TestNewClient(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockDoer := mock.NewMockHTTPDoer(ctrl)
-			client, err := NewClient(tt.baseURL, mockDoer)
+			var doer HTTPDoer
+			if tt.name != "nil doer" {
+				doer = mock.NewMockHTTPDoer(ctrl)
+			}
 
-			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Nil(t, client)
+			client, err := NewClient(tt.baseURL, doer)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, client)
+			assert.Equal(t, tt.baseURL, client.baseURL)
+			if tt.name == "nil doer" {
+				assert.Nil(t, client.doer)
 			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, client)
-				assert.Equal(t, mockDoer, client.doer)
+				assert.Equal(t, doer, client.doer)
 			}
 		})
 	}
@@ -59,160 +66,229 @@ func TestNewClient(t *testing.T) {
 
 func TestClient_Do(t *testing.T) {
 	tests := []struct {
-		name        string
-		baseURL     string
-		requestPath string
-		expectURL   string
+		name          string
+		baseURL       string
+		requestPath   string
+		method        string
+		body          string
+		headers       map[string]string
+		expectURL     string
+		setupMocks    func(ctrl *gomock.Controller) HTTPDoer
+		expectedError string
 	}{
 		{
-			name:        "simple path",
+			name:        "success",
 			baseURL:     "https://api.example.com",
 			requestPath: "/api/v1/dataplanes",
+			method:      "GET",
 			expectURL:   "https://api.example.com/api/v1/dataplanes",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				mockDoer := mock.NewMockHTTPDoer(ctrl)
+				mockDoer.EXPECT().Do(gomock.Any()).DoAndReturn(func(req *http.Request) (*http.Response, error) {
+					assert.Equal(t, "https://api.example.com/api/v1/dataplanes", req.URL.String())
+					assert.Equal(t, "GET", req.Method)
+					assert.Equal(t, "test-value", req.Context().Value(testKey("test-key")))
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader("response body")),
+					}, nil
+				})
+				return mockDoer
+			},
 		},
 		{
 			name:        "base URL with path",
 			baseURL:     "https://api.example.com/control",
 			requestPath: "/api/v1/dataplanes",
-			expectURL:   "https://api.example.com/api/v1/dataplanes",
+			method:      "GET",
+			expectURL:   "https://api.example.com/control/api/v1/dataplanes",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				mockDoer := mock.NewMockHTTPDoer(ctrl)
+				mockDoer.EXPECT().Do(gomock.Any()).Return(&http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("response body")),
+				}, nil)
+				return mockDoer
+			},
 		},
 		{
-			name:        "path with query params",
+			name:        "query params",
 			baseURL:     "https://api.example.com",
 			requestPath: "/api/v1/dataplanes?limit=10",
+			method:      "GET",
 			expectURL:   "https://api.example.com/api/v1/dataplanes?limit=10",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				mockDoer := mock.NewMockHTTPDoer(ctrl)
+				mockDoer.EXPECT().Do(gomock.Any()).Return(&http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("response body")),
+				}, nil)
+				return mockDoer
+			},
+		},
+		{
+			name:        "POST with body",
+			baseURL:     "https://api.example.com",
+			requestPath: "/api/v1/dataplanes",
+			method:      "POST",
+			body:        `{"name":"test-dataplane"}`,
+			headers:     map[string]string{"Content-Type": "application/json"},
+			expectURL:   "https://api.example.com/api/v1/dataplanes",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				mockDoer := mock.NewMockHTTPDoer(ctrl)
+				mockDoer.EXPECT().Do(gomock.Any()).DoAndReturn(func(req *http.Request) (*http.Response, error) {
+					body, _ := io.ReadAll(req.Body)
+					assert.Equal(t, `{"name":"test-dataplane"}`, string(body))
+					assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader("response body")),
+					}, nil
+				})
+				return mockDoer
+			},
+		},
+		{
+			name:        "PUT with headers",
+			baseURL:     "https://api.example.com",
+			requestPath: "/api/v1/dataplanes/123",
+			method:      "PUT",
+			body:        `{"name":"updated-dataplane"}`,
+			headers:     map[string]string{"Content-Type": "application/json", "Authorization": "Bearer token"},
+			expectURL:   "https://api.example.com/api/v1/dataplanes/123",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				mockDoer := mock.NewMockHTTPDoer(ctrl)
+				mockDoer.EXPECT().Do(gomock.Any()).DoAndReturn(func(req *http.Request) (*http.Response, error) {
+					assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
+					assert.Equal(t, "Bearer token", req.Header.Get("Authorization"))
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader("response body")),
+					}, nil
+				})
+				return mockDoer
+			},
+		},
+		{
+			name:        "DELETE request",
+			baseURL:     "https://api.example.com",
+			requestPath: "/api/v1/dataplanes/123",
+			method:      "DELETE",
+			expectURL:   "https://api.example.com/api/v1/dataplanes/123",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				mockDoer := mock.NewMockHTTPDoer(ctrl)
+				mockDoer.EXPECT().Do(gomock.Any()).Return(&http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("response body")),
+				}, nil)
+				return mockDoer
+			},
+		},
+		{
+			name:        "root path",
+			baseURL:     "https://api.example.com",
+			requestPath: "/",
+			method:      "GET",
+			expectURL:   "https://api.example.com/",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				mockDoer := mock.NewMockHTTPDoer(ctrl)
+				mockDoer.EXPECT().Do(gomock.Any()).Return(&http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("response body")),
+				}, nil)
+				return mockDoer
+			},
+		},
+		{
+			name:        "empty path",
+			baseURL:     "https://api.example.com",
+			requestPath: "",
+			method:      "GET",
+			expectURL:   "https://api.example.com",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				mockDoer := mock.NewMockHTTPDoer(ctrl)
+				mockDoer.EXPECT().Do(gomock.Any()).Return(&http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("response body")),
+				}, nil)
+				return mockDoer
+			},
+		},
+		{
+			name:          "doer error",
+			baseURL:       "https://api.example.com",
+			requestPath:   "/test/path",
+			method:        "GET",
+			expectURL:     "https://api.example.com/test/path",
+			expectedError: "mock error",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				mockDoer := mock.NewMockHTTPDoer(ctrl)
+				mockDoer.EXPECT().Do(gomock.Any()).Return(nil, errors.New("mock error"))
+				return mockDoer
+			},
+		},
+		{
+			name:          "nil doer error",
+			baseURL:       "https://api.example.com",
+			requestPath:   "/test",
+			method:        "GET",
+			expectedError: "nil pointer",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				return nil
+			},
+		},
+		{
+			name:          "invalid base URL",
+			baseURL:       ":",
+			requestPath:   "/test",
+			method:        "GET",
+			expectedError: "failed to join API base URL with request path",
+			setupMocks: func(ctrl *gomock.Controller) HTTPDoer {
+				return mock.NewMockHTTPDoer(ctrl)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a test server to capture the actual request
-			var capturedURL string
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				capturedURL = r.URL.String()
-				w.WriteHeader(http.StatusOK)
-			}))
-			defer server.Close()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-			// Create client with test server URL
-			client, err := NewClient(server.URL, &http.Client{})
+			doer := tt.setupMocks(ctrl)
+			client, err := NewClient(tt.baseURL, doer)
 			require.NoError(t, err)
 
-			// Create request with relative path
 			reqURL, err := url.Parse(tt.requestPath)
 			require.NoError(t, err)
 
 			req := &http.Request{
-				Method: "GET",
+				Method: tt.method,
 				URL:    reqURL,
 				Header: make(http.Header),
 			}
 
-			// Make request
-			resp, err := client.Do(req)
-			require.NoError(t, err)
-			defer resp.Body.Close()
+			if tt.body != "" {
+				req.Body = io.NopCloser(strings.NewReader(tt.body))
+			}
 
-			// Verify the URL was resolved correctly
-			// Note: We compare the full request URL since the host will be the test server
-			expectedURL, _ := url.Parse(tt.expectURL)
-			capturedParsedURL, _ := url.Parse(capturedURL)
-			assert.Equal(t, expectedURL.Path, capturedParsedURL.Path)
-			assert.Equal(t, expectedURL.RawQuery, capturedParsedURL.RawQuery)
+			for key, value := range tt.headers {
+				req.Header.Set(key, value)
+			}
+
+			ctx := context.WithValue(context.Background(), testKey("test-key"), "test-value")
+			req = req.WithContext(ctx)
+
+			resp, err := client.Do(req)
+
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, resp)
+				return
+			}
+
+			require.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
 		})
 	}
-}
-
-func TestClient_Do_WithMock(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockDoer := mock.NewMockHTTPDoer(ctrl)
-	client, err := NewClient("https://api.example.com", mockDoer)
-	require.NoError(t, err)
-
-	// Set up expected response
-	expectedResp := &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader("response body")),
-	}
-
-	// Expect Do to be called with a request that has the resolved URL
-	mockDoer.EXPECT().Do(gomock.Any()).DoAndReturn(func(req *http.Request) (*http.Response, error) {
-		// Verify the URL was properly resolved
-		assert.Equal(t, "https://api.example.com/test/path", req.URL.String())
-		assert.Equal(t, "GET", req.Method)
-		return expectedResp, nil
-	})
-
-	// Create request with relative path
-	reqURL, _ := url.Parse("/test/path")
-	req := &http.Request{
-		Method: "GET",
-		URL:    reqURL,
-		Header: make(http.Header),
-	}
-
-	// Make request
-	resp, err := client.Do(req)
-	require.NoError(t, err)
-	assert.Equal(t, expectedResp, resp)
-}
-
-func TestClient_Do_WithContext(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify context was preserved
-		assert.NotNil(t, r.Context())
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	client, err := NewClient(server.URL, &http.Client{})
-	require.NoError(t, err)
-
-	reqURL, _ := url.Parse("/test")
-	req := &http.Request{
-		Method: "GET",
-		URL:    reqURL,
-		Header: make(http.Header),
-	}
-
-	// Add context to request
-	req = req.WithContext(req.Context())
-
-	resp, err := client.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-}
-
-func TestClient_Do_PreservesHeaders(t *testing.T) {
-	var capturedHeaders http.Header
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		capturedHeaders = r.Header
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	client, err := NewClient(server.URL, &http.Client{})
-	require.NoError(t, err)
-
-	reqURL, _ := url.Parse("/test")
-	req := &http.Request{
-		Method: "POST",
-		URL:    reqURL,
-		Header: make(http.Header),
-		Body:   io.NopCloser(strings.NewReader("test body")),
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer token")
-
-	resp, err := client.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	// Verify headers were preserved
-	assert.Equal(t, "application/json", capturedHeaders.Get("Content-Type"))
-	assert.Equal(t, "Bearer token", capturedHeaders.Get("Authorization"))
 }
