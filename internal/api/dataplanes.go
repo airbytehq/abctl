@@ -10,23 +10,38 @@ import (
 )
 
 const (
-	dataplanesPath = "/api/v1/dataplanes"
+	dataplanesPath = "/v1/dataplanes"
 )
 
-// DataplaneSpec represents the input for dataplane operations
-type DataplaneSpec struct {
-	Name   string            `json:"name"`
-	Type   string            `json:"type"`
-	Config map[string]string `json:"config"`
+// UpdateDataplaneRequest represents the input for dataplane update operations
+type UpdateDataplaneRequest struct {
+	Name     string `json:"name"`
+	RegionID string `json:"regionId"`
+	Enabled  bool   `json:"enabled"`
 }
 
-// Dataplane represents a dataplane resource
+// CreateDataplaneRequest represents the input for creating a new dataplane
+type CreateDataplaneRequest struct {
+	Name           string `json:"name"`
+	RegionID       string `json:"regionId"`
+	OrganizationID string `json:"organizationId"`
+	Enabled        bool   `json:"enabled"`
+}
+
+// Dataplane represents a dataplane resource for GET/LIST operations
 type Dataplane struct {
-	ID     string            `json:"id"`
-	Name   string            `json:"name"`
-	Type   string            `json:"type"`
-	Status string            `json:"status"`
-	Config map[string]string `json:"config"`
+	DataplaneID string `json:"dataplaneId" yaml:"dataplaneId"`
+	Name        string `json:"name" yaml:"name"`
+	RegionID    string `json:"regionId" yaml:"regionId"`
+	Enabled     bool   `json:"enabled" yaml:"enabled"`
+}
+
+// CreateDataplaneResponse represents the response from creating a dataplane
+type CreateDataplaneResponse struct {
+	DataplaneID  string `json:"dataplaneId"`
+	RegionID     string `json:"regionId"`
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
 }
 
 // GetDataplane retrieves a specific dataplane by ID
@@ -40,7 +55,7 @@ func (c *Client) GetDataplane(ctx context.Context, id string) (*Dataplane, error
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }() // Connection cleanup, error doesn't affect functionality
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -66,7 +81,7 @@ func (c *Client) ListDataplanes(ctx context.Context) ([]Dataplane, error) {
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }() // Connection cleanup, error doesn't affect functionality
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -82,35 +97,35 @@ func (c *Client) ListDataplanes(ctx context.Context) ([]Dataplane, error) {
 }
 
 // CreateDataplane creates a new dataplane
-func (c *Client) CreateDataplane(ctx context.Context, spec DataplaneSpec) (*Dataplane, error) {
-	reqBody, err := json.Marshal(spec)
+func (c *Client) CreateDataplane(ctx context.Context, req CreateDataplaneRequest) (*CreateDataplaneResponse, error) {
+	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, dataplanesPath, bytes.NewReader(reqBody))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, dataplanesPath, bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.http.Do(req)
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }() // Connection cleanup, error doesn't affect functionality
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, string(body))
 	}
 
-	var dataplane Dataplane
-	if err := json.NewDecoder(resp.Body).Decode(&dataplane); err != nil {
+	var response CreateDataplaneResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return &dataplane, nil
+	return &response, nil
 }
 
 // DeleteDataplane deletes a dataplane by ID
@@ -124,7 +139,7 @@ func (c *Client) DeleteDataplane(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }() // Connection cleanup, error doesn't affect functionality
 
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
