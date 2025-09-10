@@ -25,6 +25,11 @@ vet:
 mocks:
 	mockgen --source $(GOPATH)/pkg/mod/github.com/mittwald/go-helm-client@v0.12.15/interface.go -destination internal/helm/mock/mock.go -package mock
 	mockgen --source internal/http/client.go -destination internal/http/mock/mock.go -package mock
+	mockgen --source internal/ui/ui.go -destination internal/ui/mock/mock.go -package mock
+	mockgen --source internal/airbox/config_store.go -destination internal/airbox/mock/config.go -package mock
+	mockgen --source internal/auth/auth.go -destination internal/auth/mocks_creds_test.go -package auth
+	mockgen --source internal/api/client.go -destination internal/api/mock/mock.go -package mock
+	mockgen --source internal/k8s/cluster.go -destination internal/k8s/mock/cluster.go -package mock
 
 .PHONY: tools
 tools:
