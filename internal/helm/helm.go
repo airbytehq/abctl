@@ -25,8 +25,17 @@ func ClientOptions(namespace string) *goHelm.Options {
 
 // New returns the default helm client
 func New(kubecfg, kubectx, namespace string) (goHelm.Client, error) {
+	// Use default loading rules if kubecfg is empty (same logic as service.DefaultK8s)
+	var loadingRules *clientcmd.ClientConfigLoadingRules
+	if kubecfg == "" {
+		// This will use KUBECONFIG env var or default ~/.kube/config
+		loadingRules = clientcmd.NewDefaultClientConfigLoadingRules()
+	} else {
+		loadingRules = &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg}
+	}
+
 	k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg},
+		loadingRules,
 		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
 	)
 
