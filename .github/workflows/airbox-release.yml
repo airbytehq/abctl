@@ -1,0 +1,50 @@
+name: Create Airbox Release
+run-name: Create Airbox Release ${{ inputs.tag_name }} by @${{ github.actor }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name (e.g., airbox-v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Build and publish airbox release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag
+        run: |
+          if [[ ! "${{ inputs.tag_name }}" =~ ^airbox-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then 
+              echo "tag is invalid: must be in the form 'airbox-v0.0.0'"
+              exit 1
+          fi
+      - name: Create tag
+        uses: actions/github-script@v5
+        with:
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/${{ inputs.tag_name }}',
+              sha: context.sha
+            })
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+           go-version: 'stable'
+
+      - name: Run GoReleaser for Airbox
+        uses: goreleaser/goreleaser-action@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.github_token }}
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --config .goreleaser-airbox.yaml --clean
