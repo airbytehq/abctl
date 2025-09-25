@@ -41,7 +41,13 @@ func FindImagesFromChart(client goHelm.Client, valuesYaml, chartName, chartVersi
 		return nil, err
 	}
 
-	images := findAllImages(rel.Manifest)
+	// Combine main manifest with hook manifests to include resources like bootloader
+	fullManifest := rel.Manifest
+	for _, hook := range rel.Hooks {
+		fullManifest += "\n---\n" + hook.Manifest
+	}
+
+	images := findAllImages(fullManifest)
 	return images, nil
 }
 

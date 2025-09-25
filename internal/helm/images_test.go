@@ -53,6 +53,60 @@ func TestFindImagesFromChart(t *testing.T) {
 			},
 		},
 		{
+			name:         "manifest-with-hooks",
+			valuesPath:   "",
+			chartName:    "airbyte/airbyte",
+			chartVersion: "1.1.0",
+			expect: []string{
+				"airbyte/bootloader:1.1.0",
+				"airbyte/server:1.1.0",
+				"airbyte/worker:1.1.0",
+				"busybox:latest",
+			},
+			mockSetup: func(client *mock.MockClient) {
+				client.EXPECT().AddOrUpdateChartRepo(gomock.Any()).Return(nil)
+				client.EXPECT().InstallChart(gomock.Any(), gomock.Any(), gomock.Any()).Return(&release.Release{
+					Manifest: manifestWithoutHooks,
+					Hooks: []*release.Hook{
+						{
+							Name:     "airbyte-bootloader",
+							Manifest: bootloaderHookManifest,
+						},
+						{
+							Name:     "pre-install-job",
+							Manifest: preInstallJobHookManifest,
+						},
+					},
+				}, nil)
+			},
+		},
+		{
+			name:         "hooks-only-no-manifest",
+			valuesPath:   "",
+			chartName:    "airbyte/airbyte",
+			chartVersion: "1.1.0",
+			expect: []string{
+				"airbyte/bootloader:1.1.0",
+				"busybox:latest",
+			},
+			mockSetup: func(client *mock.MockClient) {
+				client.EXPECT().AddOrUpdateChartRepo(gomock.Any()).Return(nil)
+				client.EXPECT().InstallChart(gomock.Any(), gomock.Any(), gomock.Any()).Return(&release.Release{
+					Manifest: "", // Empty manifest, only hooks
+					Hooks: []*release.Hook{
+						{
+							Name:     "airbyte-bootloader",
+							Manifest: bootloaderHookManifest,
+						},
+						{
+							Name:     "pre-install-job",
+							Manifest: preInstallJobHookManifest,
+						},
+					},
+				}, nil)
+			},
+		},
+		{
 			name:         "configmap-airbyte-env-image-keys",
 			valuesPath:   "",
 			chartName:    "airbyte/airbyte",
@@ -290,6 +344,60 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 9376
+`
+
+const manifestWithoutHooks = `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airbyte-server
+spec:
+  template:
+    spec:
+      containers:
+        - name: server
+          image: airbyte/server:1.1.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airbyte-worker
+spec:
+  template:
+    spec:
+      containers:
+        - name: worker
+          image: airbyte/worker:1.1.0
+`
+
+const bootloaderHookManifest = `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: airbyte-bootloader
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+spec:
+  containers:
+    - name: bootloader
+      image: airbyte/bootloader:1.1.0
+`
+
+const preInstallJobHookManifest = `
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pre-install-job
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-1"
+spec:
+  template:
+    spec:
+      containers:
+        - name: pre-install
+          image: busybox:latest
 `
 
 // sampleRenderedYaml should be a string containing a rendered Helm chart YAML with all the images above.
