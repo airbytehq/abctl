@@ -17,23 +17,37 @@ type ChartResolver struct {
 	v2RepoURL string
 	// client provides Chart.yaml metadata extraction for local paths and URLs
 	client goHelm.Client
+	// includeDevel allows prerelease versions to be considered
+	includeDevel bool
 }
 
 // NewChartResolver creates a resolver with default Airbyte v1/v2 repository URLs
 func NewChartResolver(client goHelm.Client) *ChartResolver {
 	return &ChartResolver{
-		v1RepoURL: common.AirbyteRepoURLv1,
-		v2RepoURL: common.AirbyteRepoURLv2,
-		client:    client,
+		v1RepoURL:    common.AirbyteRepoURLv1,
+		v2RepoURL:    common.AirbyteRepoURLv2,
+		client:       client,
+		includeDevel: false,
+	}
+}
+
+// NewChartResolverWithDevel creates a resolver with default Airbyte v1/v2 repository URLs and devel flag
+func NewChartResolverWithDevel(client goHelm.Client, includeDevel bool) *ChartResolver {
+	return &ChartResolver{
+		v1RepoURL:    common.AirbyteRepoURLv1,
+		v2RepoURL:    common.AirbyteRepoURLv2,
+		client:       client,
+		includeDevel: includeDevel,
 	}
 }
 
 // NewChartResolverWithURLs creates a resolver with custom v1/v2 repository URLs
 func NewChartResolverWithURLs(client goHelm.Client, v1URL, v2URL string) *ChartResolver {
 	return &ChartResolver{
-		v1RepoURL: v1URL,
-		v2RepoURL: v2URL,
-		client:    client,
+		v1RepoURL:    v1URL,
+		v2RepoURL:    v2URL,
+		client:       client,
+		includeDevel: false,
 	}
 }
 
@@ -55,13 +69,14 @@ func ChartIsV2Plus(v string) bool {
 func (r *ChartResolver) ResolveChartReference(chart, version string) (string, string, error) {
 	if chart == "" {
 		if version == "" {
-			chartURL, chartVersion, err := GetLatestAirbyteChartUrlFromRepoIndex("", r.v2RepoURL)
+			chartURL, chartVersion, err := GetLatestAirbyteChartUrlFromRepoIndex("", r.v2RepoURL, r.includeDevel)
 			if err != nil {
 				return "", "", err
 			}
 			return chartURL, chartVersion, nil
 		} else {
-			if ChartIsV2Plus(version) {
+			// Always use v2 repo for development versions
+			if r.includeDevel || ChartIsV2Plus(version) {
 				// Construct the v2 chart URL.
 				return fmt.Sprintf("%s/airbyte-%s.tgz", r.v2RepoURL, version), version, nil
 			} else {

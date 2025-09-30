@@ -19,6 +19,7 @@ import (
 type InstallCmd struct {
 	Chart           string   `help:"Path to chart." xor:"chartver"`
 	ChartVersion    string   `help:"Version to install." xor:"chartver"`
+	Devel           bool     `help:"Include development versions when searching for charts. Use with caution."`
 	DisableAuth     bool     `help:"Disable auth."`
 	DockerEmail     string   `group:"docker" help:"Docker email." env:"ABCTL_LOCAL_INSTALL_DOCKER_EMAIL"`
 	DockerPassword  string   `group:"docker" help:"Docker password." env:"ABCTL_LOCAL_INSTALL_DOCKER_PASSWORD"`
@@ -195,6 +196,7 @@ func (i *InstallCmd) installOpts(ctx context.Context, user string) (*service.Ins
 		Hosts:            i.Host,
 		LocalStorage:     !supportMinio,
 		EnablePsql17:     enablePsql17,
+		Devel:            i.Devel,
 		DockerServer:     i.DockerServer,
 		DockerUser:       i.DockerUsername,
 		DockerPass:       i.DockerPassword,
@@ -232,7 +234,15 @@ func (i *InstallCmd) installOpts(ctx context.Context, user string) (*service.Ins
 }
 
 func (i *InstallCmd) setDefaultChartFlags(helmClient goHelm.Client) error {
-	resolver := helm.NewChartResolver(helmClient)
+	// Add warning if using development charts
+	if i.Devel {
+		pterm.Warning.Println("Using development charts. These may be unstable.")
+		if i.ChartVersion == "" {
+			pterm.Info.Println("Consider specifying an explicit version with --chart-version for reproducibility")
+		}
+	}
+
+	resolver := helm.NewChartResolverWithDevel(helmClient, i.Devel)
 	resolvedChart, resolvedVersion, err := resolver.ResolveChartReference(i.Chart, i.ChartVersion)
 	if err != nil {
 		return fmt.Errorf("failed to resolve chart flags: %w", err)

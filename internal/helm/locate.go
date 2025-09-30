@@ -41,8 +41,8 @@ var defaultLoadIndexFile loadIndexFile = repo.LoadIndexFile
 
 // GetLatestAirbyteChartUrlFromRepoIndex fetches the latest stable Airbyte Helm chart URL and version
 // from the given Helm repository index. Returns the chart download URL, the chart version, and an error if any.
-// Only stable (non-prerelease) versions are considered.
-func GetLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, string, error) {
+// Only stable (non-prerelease) versions are considered unless includeDevel is true.
+func GetLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string, includeDevel bool) (string, string, error) {
 	chartRepository, err := defaultNewChartRepo(&repo.Entry{
 		Name: repoName,
 		URL:  repoUrl,
@@ -78,7 +78,8 @@ func GetLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, st
 			version = "v" + version
 		}
 
-		if semver.Prerelease(version) == "" {
+		// Include prerelease versions if includeDevel is true
+		if includeDevel || semver.Prerelease(version) == "" {
 			latest = entry
 			break
 		}

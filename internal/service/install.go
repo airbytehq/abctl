@@ -49,6 +49,7 @@ type InstallOpts struct {
 	Hosts            []string
 	LocalStorage     bool
 	EnablePsql17     bool
+	Devel            bool
 
 	DockerServer string
 	DockerUser   string
@@ -252,16 +253,23 @@ func (m *Manager) Install(ctx context.Context, opts *InstallOpts) error {
 		pterm.Success.Println(fmt.Sprintf("Secret from '%s' created or updated", secretFile))
 	}
 
+	// Use v2 repo for development versions or v2+ versions
+	repoURL := common.AirbyteRepoURLv1
+	if opts.Devel || helm.ChartIsV2Plus(opts.HelmChartVersion) {
+		repoURL = common.AirbyteRepoURLv2
+	}
+
 	if err := m.handleChart(ctx, chartRequest{
 		name:         "airbyte",
 		repoName:     common.AirbyteRepoName,
-		repoURL:      common.AirbyteRepoURLv1,
+		repoURL:      repoURL,
 		chartName:    common.AirbyteChartName,
 		chartRelease: common.AirbyteChartRelease,
 		chartVersion: opts.HelmChartVersion,
 		chartLoc:     opts.AirbyteChartLoc,
 		namespace:    common.AirbyteNamespace,
 		valuesYAML:   opts.HelmValuesYaml,
+		devel:        opts.Devel,
 	}); err != nil {
 		// if trace.SpanError isn't called here, the logs attached
 		// in the diagnoseAirbyteChartFailure method are lost
@@ -598,6 +606,7 @@ type chartRequest struct {
 	namespace      string
 	valuesYAML     string
 	uninstallFirst bool
+	devel          bool
 }
 
 // errHelmStuck is the error returned (only from a msg perspective, not this actual error) from the underlying helm
