@@ -2,6 +2,7 @@ package helm
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/validate"
@@ -50,7 +51,7 @@ func ChartIsV2Plus(v string) bool {
 
 // ResolveChartReference resolves an Airbyte chart reference to its full URL/path and version.
 // For empty chart+version, returns latest v2 chart.
-// For version-only, uses v1/v2 repo based on version number.
+// For version-only, uses v1/v2 repo based on base version (strips pre-release suffix for repo selection).
 // For URLs and local paths, returns as-is with version from chart metadata.
 func (r *ChartResolver) ResolveChartReference(chart, version string) (string, string, error) {
 	if chart == "" {
@@ -61,7 +62,10 @@ func (r *ChartResolver) ResolveChartReference(chart, version string) (string, st
 			}
 			return chartURL, chartVersion, nil
 		} else {
-			if ChartIsV2Plus(version) {
+			// Extract base version without suffix (e.g., "1.8.4-rc5" -> "1.8.4")
+			// to determine which repo to use, but keep full version for URL
+			baseVersion, _, _ := strings.Cut(version, "-")
+			if ChartIsV2Plus(baseVersion) {
 				// Construct the v2 chart URL.
 				return fmt.Sprintf("%s/airbyte-%s.tgz", r.v2RepoURL, version), version, nil
 			} else {

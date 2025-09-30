@@ -179,6 +179,13 @@ entries:
 			wantVer:   "2.1.0-beta.1",
 		},
 		{
+			name:      "version only v1 with rc suffix",
+			chart:     "",
+			version:   "1.8.4-rc5",
+			wantChart: fmt.Sprintf("%s/airbyte-%s.tgz", v1Server.URL, "1.8.4-rc5"),
+			wantVer:   "1.8.4-rc5",
+		},
+		{
 			name:      "chart as local ref",
 			chart:     "local/path",
 			version:   "",
