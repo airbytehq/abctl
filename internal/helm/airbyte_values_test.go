@@ -219,6 +219,7 @@ global:
     env_vars:
         PLATFORM_LOG_FORMAT: json
 global:
+    airbyteUrl: http://localhost:8000
     auth:
         enabled: true
     env_vars:
@@ -243,6 +244,7 @@ server:
 connectorBuilderServer:
     enabled: false
 global:
+    airbyteUrl: http://localhost:8000
     auth:
         security:
             cookieSecureSetting: '"false"'

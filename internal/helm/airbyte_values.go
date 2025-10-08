@@ -117,7 +117,12 @@ func buildAirbyteValuesV2(ctx context.Context, opts ValuesOpts) (string, error) 
 	span := trace.SpanFromContext(ctx)
 
 	vals := []string{
+		// WEBAPP_URL is required for backward compatibility with v2 Helm charts prior to Airbyte 2.0.0.
+		// Starting with Airbyte 2.0.0, the platform uses AIRBYTE_URL instead (set via global.airbyteUrl).
+		// Both are set here to support all v2 chart versions. WEBAPP_URL can be removed once all
+		// supported chart versions are >= 2.0.0.
 		"server.env_vars.WEBAPP_URL=http://airbyte-abctl-airbyte-server-svc:80",
+		"global.airbyteUrl=http://localhost:8000",
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + opts.TelemetryUser,
 		"global.jobs.resources.limits.cpu=3",
 		"global.jobs.resources.limits.memory=4Gi",
