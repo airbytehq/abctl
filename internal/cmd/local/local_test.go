@@ -118,7 +118,7 @@ func TestValues_FileDoesntExist(t *testing.T) {
 }
 
 func TestValues_BadYaml(t *testing.T) {
-	cmd := InstallCmd{Values: "./testdata/invalid.values.yaml"}
+	cmd := InstallCmd{Values: "./testdata/invalid.values.yaml", Port: 8000}
 	// Does not need actual clients for tests.
 	testFactory := func(kubeConfig, kubeContext string) (k8s.Client, goHelm.Client, error) {
 		return nil, nil, nil
@@ -134,7 +134,7 @@ func TestValues_BadYaml(t *testing.T) {
 }
 
 func TestInvalidHostFlag_IpAddr(t *testing.T) {
-	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4"}}
+	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4"}, Port: 8000}
 	// Does not need actual clients for tests.
 	testFactory := func(kubeConfig, kubeContext string) (k8s.Client, goHelm.Client, error) {
 		return nil, nil, nil
@@ -146,7 +146,7 @@ func TestInvalidHostFlag_IpAddr(t *testing.T) {
 }
 
 func TestInvalidHostFlag_IpAddrWithPort(t *testing.T) {
-	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4:8000"}}
+	cmd := InstallCmd{Host: []string{"ok", "1.2.3.4:8000"}, Port: 8000}
 	// Does not need actual clients for tests.
 	testFactory := func(kubeConfig, kubeContext string) (k8s.Client, goHelm.Client, error) {
 		return nil, nil, nil
@@ -162,6 +162,7 @@ func TestInstallOpts(t *testing.T) {
 	cmd := InstallCmd{
 		// Don't let the code dynamically resolve the latest chart version.
 		Chart: "/test/path/to/chart",
+		Port:  8000,
 	}
 	expect := &service.InstallOpts{
 		HelmValuesYaml:  string(b),
