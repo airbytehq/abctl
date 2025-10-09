@@ -40,13 +40,23 @@ func NewChartResolverWithURLs(client goHelm.Client, v1URL, v2URL string) *ChartR
 
 // ChartIsV2Plus returns true if the chart version is v2.0.0 or higher
 func ChartIsV2Plus(v string) bool {
+	return ChartEqualsOrHigherVersion(v, "v2.0.0")
+}
+
+// ChartIsV1_8Plus returns true if the chart version is v1.8.0 or higher
+func ChartIsV1_8Plus(v string) bool {
+	return ChartEqualsOrHigherVersion(v, "v1.8.0")
+}
+
+// ChartEqualsOrHigherVersion returns true if the chart version is equals or higher than threshold
+func ChartEqualsOrHigherVersion(v string, threshold string) bool {
 	if v == "" {
 		return false
 	}
 	if v[0] != 'v' {
 		v = "v" + v
 	}
-	return semver.Compare(v, "v2.0.0") >= 0
+	return semver.Compare(v, threshold) >= 0
 }
 
 // ResolveChartReference resolves an Airbyte chart reference to its full URL/path and version.

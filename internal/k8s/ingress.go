@@ -51,8 +51,8 @@ func Ingress(chartVersion string, hosts []string) *networkingv1.Ingress {
 // ingressRule creates a rule for the host with proper API routing.
 func ingressRules(chartVersion string, host string) networkingv1.IngressRule {
 	rules := ingressRulesForV1()
-	if helm.ChartIsV2Plus(chartVersion) {
-		rules = ingressRulesForV2()
+	if helm.ChartIsV1_8Plus(chartVersion) {
+		rules = ingressRulesForV1_8Plus()
 	}
 
 	return networkingv1.IngressRule{
@@ -98,7 +98,7 @@ func ingressRulesForV1() networkingv1.IngressRuleValue {
 	}
 }
 
-func ingressRulesForV2() networkingv1.IngressRuleValue {
+func ingressRulesForV1_8Plus() networkingv1.IngressRuleValue {
 	var pathType = networkingv1.PathType("Prefix")
 
 	return networkingv1.IngressRuleValue{

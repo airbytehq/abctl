@@ -65,6 +65,77 @@ func TestChartIsV2Plus(t *testing.T) {
 	}
 }
 
+func TestChartIsV1_8Plus(t *testing.T) {
+	tests := []struct {
+		name string
+		ver  string
+		want bool
+	}{
+		{
+			name: "empty version",
+			ver:  "",
+			want: false,
+		},
+		{
+			name: "v1 version",
+			ver:  "1.0.0",
+			want: false,
+		},
+		{
+			name: "v1 with v prefix",
+			ver:  "v1.0.0",
+			want: false,
+		},
+		{
+			name: "v1.8 version",
+			ver:  "1.8.0",
+			want: true,
+		},
+		{
+			name: "v1.8 with v prefix",
+			ver:  "v1.8.0",
+			want: true,
+		},
+		{
+			name: "v1.8.5 version",
+			ver:  "1.8.5",
+			want: true,
+		},
+		{
+			name: "v1.8.5 with v prefix",
+			ver:  "v1.8.5",
+			want: true,
+		},
+		{
+			name: "v2 version",
+			ver:  "2.0.0",
+			want: true,
+		},
+		{
+			name: "v2 with v prefix",
+			ver:  "v2.0.0",
+			want: true,
+		},
+		{
+			name: "v2 pre-release",
+			ver:  "v2.0.0-alpha.1",
+			want: true,
+		},
+		{
+			name: "v3 version",
+			ver:  "3.0.0",
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ChartIsV1_8Plus(tt.ver)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestResolveChartReference(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
