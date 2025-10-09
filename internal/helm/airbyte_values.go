@@ -19,6 +19,7 @@ type ValuesOpts struct {
 	DisableAuth     bool
 	LocalStorage    bool
 	EnablePsql17    bool
+	Port            int
 }
 
 const (
@@ -116,13 +117,21 @@ func buildAirbyteValuesV1(ctx context.Context, opts ValuesOpts) (string, error) 
 func buildAirbyteValuesV2(ctx context.Context, opts ValuesOpts) (string, error) {
 	span := trace.SpanFromContext(ctx)
 
+	// Validate port is in valid range
+	if opts.Port <= 0 || opts.Port > 65535 {
+		return "", fmt.Errorf("invalid port %d: must be between 1 and 65535", opts.Port)
+	}
+
+	airbyteURL := fmt.Sprintf("http://localhost:%d", opts.Port)
+
 	vals := []string{
 		// WEBAPP_URL is required for backward compatibility with v2 Helm charts prior to Airbyte 2.0.0.
 		// Starting with Airbyte 2.0.0, the platform uses AIRBYTE_URL instead (set via global.airbyteUrl).
 		// Both are set here to support all v2 chart versions. WEBAPP_URL can be removed once all
 		// supported chart versions are >= 2.0.0.
-		"server.env_vars.WEBAPP_URL=http://airbyte-abctl-airbyte-server-svc:80",
-		"global.airbyteUrl=http://localhost:8000",
+		// Port is omitted to use HTTP default (80), allowing users to override the service port via Helm values.
+		"server.env_vars.WEBAPP_URL=http://airbyte-abctl-airbyte-server-svc",
+		"global.airbyteUrl=" + airbyteURL,
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + opts.TelemetryUser,
 		"global.jobs.resources.limits.cpu=3",
 		"global.jobs.resources.limits.memory=4Gi",

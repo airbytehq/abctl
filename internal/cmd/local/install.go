@@ -209,6 +209,7 @@ func (i *InstallCmd) installOpts(ctx context.Context, user string) (*service.Ins
 		DisableAuth:     i.DisableAuth,
 		LocalStorage:    !supportMinio,
 		EnablePsql17:    enablePsql17,
+		Port:            i.Port,
 	}
 
 	if opts.DockerAuth() {
