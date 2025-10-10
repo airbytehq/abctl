@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/airbytehq/abctl/internal/ui"
@@ -34,6 +35,8 @@ func RenderOutput(uiProvider ui.Provider, data any, format string) error {
 		for k := range outputHandlers {
 			supported = append(supported, k)
 		}
+		// Sort supported since slice key order is not deterministic.
+		slices.Sort(supported)
 		return fmt.Errorf("unsupported output format: %s (supported: %s)", format, strings.Join(supported, ", "))
 	}
 
