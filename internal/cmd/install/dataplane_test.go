@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	goHelm "github.com/mittwald/go-helm-client"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	goHelm "github.com/mittwald/go-helm-client"
 
 	"github.com/airbytehq/abctl/internal/airbox"
 	airboxmock "github.com/airbytehq/abctl/internal/airbox/mock"
@@ -38,7 +38,7 @@ func TestDataplaneCmd_Run(t *testing.T) {
 				mockStore := airboxmock.NewMockConfigStore(ctrl)
 				mockHTTP := httpmock.NewMockHTTPDoer(ctrl)
 				mockUI := uimock.NewMockProvider(ctrl)
-				
+
 				mockHelmFactory := func(kubeConfig, kubeContext, namespace string) (goHelm.Client, error) {
 					return nil, nil
 				}
@@ -65,7 +65,7 @@ func TestDataplaneCmd_Run(t *testing.T) {
 				mockHTTP := httpmock.NewMockHTTPDoer(ctrl)
 				mockService := apimock.NewMockService(ctrl)
 				mockUI := uimock.NewMockProvider(ctrl)
-				
+
 				mockHelmFactory := func(kubeConfig, kubeContext, namespace string) (goHelm.Client, error) {
 					return nil, nil
 				}
@@ -93,7 +93,7 @@ func TestDataplaneCmd_Run(t *testing.T) {
 				mockHTTP := httpmock.NewMockHTTPDoer(ctrl)
 				mockService := apimock.NewMockService(ctrl)
 				mockUI := uimock.NewMockProvider(ctrl)
-				
+
 				mockHelmFactory := func(kubeConfig, kubeContext, namespace string) (goHelm.Client, error) {
 					return nil, nil
 				}
@@ -228,10 +228,6 @@ func TestDataplaneCmd_Run(t *testing.T) {
 						OrganizationID: "test-org-id",
 						Enabled:        true,
 					}).Return(createResponse, nil),
-					mockUI.EXPECT().ShowSection("Dataplane Credentials:",
-						"DataplaneID: test-dp-id",
-						"ClientID: test-client-id",
-						"ClientSecret: test-secret"),
 					mockUI.EXPECT().RunWithSpinner("Installing dataplane chart", gomock.Any()).DoAndReturn(func(msg string, fn func() error) error {
 						return fn()
 					}),
@@ -245,8 +241,8 @@ func TestDataplaneCmd_Run(t *testing.T) {
 			},
 		},
 		{
-			name:      "success flow with Kind cluster",
-			withKind:  true,
+			name:     "success flow with Kind cluster",
+			withKind: true,
 			setupMocks: func(ctrl *gomock.Controller) (airbox.ConfigStore, http.HTTPDoer, airbox.APIServiceFactory, helm.Factory, k8s.ClusterFactory, *uimock.MockProvider) {
 				mockStore := airboxmock.NewMockConfigStore(ctrl)
 				mockHTTP := httpmock.NewMockHTTPDoer(ctrl)
@@ -308,10 +304,6 @@ func TestDataplaneCmd_Run(t *testing.T) {
 						OrganizationID: "test-org-id",
 						Enabled:        true,
 					}).Return(createResponse, nil),
-					mockUI.EXPECT().ShowSection("Dataplane Credentials:",
-						"DataplaneID: test-dp-id",
-						"ClientID: test-client-id",
-						"ClientSecret: test-secret"),
 					mockUI.EXPECT().RunWithSpinner("Installing dataplane chart", gomock.Any()).DoAndReturn(func(msg string, fn func() error) error {
 						return fn()
 					}),
@@ -392,10 +384,6 @@ func TestDataplaneCmd_Run(t *testing.T) {
 						OrganizationID: "test-org-id",
 						Enabled:        true,
 					}).Return(createResponse, nil),
-					mockUI.EXPECT().ShowSection("Dataplane Credentials:",
-						"DataplaneID: test-dp-id",
-						"ClientID: test-client-id",
-						"ClientSecret: test-secret"),
 					mockUI.EXPECT().RunWithSpinner("Installing dataplane chart", gomock.Any()).DoAndReturn(func(msg string, fn func() error) error {
 						return fn()
 					}),
@@ -437,4 +425,3 @@ func TestDataplaneCmd_Run(t *testing.T) {
 		})
 	}
 }
-

@@ -172,12 +172,6 @@ func registerDataplane(ctx context.Context, ui ui.Provider, apiClient api.Servic
 		return nil, fmt.Errorf("failed to create dataplane: %w", err)
 	}
 
-	ui.ShowSection("Dataplane Credentials:",
-		"DataplaneID: "+response.DataplaneID,
-		"ClientID: "+response.ClientID,
-		"ClientSecret: "+response.ClientSecret,
-	)
-
 	return response, nil
 }
 
