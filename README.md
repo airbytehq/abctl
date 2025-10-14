@@ -187,9 +187,6 @@ The `--low-resource-mode` flag optimizes Airbyte for environments with limited C
 - Sets all job resource requests (CPU and memory) to `0`, allowing Kubernetes to schedule jobs without minimum resource guarantees
 - Applies to all job types: `check`, `discover`, `spec`, and `sidecar` containers
 
-**Job Resource Variant:**
-- Configures `JOB_RESOURCE_VARIANT_OVERRIDE=lowresource` to use lower default resource allocations for connector operations
-
 **Feature Adjustments:**
 - Disables the Connector Builder Server to reduce overall resource consumption
 
