@@ -179,6 +179,33 @@ Installs a local Airbyte instance or updates an existing installation which was 
 | --values            | ""      | Helm values file to further customize the Airbyte installation.                                                                                                                                                                                        |
 | --volume            | ""      | **Can be set multiple times**.<br />Mounts additional volumes in the kubernetes cluster.<br />Must be in the format of `<HOST_PATH>:<GUEST_PATH>`.                                                                                                     |
 
+#### Low Resource Mode
+
+The `--low-resource-mode` flag optimizes Airbyte for environments with limited CPU and memory resources. When enabled, this mode makes the following changes:
+
+**Resource Requests:**
+- Sets all job resource requests (CPU and memory) to `0`, allowing Kubernetes to schedule jobs without minimum resource guarantees
+- Applies to all job types: `check`, `discover`, `spec`, and `sidecar` containers
+
+**Job Resource Variant:**
+- Configures `JOB_RESOURCE_VARIANT_OVERRIDE=lowresource` to use lower default resource allocations for connector operations
+
+**Feature Adjustments:**
+- Disables the Connector Builder Server to reduce overall resource consumption
+
+This mode is ideal for:
+- Development and testing environments with limited resources
+- Machines with constrained CPU or memory
+- Situations where multiple services need to share limited system resources
+
+> [!NOTE]
+> While low resource mode reduces resource requirements, it may impact performance for data-intensive operations. It is not recommended for production workloads with large data volumes.
+
+Example usage:
+```
+abctl local install --low-resource-mode
+```
+
 ### status
 
 ```abctl local status```
