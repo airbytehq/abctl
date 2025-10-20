@@ -117,9 +117,14 @@ func TestIngressRouting(t *testing.T) {
 		wantService  string
 	}{
 		{
-			name:         "v1 routes to webapp",
-			chartVersion: "1.9.9",
+			name:         "v1.7 routes to webapp",
+			chartVersion: "1.7.1",
 			wantService:  "airbyte-abctl-airbyte-webapp-svc",
+		},
+		{
+			name:         "v1.9 routes to server",
+			chartVersion: "1.9.9",
+			wantService:  "airbyte-abctl-airbyte-server-svc",
 		},
 		{
 			name:         "v2 routes to server",

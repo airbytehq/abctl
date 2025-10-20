@@ -65,7 +65,7 @@ func TestChartIsV2Plus(t *testing.T) {
 	}
 }
 
-func TestChartIsV1_8Plus(t *testing.T) {
+func TestChartIsV1Dot8Plus(t *testing.T) {
 	tests := []struct {
 		name string
 		ver  string
@@ -130,7 +130,7 @@ func TestChartIsV1_8Plus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ChartIsV1_8Plus(tt.ver)
+			got := ChartIsV1Dot8Plus(tt.ver)
 			assert.Equal(t, tt.want, got)
 		})
 	}

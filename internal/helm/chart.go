@@ -43,8 +43,8 @@ func ChartIsV2Plus(v string) bool {
 	return ChartEqualsOrHigherVersion(v, "v2.0.0")
 }
 
-// ChartIsV1_8Plus returns true if the chart version is v1.8.0 or higher
-func ChartIsV1_8Plus(v string) bool {
+// ChartIsV1Dot8Plus returns true if the chart version is v1.8.0 or higher
+func ChartIsV1Dot8Plus(v string) bool {
 	return ChartEqualsOrHigherVersion(v, "v1.8.0")
 }
 
