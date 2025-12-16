@@ -4,27 +4,25 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"net"
-	"net/http"
+	stdhttp "net/http"
 	"net/url"
 	"time"
 
+	"github.com/airbytehq/abctl/internal/http"
 	"github.com/cli/browser"
 	"github.com/google/uuid"
-	"github.com/pterm/pterm"
 )
 
 //go:embed success.html
 var successHTML string
 
 const (
-	// DefaultClientID is the default OAuth client ID for public clients
-	DefaultClientID = "abctl"
-	// CallbackPath is the OAuth callback path
-	CallbackPath = "/callback"
+	// callbackPath is the OAuth callback path
+	callbackPath = "/callback"
 )
 
 // Flow manages the OAuth2/OIDC authorization flow.
@@ -32,89 +30,144 @@ const (
 // while maintaining a timeout. This pattern is necessary because we need to
 // serve HTTP callbacks while the main thread waits for authentication to complete.
 type Flow struct {
-	Provider     *Provider
-	ClientID     string
-	RedirectPort int
+	provider     *OIDCProvider
+	clientID     string
+	callbackPort int           // Port for our callback server (0 = random)
+	SkipBrowser  bool          // Skip browser opening for tests
+	timeout      time.Duration // Configurable timeout
+	httpClient   http.HTTPDoer
 	codeVerifier string
 	state        string
+	codeChan     chan string
+	errChan      chan error
+}
+
+// FlowOption is used to configure the flow object.
+type FlowOption func(f *Flow)
+
+// StateGenerator is a function that generates the OAuth state parameter for CSRF protection.
+type StateGenerator func() string
+
+// WithStateGenerator is an option used to override the state generation for authentication.
+func WithStateGenerator(g StateGenerator) FlowOption {
+	return func(f *Flow) {
+		f.state = g()
+	}
+}
+
+// WithProvider sets a specific OIDC provider for the flow
+func WithProvider(provider *OIDCProvider) FlowOption {
+	return func(f *Flow) {
+		f.provider = provider
+	}
 }
 
 // NewFlow creates a new OAuth flow with PKCE.
 // The flow is designed to be reusable across different service contexts.
-func NewFlow(provider *Provider, clientID string, callbackPort int) *Flow {
-	return &Flow{
-		Provider:     provider,
-		ClientID:     clientID,
-		RedirectPort: callbackPort,
-		state:        uuid.New().String(),
+func NewFlow(clientID string, callbackPort int, httpClient http.HTTPDoer, opts ...FlowOption) *Flow {
+	flow := &Flow{
+		provider:     &OIDCProvider{},
+		clientID:     clientID,
+		callbackPort: callbackPort,
+		timeout:      defaultAuthTimeout,
+		httpClient:   httpClient,
+		state:        "", // Set by options or DefaultStateGenerator
 		codeVerifier: generateCodeVerifier(),
 	}
+
+	// Apply any flow options
+	for _, opt := range opts {
+		if opt != nil {
+			opt(flow)
+		}
+	}
+
+	// If no state generator was provided via options, use default
+	if flow.state == "" {
+		flow.state = DefaultStateGenerator()
+	}
+
+	return flow
 }
 
-// Authenticate performs the OAuth flow and returns credentials.
-// Uses goroutines and channels to handle the OAuth callback asynchronously
-// because we need to run an HTTP server for the callback while also
-// enforcing a timeout on the overall authentication process.
-func (f *Flow) Authenticate(ctx context.Context) (*Credentials, error) {
-	// Start callback server on fixed port
-	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", f.RedirectPort))
+// GetAuthURL returns the authorization URL for manual browser opening
+func (f *Flow) GetAuthURL() string {
+	return f.buildAuthURL()
+}
+
+// StartCallbackServer starts the OAuth callback server
+func (f *Flow) StartCallbackServer() error {
+	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", f.callbackPort))
 	if err != nil {
-		return nil, fmt.Errorf("failed to start callback server on port %d: %w", f.RedirectPort, err)
+		return fmt.Errorf("failed to start callback server on port %d: %w", f.callbackPort, err)
 	}
-	defer listener.Close()
 
-	// Build and open authorization URL
+	// Update callbackPort with actual port if it was 0 (random port)
+	if f.callbackPort == 0 {
+		f.callbackPort = listener.Addr().(*net.TCPAddr).Port
+	}
+
+	// Initialize channels
+	f.codeChan = make(chan string, 1)
+	f.errChan = make(chan error, 1)
+
+	// Start HTTP server in goroutine
+	go f.handleCallback(listener, f.codeChan, f.errChan)
+
+	return nil
+}
+
+// SendAuthRequest opens browser with auth URL
+func (f *Flow) SendAuthRequest() error {
 	authURL := f.buildAuthURL()
-	pterm.Info.Printf("Opening browser for authentication...\n")
-	pterm.Info.Printf("If browser doesn't open, visit: %s\n", authURL)
-
-	if err := browser.OpenURL(authURL); err != nil {
-		pterm.Warning.Printf("Could not open browser automatically: %v\n", err)
+	if !f.SkipBrowser {
+		_ = browser.OpenURL(authURL) // Best effort - user can manually open URL if browser fails
 	}
 
-	// Wait for callback
-	codeChan := make(chan string, 1)
-	errChan := make(chan error, 1)
+	// Also make HTTP request for tests
+	u, err := url.Parse(authURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse auth URL: %w", err)
+	}
 
-	go f.handleCallback(listener, codeChan, errChan)
+	resp, err := f.httpClient.Do(&stdhttp.Request{
+		Method: "GET",
+		URL:    u,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to send auth request: %w", err)
+	}
 
+	if resp != nil {
+		_ = resp.Body.Close() // Best effort cleanup
+	}
+
+	return nil
+}
+
+// WaitForCallback waits for OAuth callback and returns credentials
+func (f *Flow) WaitForCallback(ctx context.Context) (*Credentials, error) {
 	// Wait for authorization code with timeout
 	select {
-	case code := <-codeChan:
+	case code := <-f.codeChan:
 		return f.exchangeCode(ctx, code)
-	case err := <-errChan:
+	case err := <-f.errChan:
 		return nil, err
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case <-time.After(5 * time.Minute):
-		return nil, fmt.Errorf("authentication timeout after 5 minutes")
+	case <-time.After(f.timeout):
+		return nil, fmt.Errorf("authentication timeout after %v", f.timeout)
 	}
 }
 
-func (f *Flow) buildAuthURL() string {
-	redirectURI := fmt.Sprintf("http://localhost:%d%s", f.RedirectPort, CallbackPath)
-	codeChallenge := generateCodeChallenge(f.codeVerifier)
-
-	params := url.Values{}
-	params.Set("client_id", f.ClientID)
-	params.Set("response_type", "code")
-	params.Set("redirect_uri", redirectURI)
-	params.Set("state", f.state)
-	params.Set("code_challenge", codeChallenge)
-	params.Set("code_challenge_method", "S256")
-	params.Set("scope", "openid profile email offline_access")
-
-	return fmt.Sprintf("%s?%s", f.Provider.AuthorizationEndpoint, params.Encode())
-}
-
 func (f *Flow) handleCallback(listener net.Listener, codeChan chan<- string, errChan chan<- error) {
-	mux := http.NewServeMux()
+	mux := stdhttp.NewServeMux()
 
-	mux.HandleFunc(CallbackPath, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(callbackPath, func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		// Validate state
 		if state := r.URL.Query().Get("state"); state != f.state {
 			errChan <- fmt.Errorf("invalid state parameter")
-			http.Error(w, "Invalid state", http.StatusBadRequest)
+			stdhttp.Error(w, "Invalid state", stdhttp.StatusBadRequest)
 			return
 		}
 
@@ -122,7 +175,7 @@ func (f *Flow) handleCallback(listener net.Listener, codeChan chan<- string, err
 		if errParam := r.URL.Query().Get("error"); errParam != "" {
 			errDesc := r.URL.Query().Get("error_description")
 			errChan <- fmt.Errorf("authentication error: %s - %s", errParam, errDesc)
-			http.Error(w, "Authentication failed", http.StatusBadRequest)
+			stdhttp.Error(w, "Authentication failed", stdhttp.StatusBadRequest)
 			return
 		}
 
@@ -130,44 +183,40 @@ func (f *Flow) handleCallback(listener net.Listener, codeChan chan<- string, err
 		code := r.URL.Query().Get("code")
 		if code == "" {
 			errChan <- fmt.Errorf("no authorization code received")
-			http.Error(w, "No code received", http.StatusBadRequest)
+			stdhttp.Error(w, "No code received", stdhttp.StatusBadRequest)
 			return
 		}
 
 		// Send success response
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, successHTML)
+		_, _ = fmt.Fprint(w, successHTML) // HTTP response write - handled by server
 
 		// Send code
 		codeChan <- code
 	})
 
-	server := &http.Server{Handler: mux}
-	server.Serve(listener)
+	server := &stdhttp.Server{Handler: mux}
+	_ = server.Serve(listener) // Returns error when server shuts down, which is expected behavior
 }
 
 func (f *Flow) exchangeCode(ctx context.Context, code string) (*Credentials, error) {
-	redirectURI := fmt.Sprintf("http://localhost:%d%s", f.RedirectPort, CallbackPath)
-
-	tokens, err := ExchangeCodeForTokens(ctx, f.Provider, f.ClientID, code, redirectURI, f.codeVerifier)
+	tokens, err := f.exchangeCodeForTokens(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange code for tokens: %w", err)
 	}
 
 	// Calculate expiration time
-	expiresAt := time.Now()
-	if tokens.ExpiresIn > 0 {
-		expiresAt = expiresAt.Add(time.Duration(tokens.ExpiresIn) * time.Second)
-	} else {
-		// Default to 1 hour if not specified
-		expiresAt = expiresAt.Add(time.Hour)
+	if tokens.ExpiresIn <= 0 {
+		return nil, fmt.Errorf("token without expiration is not allowed for security reasons")
 	}
+
+	expiresAt := time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
 
 	tokenType := tokens.TokenType
 	if tokenType == "" {
 		tokenType = "Bearer" // Default to Bearer if not specified
 	}
-	
+
 	return &Credentials{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
@@ -176,11 +225,28 @@ func (f *Flow) exchangeCode(ctx context.Context, code string) (*Credentials, err
 	}, nil
 }
 
+func (f *Flow) buildAuthURL() string {
+	handler := f.provider.AuthEndpointHandler()
+	if handler == nil {
+		return "" // FlowProvider doesn't support authorization endpoint
+	}
+
+	redirectURI := fmt.Sprintf("http://localhost:%d%s", f.callbackPort, callbackPath)
+	codeChallenge := generateCodeChallenge(f.codeVerifier)
+
+	return handler(f.clientID, redirectURI, f.state, codeChallenge)
+}
+
 // PKCE helpers
+
+// DefaultStateGenerator generates a secure random OAuth state parameter for CSRF protection.
+func DefaultStateGenerator() string {
+	return uuid.New().String()
+}
 
 func generateCodeVerifier() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	_, _ = rand.Read(b) // Cryptographic random never fails on supported platforms
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
@@ -189,3 +255,18 @@ func generateCodeChallenge(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
 
+// ExchangeCodeForTokens exchanges an authorization code for tokens
+func (f *Flow) exchangeCodeForTokens(ctx context.Context, code string) (*TokenResponse, error) {
+	redirectURI := fmt.Sprintf("http://localhost:%d%s", f.callbackPort, callbackPath)
+
+	data := url.Values{}
+	data.Set("grant_type", "authorization_code")
+	data.Set("client_id", f.clientID)
+	data.Set("code", code)
+	data.Set("redirect_uri", redirectURI)
+	if f.codeVerifier != "" {
+		data.Set("code_verifier", f.codeVerifier)
+	}
+
+	return doTokenRequest(ctx, f.provider.GetTokenEndpoint(), data, f.httpClient)
+}

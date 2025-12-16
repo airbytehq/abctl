@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	stdhttp "net/http"
 	"net/url"
 	"strings"
@@ -11,6 +12,27 @@ import (
 
 	"github.com/airbytehq/abctl/internal/http"
 )
+
+const (
+	// defaultTokenExpiry is the fallback expiration time for tokens without explicit expiry
+	defaultTokenExpiry = time.Hour
+	// clockSkewBuffer accounts for clock differences between client and server
+	clockSkewBuffer = time.Minute
+	// defaultAuthTimeout is the maximum time to wait for authentication flow completion
+	defaultAuthTimeout = 5 * time.Minute
+)
+
+// CredentialsStore interface for storing/loading credentials
+type CredentialsStore interface {
+	Load() (*Credentials, error)
+	Save(*Credentials) error
+}
+
+// Provider combines HTTP client functionality with credential storage for authenticated requests
+type Provider interface {
+	http.HTTPDoer
+	CredentialsStore
+}
 
 // TokenResponse represents an OAuth2 token response
 type TokenResponse struct {
@@ -21,27 +43,28 @@ type TokenResponse struct {
 	IDToken      string `json:"id_token,omitempty"`
 }
 
+// oAuth2ErrorResponse represents a standard OAuth2 error response as defined in RFC 6749
+type oAuth2ErrorResponse struct {
+	Error            string `json:"error"`
+	ErrorDescription string `json:"error_description"`
+}
+
 // Credentials stores authentication tokens and metadata
 type Credentials struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token,omitempty"`
-	TokenType    string    `json:"token_type"`
-	ExpiresAt    time.Time `json:"expires_at"`
+	AccessToken  string    `json:"access_token" yaml:"access_token"`
+	RefreshToken string    `json:"refresh_token,omitempty" yaml:"refresh_token,omitempty"`
+	TokenType    string    `json:"token_type" yaml:"token_type"`
+	ExpiresAt    time.Time `json:"expires_at" yaml:"expires_at"`
 }
 
 // IsExpired checks if the access token has expired
 func (c *Credentials) IsExpired() bool {
 	// Consider expired 1 minute early to account for clock skew
-	return time.Now().After(c.ExpiresAt.Add(-1 * time.Minute))
+	return time.Now().After(c.ExpiresAt.Add(-clockSkewBuffer))
 }
 
-// ToJSON serializes credentials to JSON
-func (c *Credentials) ToJSON() ([]byte, error) {
-	return json.Marshal(c)
-}
-
-// CredentialsFromJSON deserializes credentials from JSON
-func CredentialsFromJSON(data []byte) (*Credentials, error) {
+// credentialsFromJSON deserializes credentials from JSON
+func credentialsFromJSON(data []byte) (*Credentials, error) {
 	var creds Credentials
 	if err := json.Unmarshal(data, &creds); err != nil {
 		return nil, err
@@ -49,17 +72,13 @@ func CredentialsFromJSON(data []byte) (*Credentials, error) {
 	return &creds, nil
 }
 
-// Provider represents an OAuth2/OIDC provider configuration
-type Provider struct {
-	Issuer                string `json:"issuer"`
-	AuthorizationEndpoint string `json:"authorization_endpoint"`
-	TokenEndpoint         string `json:"token_endpoint"`
-	UserinfoEndpoint      string `json:"userinfo_endpoint,omitempty"`
-	JwksURI               string `json:"jwks_uri,omitempty"`
+// DiscoverProvider fetches OIDC provider configuration from well-known endpoint
+func DiscoverProvider(ctx context.Context, issuerURL string, client http.HTTPDoer) (*OIDCProvider, error) {
+	return discoverProviderWithClient(ctx, issuerURL, client)
 }
 
-// DiscoverProvider fetches OIDC provider configuration from well-known endpoint
-func DiscoverProvider(ctx context.Context, issuerURL string) (*Provider, error) {
+// discoverProviderWithClient fetches OIDC provider configuration using the provided HTTP client
+func discoverProviderWithClient(ctx context.Context, issuerURL string, client http.HTTPDoer) (*OIDCProvider, error) {
 	// Construct well-known URL
 	wellKnownURL := fmt.Sprintf("%s/.well-known/openid-configuration", issuerURL)
 
@@ -68,49 +87,31 @@ func DiscoverProvider(ctx context.Context, issuerURL string) (*Provider, error) 
 		return nil, fmt.Errorf("failed to create discovery request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch provider configuration: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }() // Connection cleanup, error doesn't affect functionality
 
 	if resp.StatusCode != stdhttp.StatusOK {
 		return nil, fmt.Errorf("discovery failed with status %d", resp.StatusCode)
 	}
 
-	var provider Provider
-	if err := json.NewDecoder(resp.Body).Decode(&provider); err != nil {
+	// Read response body for better error reporting
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read provider configuration response: %w", err)
+	}
+
+	var provider OIDCProvider
+	if err := json.Unmarshal(body, &provider); err != nil {
 		return nil, fmt.Errorf("failed to decode provider configuration: %w", err)
 	}
 
 	return &provider, nil
 }
 
-// ExchangeCodeForTokens exchanges an authorization code for tokens
-func ExchangeCodeForTokens(ctx context.Context, provider *Provider, clientID, code, redirectURI, codeVerifier string) (*TokenResponse, error) {
-	data := url.Values{}
-	data.Set("grant_type", "authorization_code")
-	data.Set("client_id", clientID)
-	data.Set("code", code)
-	data.Set("redirect_uri", redirectURI)
-	if codeVerifier != "" {
-		data.Set("code_verifier", codeVerifier)
-	}
-
-	return doTokenRequest(ctx, provider.TokenEndpoint, data)
-}
-
-// RefreshAccessToken uses a refresh token to get a new access token
-func RefreshAccessToken(ctx context.Context, provider *Provider, clientID, refreshToken string) (*TokenResponse, error) {
-	data := url.Values{}
-	data.Set("grant_type", "refresh_token")
-	data.Set("client_id", clientID)
-	data.Set("refresh_token", refreshToken)
-
-	return doTokenRequest(ctx, provider.TokenEndpoint, data)
-}
-
-func doTokenRequest(ctx context.Context, endpoint string, data url.Values) (*TokenResponse, error) {
+func doTokenRequest(ctx context.Context, endpoint string, data url.Values, client http.HTTPDoer) (*TokenResponse, error) {
 	body := strings.NewReader(data.Encode())
 	req, err := stdhttp.NewRequestWithContext(ctx, "POST", endpoint, body)
 	if err != nil {
@@ -119,21 +120,31 @@ func doTokenRequest(ctx context.Context, endpoint string, data url.Values) (*Tok
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("token request failed: %w", err)
+		return nil, fmt.Errorf("failed to execute token request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }() // Connection cleanup, error doesn't affect functionality
 
 	if resp.StatusCode != stdhttp.StatusOK {
-		var errResp struct {
-			Error            string `json:"error"`
-			ErrorDescription string `json:"error_description"`
+		body, _ := io.ReadAll(resp.Body)
+
+		// Try standard OAuth2 error format
+		var errResp oAuth2ErrorResponse
+		if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error != "" {
+			return nil, fmt.Errorf("failed to authenticate: %s - %s", errResp.Error, strings.ToLower(errResp.ErrorDescription))
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
-			return nil, fmt.Errorf("failed to decode error response for status code %d: %w", resp.StatusCode, err)
+
+		// Try Airbyte API error format
+		var apiErr struct {
+			Message string `json:"message"`
 		}
-		return nil, fmt.Errorf("token request failed: %s - %s", errResp.Error, errResp.ErrorDescription)
+		if err := json.Unmarshal(body, &apiErr); err == nil && apiErr.Message != "" {
+			return nil, fmt.Errorf("authentication failed: %s", apiErr.Message)
+		}
+
+		// Fallback to status code
+		return nil, fmt.Errorf("authentication failed with status %d", resp.StatusCode)
 	}
 
 	var tokenResp TokenResponse

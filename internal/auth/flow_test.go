@@ -1,416 +1,380 @@
 package auth
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
-	"net/url"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewFlow(t *testing.T) {
-	provider := &Provider{
-		Issuer:                "https://auth.example.com",
-		AuthorizationEndpoint: "https://auth.example.com/authorize",
-		TokenEndpoint:         "https://auth.example.com/token",
-	}
-
-	flow := NewFlow(provider, "test-client", 8085)
-
-	assert.NotNil(t, flow)
-	assert.Equal(t, provider, flow.Provider)
-	assert.Equal(t, "test-client", flow.ClientID)
-	assert.Equal(t, 8085, flow.RedirectPort)
-	assert.NotEmpty(t, flow.state)
-	assert.NotEmpty(t, flow.codeVerifier)
-
-	// Verify state is a valid UUID
-	assert.Len(t, flow.state, 36) // UUID v4 format
-	assert.Contains(t, flow.state, "-")
-
-	// Verify code verifier is base64url encoded
-	decoded, err := base64.RawURLEncoding.DecodeString(flow.codeVerifier)
-	assert.NoError(t, err)
-	assert.Len(t, decoded, 32) // Should be 32 bytes
-}
-
-func TestGenerateCodeVerifier(t *testing.T) {
+func TestFlow_CompleteOIDCAuthFlow(t *testing.T) {
 	tests := []struct {
 		name string
-		runs int
+		// Mocks
+		setupHandler func(t *testing.T) http.HandlerFunc
+
+		// Test control
+		contextTimeout time.Duration // 0 = use default
+		flowTimeout    time.Duration // 0 = use default
+		closeServer    bool          // close server before auth request
+
+		// Expected results
+		expectAuthErr error                                  // expected error from SendAuthRequest
+		expectErr     error                                  // expected error from WaitForCallback
+		validateCreds func(t *testing.T, creds *Credentials) // credential validation
 	}{
 		{
-			name: "generates unique values",
-			runs: 10,
-		},
-	}
+			name: "successful OAuth flow",
+			setupHandler: func(t *testing.T) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					t.Logf("OAuth server: %s %s", r.Method, r.URL.Path)
+					switch r.URL.Path {
+					case "/auth":
+						// Authorization endpoint - redirect to callback
+						assert.Equal(t, "GET", r.Method)
+						callbackURL := r.URL.Query().Get("redirect_uri")
+						state := r.URL.Query().Get("state")
+						redirectURL := fmt.Sprintf("%s?code=test_code&state=%s", callbackURL, state)
+						t.Logf("OAuth server: redirecting to %s", redirectURL)
+						http.Redirect(w, r, redirectURL, http.StatusFound)
+					case "/token":
+						// Token endpoint
+						assert.Equal(t, "POST", r.Method)
+						assert.Equal(t, "application/x-www-form-urlencoded", r.Header.Get("Content-Type"))
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			seen := make(map[string]bool)
+						// Parse form data
+						err := r.ParseForm()
+						require.NoError(t, err)
+						assert.Equal(t, "authorization_code", r.FormValue("grant_type"))
+						assert.Equal(t, "test_client", r.FormValue("client_id"))
+						assert.Equal(t, "test_code", r.FormValue("code"))
+						assert.NotEmpty(t, r.FormValue("code_verifier"))
 
-			for i := 0; i < tt.runs; i++ {
-				verifier := generateCodeVerifier()
-
-				// Check it's not empty
-				assert.NotEmpty(t, verifier)
-
-				// Check it's unique
-				assert.False(t, seen[verifier], "Generated duplicate verifier")
-				seen[verifier] = true
-
-				// Check it's valid base64url
-				decoded, err := base64.RawURLEncoding.DecodeString(verifier)
-				assert.NoError(t, err)
-				assert.Len(t, decoded, 32)
-
-				// Check it's URL-safe (no padding, no +, no /)
-				assert.NotContains(t, verifier, "=")
-				assert.NotContains(t, verifier, "+")
-				assert.NotContains(t, verifier, "/")
-			}
-		})
-	}
-}
-
-func TestGenerateCodeChallenge(t *testing.T) {
-	tests := []struct {
-		name     string
-		verifier string
-		want     string
-	}{
-		{
-			name:     "empty verifier",
-			verifier: "",
-			want:     "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU", // SHA256 of empty string
-		},
-		{
-			name:     "known verifier",
-			verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
-			want:     "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
-		},
-		{
-			name:     "another known verifier",
-			verifier: "test-verifier",
-			want:     calculateExpectedChallenge("test-verifier"),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			challenge := generateCodeChallenge(tt.verifier)
-			assert.Equal(t, tt.want, challenge)
-
-			// Verify it's valid base64url
-			decoded, err := base64.RawURLEncoding.DecodeString(challenge)
-			assert.NoError(t, err)
-			assert.Len(t, decoded, 32) // SHA256 is 32 bytes
-
-			// Verify it's URL-safe
-			assert.NotContains(t, challenge, "=")
-			assert.NotContains(t, challenge, "+")
-			assert.NotContains(t, challenge, "/")
-		})
-	}
-}
-
-func TestFlow_BuildAuthURL(t *testing.T) {
-	tests := []struct {
-		name         string
-		provider     *Provider
-		clientID     string
-		redirectPort int
-		state        string
-		codeVerifier string
-		validate     func(*testing.T, string)
-	}{
-		{
-			name: "builds correct auth URL with all parameters",
-			provider: &Provider{
-				AuthorizationEndpoint: "https://auth.example.com/authorize",
+						// Return token response
+						response := TokenResponse{
+							AccessToken:  "test_access_token",
+							TokenType:    "Bearer",
+							ExpiresIn:    3600,
+							RefreshToken: "test_refresh_token",
+						}
+						w.Header().Set("Content-Type", "application/json")
+						_ = json.NewEncoder(w).Encode(response)
+					default:
+						http.NotFound(w, r)
+					}
+				}
 			},
-			clientID:     "test-client",
-			redirectPort: 8085,
-			state:        "test-state",
-			codeVerifier: "test-verifier",
-			validate: func(t *testing.T, authURL string) {
-				u, err := url.Parse(authURL)
-				require.NoError(t, err)
-
-				// Check base URL
-				assert.Equal(t, "https", u.Scheme)
-				assert.Equal(t, "auth.example.com", u.Host)
-				assert.Equal(t, "/authorize", u.Path)
-
-				// Check query parameters
-				params := u.Query()
-				assert.Equal(t, "test-client", params.Get("client_id"))
-				assert.Equal(t, "code", params.Get("response_type"))
-				assert.Equal(t, "http://localhost:8085/callback", params.Get("redirect_uri"))
-				assert.Equal(t, "test-state", params.Get("state"))
-				assert.Equal(t, "S256", params.Get("code_challenge_method"))
-				assert.Equal(t, "openid profile email offline_access", params.Get("scope"))
-
-				// Verify code challenge is correct
-				expectedChallenge := calculateExpectedChallenge("test-verifier")
-				assert.Equal(t, expectedChallenge, params.Get("code_challenge"))
+			expectErr: nil,
+			validateCreds: func(t *testing.T, creds *Credentials) {
+				assert.Equal(t, "test_access_token", creds.AccessToken)
+				assert.Equal(t, "test_refresh_token", creds.RefreshToken)
+				assert.Equal(t, "Bearer", creds.TokenType)
+				assert.False(t, creds.IsExpired())
 			},
 		},
 		{
-			name: "handles authorization endpoint with existing query params",
-			provider: &Provider{
-				AuthorizationEndpoint: "https://auth.example.com/authorize?tenant=default",
+			name: "OAuth error response",
+			setupHandler: func(t *testing.T) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/auth":
+						// Authorization endpoint - redirect with error
+						callbackURL := r.URL.Query().Get("redirect_uri")
+						state := r.URL.Query().Get("state")
+						http.Redirect(w, r, fmt.Sprintf("%s?error=access_denied&error_description=User+denied+access&state=%s", callbackURL, state), http.StatusFound)
+					default:
+						http.NotFound(w, r)
+					}
+				}
 			},
-			clientID:     "test-client",
-			redirectPort: 8081,
-			state:        "test-state",
-			codeVerifier: "test-verifier",
-			validate: func(t *testing.T, authURL string) {
-				// The existing query param should be preserved (it's malformed but that's what happens)
-				assert.Contains(t, authURL, "client_id=test-client")
-				assert.Contains(t, authURL, "redirect_uri=http%3A%2F%2Flocalhost%3A8081%2Fcallback")
-				// Original param is preserved in the malformed URL
-				assert.Contains(t, authURL, "tenant=default")
+			expectErr: fmt.Errorf("authentication error: access_denied - User denied access"),
+			validateCreds: func(t *testing.T, creds *Credentials) {
+				assert.Nil(t, creds)
 			},
 		},
 		{
-			name: "uses custom redirect port",
-			provider: &Provider{
-				AuthorizationEndpoint: "https://auth.example.com/authorize",
+			name: "invalid state parameter",
+			setupHandler: func(t *testing.T) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/auth":
+						// Authorization endpoint - redirect with wrong state
+						callbackURL := r.URL.Query().Get("redirect_uri")
+						http.Redirect(w, r, fmt.Sprintf("%s?code=test_code&state=wrong_state", callbackURL), http.StatusFound)
+					default:
+						http.NotFound(w, r)
+					}
+				}
 			},
-			clientID:     "custom-client",
-			redirectPort: 9999,
-			state:        "custom-state",
-			codeVerifier: "custom-verifier",
-			validate: func(t *testing.T, authURL string) {
-				assert.Contains(t, authURL, "redirect_uri=http%3A%2F%2Flocalhost%3A9999%2Fcallback")
+			expectErr: fmt.Errorf("invalid state parameter"),
+			validateCreds: func(t *testing.T, creds *Credentials) {
+				assert.Nil(t, creds)
+			},
+		},
+		{
+			name: "missing authorization code",
+			setupHandler: func(t *testing.T) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/auth":
+						// Authorization endpoint - redirect without code
+						callbackURL := r.URL.Query().Get("redirect_uri")
+						state := r.URL.Query().Get("state")
+						http.Redirect(w, r, fmt.Sprintf("%s?state=%s", callbackURL, state), http.StatusFound)
+					default:
+						http.NotFound(w, r)
+					}
+				}
+			},
+			expectErr: fmt.Errorf("no authorization code received"),
+			validateCreds: func(t *testing.T, creds *Credentials) {
+				assert.Nil(t, creds)
+			},
+		},
+		{
+			name: "token exchange failure",
+			setupHandler: func(t *testing.T) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/auth":
+						// Authorization endpoint - successful redirect
+						callbackURL := r.URL.Query().Get("redirect_uri")
+						state := r.URL.Query().Get("state")
+						http.Redirect(w, r, fmt.Sprintf("%s?code=test_code&state=%s", callbackURL, state), http.StatusFound)
+					case "/token":
+						// Token endpoint - return error
+						w.WriteHeader(http.StatusBadRequest)
+						w.Header().Set("Content-Type", "application/json")
+						_ = json.NewEncoder(w).Encode(map[string]string{
+							"error":             "invalid_grant",
+							"error_description": "Invalid authorization code",
+						})
+					default:
+						http.NotFound(w, r)
+					}
+				}
+			},
+			expectErr: fmt.Errorf("failed to exchange code for tokens: failed to authenticate: invalid_grant - invalid authorization code"),
+			validateCreds: func(t *testing.T, creds *Credentials) {
+				assert.Nil(t, creds)
+			},
+		},
+		{
+			name: "timeout scenario",
+			setupHandler: func(t *testing.T) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					// Never respond to auth endpoint to trigger timeout
+					if r.URL.Path == "/auth" {
+						time.Sleep(200 * time.Millisecond) // Longer than test timeout
+					}
+					http.NotFound(w, r)
+				}
+			},
+			flowTimeout: 100 * time.Millisecond,
+			expectErr:   fmt.Errorf("authentication timeout after 100ms"),
+			validateCreds: func(t *testing.T, creds *Credentials) {
+				assert.Nil(t, creds)
+			},
+		},
+		{
+			name: "context cancellation",
+			setupHandler: func(t *testing.T) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					// Never respond to trigger context cancellation
+					time.Sleep(200 * time.Millisecond)
+					http.NotFound(w, r)
+				}
+			},
+			expectErr: fmt.Errorf("context deadline exceeded"),
+			validateCreds: func(t *testing.T, creds *Credentials) {
+				assert.Nil(t, creds)
+			},
+			contextTimeout: 50 * time.Millisecond,
+		},
+		{
+			name: "HTTP request error",
+			setupHandler: func(t *testing.T) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					// This handler won't be called because server will be closed
+					http.NotFound(w, r)
+				}
+			},
+			closeServer:   true,
+			expectAuthErr: fmt.Errorf("failed to send auth request"),
+			validateCreds: func(t *testing.T, creds *Credentials) {
+				assert.Nil(t, creds)
+			},
+		},
+		{
+			name: "token without expiration",
+			setupHandler: func(t *testing.T) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/auth":
+						callbackURL := r.URL.Query().Get("redirect_uri")
+						state := r.URL.Query().Get("state")
+						http.Redirect(w, r, fmt.Sprintf("%s?code=test_code&state=%s", callbackURL, state), http.StatusFound)
+					case "/token":
+						// Token without expires_in - should be rejected
+						response := TokenResponse{
+							AccessToken:  "test_access_token",
+							TokenType:    "Bearer",
+							RefreshToken: "test_refresh_token",
+							// ExpiresIn: 0 (no expiration)
+						}
+						w.Header().Set("Content-Type", "application/json")
+						_ = json.NewEncoder(w).Encode(response)
+					default:
+						http.NotFound(w, r)
+					}
+				}
+			},
+			expectErr: fmt.Errorf("token without expiration is not allowed for security reasons"),
+			validateCreds: func(t *testing.T, creds *Credentials) {
+				assert.Nil(t, creds)
+			},
+		},
+		{
+			name: "token response with missing token_type",
+			setupHandler: func(t *testing.T) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/auth":
+						callbackURL := r.URL.Query().Get("redirect_uri")
+						state := r.URL.Query().Get("state")
+						http.Redirect(w, r, fmt.Sprintf("%s?code=test_code&state=%s", callbackURL, state), http.StatusFound)
+					case "/token":
+						// Token without token_type - should default to Bearer
+						response := TokenResponse{
+							AccessToken:  "test_access_token",
+							ExpiresIn:    3600,
+							RefreshToken: "test_refresh_token",
+							// TokenType is empty (missing)
+						}
+						w.Header().Set("Content-Type", "application/json")
+						_ = json.NewEncoder(w).Encode(response)
+					default:
+						http.NotFound(w, r)
+					}
+				}
+			},
+			validateCreds: func(t *testing.T, creds *Credentials) {
+				assert.Equal(t, "test_access_token", creds.AccessToken)
+				assert.Equal(t, "Bearer", creds.TokenType) // Should default to Bearer
+				assert.False(t, creds.IsExpired())
 			},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			flow := &Flow{
-				Provider:     tt.provider,
-				ClientID:     tt.clientID,
-				RedirectPort: tt.redirectPort,
-				state:        tt.state,
-				codeVerifier: tt.codeVerifier,
-			}
-
-			authURL := flow.buildAuthURL()
-			assert.NotEmpty(t, authURL)
-
-			if tt.validate != nil {
-				tt.validate(t, authURL)
-			}
-		})
-	}
-}
-
-func TestPKCEFlow(t *testing.T) {
-	t.Run("PKCE verifier and challenge relationship", func(t *testing.T) {
-		// Generate a verifier
-		verifier := generateCodeVerifier()
-		assert.NotEmpty(t, verifier)
-
-		// Generate challenge from verifier
-		challenge := generateCodeChallenge(verifier)
-		assert.NotEmpty(t, challenge)
-
-		// Verify the challenge is the SHA256 of the verifier
-		hash := sha256.Sum256([]byte(verifier))
-		expectedChallenge := base64.RawURLEncoding.EncodeToString(hash[:])
-		assert.Equal(t, expectedChallenge, challenge)
-
-		// Verify both are URL-safe
-		for _, s := range []string{verifier, challenge} {
-			assert.NotContains(t, s, "=", "Should not contain padding")
-			assert.NotContains(t, s, "+", "Should not contain +")
-			assert.NotContains(t, s, "/", "Should not contain /")
+	// Test malformed auth URL parsing
+	t.Run("malformed auth URL", func(t *testing.T) {
+		// Create provider that returns malformed URL
+		provider := &OIDCProvider{
+			AuthorizationEndpoint: "ht!tp://bad-url-scheme",
+			TokenEndpoint:         "/token",
 		}
-	})
-}
 
-func TestAuthURLParameters(t *testing.T) {
-	tests := []struct {
-		name     string
-		flow     *Flow
-		expected map[string]string
-	}{
-		{
-			name: "all required OAuth parameters present",
-			flow: &Flow{
-				Provider: &Provider{
-					AuthorizationEndpoint: "https://auth.example.com/authorize",
-				},
-				ClientID:     "my-client",
-				RedirectPort: 8085,
-				state:        "state-123",
-				codeVerifier: "verifier-456",
-			},
-			expected: map[string]string{
-				"client_id":             "my-client",
-				"response_type":         "code",
-				"redirect_uri":          "http://localhost:8085/callback",
-				"state":                 "state-123",
-				"code_challenge_method": "S256",
-				"scope":                 "openid profile email offline_access",
-			},
-		},
-	}
+		httpClient := &http.Client{Timeout: 1 * time.Second}
+		flow := NewFlow("test_client", 0, httpClient, WithProvider(provider))
+		flow.SkipBrowser = true
+
+		// Start callback server
+		err := flow.StartCallbackServer()
+		require.NoError(t, err)
+
+		// SendAuthRequest should fail with URL parse error
+		err = flow.SendAuthRequest()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse auth URL")
+	})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			authURL := tt.flow.buildAuthURL()
+			// Setup test server with handler
+			handler := tt.setupHandler(t)
+			server := httptest.NewServer(handler)
+			defer server.Close()
+			t.Logf("OAuth server: %s", server.URL)
 
-			// Parse the URL
-			u, err := url.Parse(authURL)
+			// Close server early if requested
+			if tt.closeServer {
+				server.Close()
+			}
+
+			// Create real OIDC provider
+			provider := &OIDCProvider{
+				AuthorizationEndpoint: server.URL + "/auth",
+				TokenEndpoint:         server.URL + "/token",
+			}
+
+			// Create real HTTP client
+			httpClient := &http.Client{Timeout: 1 * time.Second}
+
+			// Create flow with timeout
+			flowTimeout := 100 * time.Millisecond
+			if tt.flowTimeout > 0 {
+				flowTimeout = tt.flowTimeout
+			}
+
+			flow := NewFlow("test_client", 0, httpClient, WithProvider(provider), WithStateGenerator(func() string {
+				return "test_state"
+			}))
+			flow.timeout = flowTimeout
+			flow.SkipBrowser = true
+
+			// Start callback server
+			err := flow.StartCallbackServer()
 			require.NoError(t, err)
+			t.Logf("Callback server: localhost:%d", flow.callbackPort)
 
-			// Check all expected parameters
-			params := u.Query()
-			for key, expectedValue := range tt.expected {
-				assert.Equal(t, expectedValue, params.Get(key), "Parameter %s mismatch", key)
+			// Build and log auth URL
+			authURL := flow.GetAuthURL()
+			t.Logf("Auth URL: %s", authURL)
+
+			// Send auth request
+			err = flow.SendAuthRequest()
+			if tt.expectAuthErr != nil {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectAuthErr.Error())
+				t.Logf("Auth request: error - %v", err)
+			} else {
+				require.NoError(t, err)
+				t.Logf("Auth request: sent")
 			}
 
-			// Verify code_challenge is present and valid
-			codeChallenge := params.Get("code_challenge")
-			assert.NotEmpty(t, codeChallenge)
+			// Wait for OAuth callback (only if auth request succeeded)
+			var creds *Credentials
+			if tt.expectAuthErr == nil {
+				contextTimeout := flowTimeout // Use flow timeout by default
+				if tt.contextTimeout > 0 {
+					contextTimeout = tt.contextTimeout
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
+				defer cancel()
 
-			// Verify it's a valid base64url string
-			decoded, err := base64.RawURLEncoding.DecodeString(codeChallenge)
-			assert.NoError(t, err)
-			assert.Len(t, decoded, 32) // SHA256 output
+				creds, err = flow.WaitForCallback(ctx)
+				if err != nil {
+					t.Logf("OAuth result: error - %v", err)
+				} else {
+					t.Logf("OAuth result: success - got credentials")
+				}
+
+				// Validate results
+				if tt.expectErr != nil {
+					assert.Error(t, err)
+					assert.Contains(t, err.Error(), tt.expectErr.Error())
+				} else {
+					assert.NoError(t, err)
+				}
+			}
+
+			tt.validateCreds(t, creds)
 		})
 	}
-}
-
-func TestCallbackPath(t *testing.T) {
-	// Verify the constant is what we expect
-	assert.Equal(t, "/callback", CallbackPath)
-
-	// Verify it's used in buildAuthURL
-	flow := &Flow{
-		Provider: &Provider{
-			AuthorizationEndpoint: "https://auth.example.com/authorize",
-		},
-		ClientID:     "test",
-		RedirectPort: 12345,
-		state:        "test",
-		codeVerifier: "test",
-	}
-
-	authURL := flow.buildAuthURL()
-	assert.Contains(t, authURL, "redirect_uri=http%3A%2F%2Flocalhost%3A12345%2Fcallback")
-	// The CallbackPath is URL-encoded in the query parameter
-	assert.Contains(t, authURL, "%2Fcallback")
-}
-
-// Helper function to calculate expected challenge
-func calculateExpectedChallenge(verifier string) string {
-	hash := sha256.Sum256([]byte(verifier))
-	return base64.RawURLEncoding.EncodeToString(hash[:])
-}
-
-func TestSuccessHTML(t *testing.T) {
-	// Verify the HTML contains expected elements
-	assert.Contains(t, successHTML, "<!DOCTYPE html>")
-	assert.Contains(t, successHTML, "Authentication Successful")
-	assert.Contains(t, successHTML, "You can close this window")
-	assert.Contains(t, successHTML, "window.close()")
-
-	// Verify it's valid HTML structure
-	assert.Contains(t, successHTML, "<html>")
-	assert.Contains(t, successHTML, "</html>")
-	assert.Contains(t, successHTML, "<head>")
-	assert.Contains(t, successHTML, "</head>")
-	assert.Contains(t, successHTML, "<body>")
-	assert.Contains(t, successHTML, "</body>")
-
-	// Verify styling exists
-	assert.Contains(t, successHTML, "<style>")
-	assert.Contains(t, successHTML, "</style>")
-
-	// Verify auto-close script
-	assert.Contains(t, successHTML, "setTimeout")
-	assert.Contains(t, successHTML, "3000") // 3 second delay
-}
-
-func TestDefaultConstants(t *testing.T) {
-	tests := []struct {
-		name     string
-		got      interface{}
-		expected interface{}
-	}{
-		{
-			name:     "DefaultClientID",
-			got:      DefaultClientID,
-			expected: "abctl",
-		},
-		{
-			name:     "CallbackPath",
-			got:      CallbackPath,
-			expected: "/callback",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.got)
-		})
-	}
-}
-
-func TestURLEncoding(t *testing.T) {
-	t.Run("redirect URI properly encoded in auth URL", func(t *testing.T) {
-		flow := &Flow{
-			Provider: &Provider{
-				AuthorizationEndpoint: "https://auth.example.com/authorize",
-			},
-			ClientID:     "test",
-			RedirectPort: 8085,
-			state:        "test",
-			codeVerifier: "test",
-		}
-
-		authURL := flow.buildAuthURL()
-
-		// Check that special characters are properly encoded
-		assert.Contains(t, authURL, "http%3A%2F%2Flocalhost")
-		assert.NotContains(t, authURL, "http://localhost") // Should be encoded
-
-		// Verify the URL can be parsed
-		u, err := url.Parse(authURL)
-		assert.NoError(t, err)
-
-		// Verify redirect_uri decodes correctly
-		redirectURI := u.Query().Get("redirect_uri")
-		assert.Equal(t, "http://localhost:8085/callback", redirectURI)
-	})
-
-	t.Run("scope properly encoded", func(t *testing.T) {
-		flow := &Flow{
-			Provider: &Provider{
-				AuthorizationEndpoint: "https://auth.example.com/authorize",
-			},
-			ClientID:     "test",
-			RedirectPort: 8085,
-			state:        "test",
-			codeVerifier: "test",
-		}
-
-		authURL := flow.buildAuthURL()
-
-		// Spaces in scope should be encoded as +
-		assert.Contains(t, authURL, "scope=openid+profile+email+offline_access")
-
-		// Verify it decodes correctly
-		u, err := url.Parse(authURL)
-		assert.NoError(t, err)
-		scope := u.Query().Get("scope")
-		assert.Equal(t, "openid profile email offline_access", scope)
-	})
 }
