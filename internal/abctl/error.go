@@ -97,4 +97,12 @@ By default, abctl will allow access from any hostname or IP, so you might not ne
 		msg:  "bootloader failed",
 		help: "The bootloader failed to its initialization checks or migrations. Try running again with --verbose to see the full bootloader logs.",
 	}
+
+	// ErrInsufficientResources is returned when the system does not meet the minimum resource requirements.
+	ErrInsufficientResources = &Error{
+		msg: "insufficient system resources",
+		help: `The system does not meet the minimum resource requirements for running Airbyte.
+Airbyte requires at least 2 vCPUs and 8 GB of RAM to run properly.
+Please ensure your system has sufficient resources before attempting to install Airbyte.`,
+	}
 )

@@ -294,6 +294,23 @@ func TestValidateHostFlag(t *testing.T) {
 	expectOk("sub.example01.com")
 }
 
+func TestSystemResourcesAvailable(t *testing.T) {
+	tel := telemetry.MockClient{}
+	err := systemResourcesAvailable(context.Background(), &tel)
+
+	// The function should either succeed (nil error) or return ErrInsufficientResources
+	// We can't control system resources in a test, so we just verify the error handling
+	if err != nil {
+		if !errors.Is(err, abctl.ErrInsufficientResources) {
+			t.Errorf("expected ErrInsufficientResources but got %v", err)
+		}
+		// Verify error message contains helpful information
+		if err.Error() == "" {
+			t.Error("error message should not be empty")
+		}
+	}
+}
+
 // port returns the port from a string value in the format of "ipv4:port" or "ip::v6:port"
 func port(s string) int {
 	vals := strings.Split(s, ":")

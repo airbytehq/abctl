@@ -15,6 +15,7 @@ import (
 	"github.com/airbytehq/abctl/internal/docker"
 	"github.com/airbytehq/abctl/internal/telemetry"
 	"github.com/airbytehq/abctl/internal/trace"
+	"github.com/pbnjay/memory"
 	"github.com/pterm/pterm"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -198,5 +199,46 @@ func validateHostFlag(host string) error {
 	if !regexp.MustCompile(`^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9](?:[-a-z0-9]*[a-z0-9])?)*$`).MatchString(host) {
 		return abctl.ErrInvalidHostFlag
 	}
+	return nil
+}
+
+const (
+	// minRequiredCPUs is the minimum number of vCPUs required for running Airbyte.
+	minRequiredCPUs = 2
+	// minRequiredRAM is the minimum amount of RAM required for running Airbyte (8 GB in bytes).
+	minRequiredRAM = 8 * 1024 * 1024 * 1024 // 8 GB
+)
+
+// systemResourcesAvailable checks if the system meets the minimum resource requirements
+// for running Airbyte. It requires at least 2 vCPUs and 8 GB of RAM.
+// Returns a nil error if resources are sufficient, otherwise returns an error that includes
+// ErrInsufficientResources in the error chain.
+func systemResourcesAvailable(ctx context.Context, telClient telemetry.Client) error {
+	ctx, span := trace.NewSpan(ctx, "check.systemResourcesAvailable")
+	defer span.End()
+
+	// Check CPU count
+	cpuCount := runtime.NumCPU()
+	span.SetAttributes(attribute.Int("system_cpu_count", cpuCount))
+	telClient.Attr("system_cpu_count", fmt.Sprintf("%d", cpuCount))
+
+	if cpuCount < minRequiredCPUs {
+		pterm.Error.Printfln("Insufficient CPUs: found %d, required %d", cpuCount, minRequiredCPUs)
+		return fmt.Errorf("%w: insufficient CPUs (found %d, required %d)", abctl.ErrInsufficientResources, cpuCount, minRequiredCPUs)
+	}
+
+	// Check total system memory
+	totalMemory := memory.TotalMemory()
+	span.SetAttributes(attribute.Int64("system_total_memory", int64(totalMemory)))
+	telClient.Attr("system_total_memory", fmt.Sprintf("%d", totalMemory))
+
+	if totalMemory < minRequiredRAM {
+		availableGB := float64(totalMemory) / (1024 * 1024 * 1024)
+		requiredGB := float64(minRequiredRAM) / (1024 * 1024 * 1024)
+		pterm.Error.Printfln("Insufficient RAM: found %.2f GB, required %.0f GB", availableGB, requiredGB)
+		return fmt.Errorf("%w: insufficient RAM (found %.2f GB, required %.0f GB)", abctl.ErrInsufficientResources, availableGB, requiredGB)
+	}
+
+	pterm.Success.Printfln("System resources check passed: %d vCPUs, %.2f GB RAM", cpuCount, float64(totalMemory)/(1024*1024*1024))
 	return nil
 }
