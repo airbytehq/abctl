@@ -1,6 +1,26 @@
 package abctl
 
 var _ error = (*Error)(nil)
+var _ error = (*UntrackedError)(nil)
+
+// UntrackedError wraps errors caused by the user's environment (permissions,
+// disk space, docker not running, etc.) that should be displayed to the user
+// but not sent to error tracking since they are outside abctl's control.
+type UntrackedError struct {
+	err error
+}
+
+func (e UntrackedError) Error() string {
+	return e.err.Error()
+}
+
+func (e UntrackedError) Unwrap() error {
+	return e.err
+}
+
+func NewUntrackedError(err error) *UntrackedError {
+	return &UntrackedError{err: err}
+}
 
 // Error adds a user-friendly help message to specific errors.
 type Error struct {

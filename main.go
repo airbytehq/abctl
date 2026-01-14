@@ -79,7 +79,11 @@ func handleErr(ctx context.Context, err error) int {
 		return 0
 	}
 
-	trace.CaptureError(ctx, err)
+	// Only send to error tracking if not an untracked error
+	var untrackedErr *abctl.UntrackedError
+	if !errors.As(err, &untrackedErr) {
+		trace.CaptureError(ctx, err)
+	}
 
 	pterm.Error.Println(err)
 
