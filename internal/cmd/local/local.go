@@ -27,7 +27,9 @@ func (c *Cmd) BeforeApply() error {
 	}
 
 	if err := checkAirbyteDir(); err != nil {
-		return fmt.Errorf("%w: %w", abctl.ErrAirbyteDir, err)
+		return abctl.NewUntrackedError(
+			fmt.Errorf("%w: %w", abctl.ErrAirbyteDir, err),
+		)
 	}
 
 	return nil

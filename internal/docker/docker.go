@@ -148,7 +148,9 @@ func newWithOptions(ctx context.Context, newPing newPing, goos string) (*Docker,
 		}
 	}
 
-	return nil, fmt.Errorf("%w: unable to create docker client", abctl.ErrDocker)
+	return nil, abctl.NewUntrackedError(
+		fmt.Errorf("%w: unable to create docker client", abctl.ErrDocker),
+	)
 }
 
 // createAndPing attempts to create a docker client and ping it to ensure we can communicate

@@ -241,7 +241,7 @@ func EnablePsql17() (bool, error) {
 
 	pgVersion, err := pgData.Version()
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return false, fmt.Errorf("failed to determine if any previous psql version exists: %w", err)
+		return false, abctl.NewUntrackedError(fmt.Errorf("failed to determine if any previous psql version exists: %w", err))
 	}
 
 	if pgVersion == "" || pgVersion == "17" {
