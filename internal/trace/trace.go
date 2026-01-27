@@ -2,11 +2,13 @@ package trace
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/airbytehq/abctl/internal/abctl"
 	"github.com/airbytehq/abctl/internal/build"
 	"github.com/airbytehq/abctl/internal/paths"
 	"github.com/airbytehq/abctl/internal/telemetry"
@@ -57,13 +59,20 @@ func AttachLog(name, body string) {
 
 // SpanError marks the span with the provided err.
 // Returns the same error provided.
+// UntrackedErrors are not sent to Sentry as they represent user environment
+// issues (permissions, disk space, docker not running, etc.) that are outside
+// abctl's control.
 func SpanError(span trace.Span, err error) error {
 	if err == nil {
 		return nil
 	}
 	span.RecordError(err)
 	span.SetStatus(codes.Error, strings.ReplaceAll(err.Error(), paths.UserHome, redactedUserHome))
-	sentry.CaptureException(err)
+
+	var untrackedErr *abctl.UntrackedError
+	if !errors.As(err, &untrackedErr) {
+		sentry.CaptureException(err)
+	}
 	return err
 }
 
