@@ -133,8 +133,8 @@ func buildAirbyteValuesV2(ctx context.Context, opts ValuesOpts) (string, error) 
 		"server.env_vars.WEBAPP_URL=http://airbyte-abctl-airbyte-server-svc",
 		"global.airbyteUrl=" + airbyteURL,
 		"global.env_vars.AIRBYTE_INSTALLATION_ID=" + opts.TelemetryUser,
-		"global.jobs.resources.limits.cpu=3",
-		"global.jobs.resources.limits.memory=4Gi",
+		"global.workloads.resources.mainContainer.cpu.limit=3",
+		"global.workloads.resources.mainContainer.memory.limit=4Gi",
 		"airbyte-bootloader.env_vars.PLATFORM_LOG_FORMAT=json",
 	}
 
@@ -160,8 +160,8 @@ func buildAirbyteValuesV2(ctx context.Context, opts ValuesOpts) (string, error) 
 	if opts.LowResourceMode {
 		vals = append(vals,
 			"server.env_vars.JOB_RESOURCE_VARIANT_OVERRIDE=lowresource",
-			"global.jobs.resources.requests.cpu=0",
-			"global.jobs.resources.requests.memory=0",
+			"global.workloads.resources.mainContainer.cpu.request=0",
+			"global.workloads.resources.mainContainer.memory.request=0",
 
 			"connectorBuilderServer.enabled=false",
 
