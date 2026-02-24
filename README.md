@@ -203,6 +203,31 @@ Example usage:
 abctl local install --low-resource-mode
 ```
 
+#### Deploying a Specific Airbyte Version
+
+By default, `abctl local install` installs the latest version of Airbyte. To deploy a specific version, create a custom Helm values file and pass it using the `--values` flag.
+
+1. Create an `override_values.yaml` file with the following content (replacing `1.2.0` with your desired version):
+
+   ```yaml
+   global:
+     # Docker image config that will apply to all images.
+     image:
+       # Image tag to use for airbyte images.
+       # Does not include non-airbyte images such as temporal, minio, etc.
+       tag: "1.2.0"
+   ```
+
+2. Install Airbyte using the custom values file:
+
+   ```
+   abctl local install --values override_values.yaml
+   ```
+
+> [!NOTE]
+> The `--values` flag can be used to customize any Airbyte Helm chart values, not just the image tag.
+> See the [Airbyte Helm chart](https://github.com/airbytehq/airbyte-platform/tree/main/charts/airbyte) for all available configuration options.
+
 ### status
 
 ```abctl local status```
