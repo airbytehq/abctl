@@ -187,7 +187,7 @@ func NewManager(provider k8s.Provider, opts ...Option) (*Manager, error) {
 // DefaultK8s returns the default k8s client
 func DefaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	rest.SetDefaultWarningHandler(k8s.Logger{})
-	
+
 	// Use default loading rules if kubecfg is empty
 	var loadingRules *clientcmd.ClientConfigLoadingRules
 	if kubecfg == "" {
@@ -196,7 +196,7 @@ func DefaultK8s(kubecfg, kubectx string) (k8s.Client, error) {
 	} else {
 		loadingRules = &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubecfg}
 	}
-	
+
 	k8sCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		loadingRules,
 		&clientcmd.ConfigOverrides{CurrentContext: kubectx},
@@ -240,7 +240,7 @@ func EnablePsql17() (bool, error) {
 	})
 
 	pgVersion, err := pgData.Version()
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, fs.ErrPermission) {
 		return false, abctl.NewUntrackedError(fmt.Errorf("failed to determine if any previous psql version exists: %w", err))
 	}
 
