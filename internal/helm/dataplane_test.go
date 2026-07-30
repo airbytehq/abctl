@@ -114,6 +114,12 @@ func TestBuildDataplaneValues(t *testing.T) {
 }
 
 func TestInstallDataplaneChart(t *testing.T) {
+	originalResolver := getLatestDataplaneChartURL
+	t.Cleanup(func() { getLatestDataplaneChartURL = originalResolver })
+	getLatestDataplaneChartURL = func(string) (string, string, error) {
+		return "https://example.com/airbyte-data-plane-2.1.1.tgz", "2.1.1", nil
+	}
+
 	tests := []struct {
 		name              string
 		namespace         string
@@ -204,8 +210,8 @@ func TestInstallDataplaneChart(t *testing.T) {
 					DoAndReturn(func(ctx context.Context, spec *goHelm.ChartSpec, opts *goHelm.GenericHelmOptions) (*release.Release, error) {
 						// Verify chart spec parameters
 						assert.Equal(t, tt.releaseName, spec.ReleaseName)
-						assert.Equal(t, dataplaneChartName, spec.ChartName)
-						assert.Equal(t, dataplaneChartVersion, spec.Version)
+						assert.Equal(t, "https://example.com/airbyte-data-plane-2.1.1.tgz", spec.ChartName)
+						assert.Equal(t, "2.1.1", spec.Version)
 						assert.Equal(t, tt.namespace, spec.Namespace)
 						assert.True(t, spec.CreateNamespace)
 						assert.True(t, spec.Wait)

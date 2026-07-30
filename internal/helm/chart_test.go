@@ -314,3 +314,25 @@ entries:
 		})
 	}
 }
+
+func TestGetLatestChartURLFromRepoIndex(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `apiVersion: v1
+entries:
+  airbyte-data-plane:
+    - name: "airbyte-data-plane"
+      version: "2.1.1"
+      urls: ["airbyte-data-plane-2.1.1.tgz"]
+    - name: "airbyte-data-plane"
+      version: "2.1.2-beta.1"
+      urls: ["airbyte-data-plane-2.1.2-beta.1.tgz"]
+`)
+	}))
+	defer server.Close()
+
+	url, version, err := GetLatestChartURLFromRepoIndex("airbyte", server.URL, "airbyte-data-plane")
+
+	assert.NoError(t, err)
+	assert.Equal(t, server.URL+"/airbyte-data-plane-2.1.1.tgz", url)
+	assert.Equal(t, "2.1.1", version)
+}
