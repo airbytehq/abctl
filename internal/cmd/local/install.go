@@ -241,7 +241,7 @@ func (i *InstallCmd) setDefaultChartFlags(helmClient goHelm.Client) error {
 
 	i.Chart = resolvedChart
 	i.ChartVersion = resolvedVersion
-	if !helm.ChartIsV2Plus(resolvedVersion) {
+	if resolvedVersion != "" && !helm.ChartIsV2Plus(resolvedVersion) {
 		pterm.Warning.Printfln(
 			"Chart V1 is deprecated. Upgrade to the V2 chart: https://docs.airbyte.com/platform/deploying-airbyte/chart-v2-community",
 		)
