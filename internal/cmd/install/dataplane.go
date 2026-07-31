@@ -17,7 +17,8 @@ import (
 
 // DataplaneCmd handles dataplane installation
 type DataplaneCmd struct {
-	Namespace string `short:"n" help:"Target namespace (default: 'default' for Kind clusters, current kubeconfig context for existing clusters)."`
+	Namespace    string `short:"n" help:"Target namespace (default: 'default' for Kind clusters, current kubeconfig context for existing clusters)."`
+	ChartVersion string `help:"Version of the airbyte-data-plane chart to install (default: latest chart V2 release)."`
 	// Hide flag for now.
 	WithKindCluster bool `default:"true" help:"Create a Kind cluster for the dataplane and set it as current context." hidden:""`
 }
@@ -62,6 +63,12 @@ func (c *DataplaneCmd) Run(
 		return err
 	}
 
+	chartURL, chartVersion, repoURL, err := helm.ResolveDataplaneChartReference(c.ChartVersion)
+	if err != nil {
+		return fmt.Errorf("failed to resolve dataplane chart: %w", err)
+	}
+	c.warnOnChartV1(ui)
+
 	// Setup Kind cluster if needed
 	var kubeconfig, kubeContext, clusterName string
 	if c.WithKindCluster {
@@ -84,13 +91,25 @@ func (c *DataplaneCmd) Run(
 	}
 
 	// Deploy to Kubernetes
-	if err := deployChart(ctx, ui, helmClient, c.Namespace, name, creds, abContext); err != nil {
+	if err := deployChart(ctx, ui, helmClient, c.Namespace, name, chartURL, chartVersion, repoURL, creds, abContext); err != nil {
 		return err
 	}
 
 	// Show success
 	c.showSuccess(ui, name, clusterName)
 	return nil
+}
+
+// warnOnChartV1 notifies the user when an explicitly requested chart version
+// comes from the retired V1 Helm repository.
+func (c *DataplaneCmd) warnOnChartV1(ui ui.Provider) {
+	if c.ChartVersion == "" || helm.ChartIsV2PlusBaseVersion(c.ChartVersion) {
+		return
+	}
+	ui.ShowInfo(fmt.Sprintf(
+		"Warning: chart V1 (%s) is retired and no longer receives updates. Migrate to chart V2: https://docs.airbyte.com/platform/deploying-airbyte/chart-v2-community",
+		c.ChartVersion,
+	))
 }
 
 // resolveNamespace sets the namespace based on cluster type
@@ -176,9 +195,9 @@ func registerDataplane(ctx context.Context, ui ui.Provider, apiClient api.Servic
 }
 
 // deployChart installs the Helm chart
-func deployChart(ctx context.Context, ui ui.Provider, client goHelm.Client, namespace, name string, creds *api.CreateDataplaneResponse, context *airbox.Context) error {
+func deployChart(ctx context.Context, ui ui.Provider, client goHelm.Client, namespace, name, chartURL, chartVersion, repoURL string, creds *api.CreateDataplaneResponse, context *airbox.Context) error {
 	return ui.RunWithSpinner("Installing dataplane chart", func() error {
-		return helm.InstallDataplaneChart(ctx, client, namespace, name, creds, context)
+		return helm.InstallDataplaneChart(ctx, client, namespace, name, chartURL, chartVersion, repoURL, creds, context)
 	})
 }
 

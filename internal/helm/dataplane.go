@@ -13,18 +13,41 @@ import (
 )
 
 const (
-	dataplaneChartName    = "airbyte/airbyte-data-plane"
-	dataplaneChartVersion = "1.8.1"
-	dataplaneRepoName     = "airbyte"
-	dataplaneRepoURL      = common.AirbyteRepoURLv1 // v1 repo has the dataplane chart
+	dataplaneRepoName  = "airbyte"
+	dataplaneChartName = "airbyte-data-plane"
 )
 
-// InstallDataplaneChart installs the official Airbyte dataplane Helm chart
-func InstallDataplaneChart(ctx context.Context, client goHelm.Client, namespace, releaseName string, credentials *api.CreateDataplaneResponse, config *airbox.Context) error {
+var getLatestDataplaneChartURL = func(repoURL string) (string, string, error) {
+	return GetLatestChartURLFromRepoIndex(dataplaneRepoName, repoURL, dataplaneChartName)
+}
+
+// ResolveDataplaneChartReference resolves the dataplane chart URL, version and
+// source repository for the requested version. An empty version resolves the
+// latest stable chart from the v2 repository; a version below 2.0.0 resolves
+// against the deprecated v1 repository.
+func ResolveDataplaneChartReference(version string) (chartURL, chartVersion, repoURL string, err error) {
+	if version == "" {
+		chartURL, chartVersion, err = getLatestDataplaneChartURL(common.AirbyteRepoURLv2)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to resolve latest dataplane chart: %w", err)
+		}
+		return chartURL, chartVersion, common.AirbyteRepoURLv2, nil
+	}
+
+	repoURL = common.AirbyteRepoURLv1
+	if ChartIsV2PlusBaseVersion(version) {
+		repoURL = common.AirbyteRepoURLv2
+	}
+
+	return fmt.Sprintf("%s/%s-%s.tgz", repoURL, dataplaneChartName, version), version, repoURL, nil
+}
+
+// InstallDataplaneChart installs the official Airbyte dataplane Helm chart.
+func InstallDataplaneChart(ctx context.Context, client goHelm.Client, namespace, releaseName, chartURL, chartVersion, repoURL string, credentials *api.CreateDataplaneResponse, config *airbox.Context) error {
 	// Add the Airbyte Helm repository
 	if err := client.AddOrUpdateChartRepo(repo.Entry{
 		Name: dataplaneRepoName,
-		URL:  dataplaneRepoURL,
+		URL:  repoURL,
 	}); err != nil {
 		return fmt.Errorf("failed to add Airbyte chart repository: %w", err)
 	}
@@ -35,8 +58,8 @@ func InstallDataplaneChart(ctx context.Context, client goHelm.Client, namespace,
 	// Install the chart with atomic flag to ensure cleanup on failure/interrupt
 	_, err := client.InstallOrUpgradeChart(ctx, &goHelm.ChartSpec{
 		ReleaseName:     releaseName,
-		ChartName:       dataplaneChartName,
-		Version:         dataplaneChartVersion,
+		ChartName:       chartURL,
+		Version:         chartVersion,
 		CreateNamespace: true,
 		Namespace:       namespace,
 		Wait:            true,

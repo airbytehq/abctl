@@ -8,6 +8,7 @@ import (
 
 	"github.com/airbytehq/abctl/internal/airbox"
 	"github.com/airbytehq/abctl/internal/api"
+	"github.com/airbytehq/abctl/internal/common"
 	"github.com/airbytehq/abctl/internal/helm/mock"
 	goHelm "github.com/mittwald/go-helm-client"
 	"github.com/stretchr/testify/assert"
@@ -113,11 +114,68 @@ func TestBuildDataplaneValues(t *testing.T) {
 	}
 }
 
+func TestResolveDataplaneChartReference(t *testing.T) {
+	originalResolver := getLatestDataplaneChartURL
+	t.Cleanup(func() { getLatestDataplaneChartURL = originalResolver })
+	getLatestDataplaneChartURL = func(string) (string, string, error) {
+		return "https://example.com/airbyte-data-plane-2.1.1.tgz", "2.1.1", nil
+	}
+
+	tests := []struct {
+		name         string
+		version      string
+		wantChartURL string
+		wantVersion  string
+		wantRepoURL  string
+	}{
+		{
+			name:         "empty version resolves latest v2",
+			wantChartURL: "https://example.com/airbyte-data-plane-2.1.1.tgz",
+			wantVersion:  "2.1.1",
+			wantRepoURL:  common.AirbyteRepoURLv2,
+		},
+		{
+			name:         "v2 version uses the v2 repo",
+			version:      "2.1.0",
+			wantChartURL: common.AirbyteRepoURLv2 + "/airbyte-data-plane-2.1.0.tgz",
+			wantVersion:  "2.1.0",
+			wantRepoURL:  common.AirbyteRepoURLv2,
+		},
+		{
+			name:         "v1 version uses the v1 repo",
+			version:      "1.8.1",
+			wantChartURL: common.AirbyteRepoURLv1 + "/airbyte-data-plane-1.8.1.tgz",
+			wantVersion:  "1.8.1",
+			wantRepoURL:  common.AirbyteRepoURLv1,
+		},
+		{
+			name:         "prerelease suffix does not change repo selection",
+			version:      "2.2.0-rc1",
+			wantChartURL: common.AirbyteRepoURLv2 + "/airbyte-data-plane-2.2.0-rc1.tgz",
+			wantVersion:  "2.2.0-rc1",
+			wantRepoURL:  common.AirbyteRepoURLv2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			chartURL, version, repoURL, err := ResolveDataplaneChartReference(tt.version)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantChartURL, chartURL)
+			assert.Equal(t, tt.wantVersion, version)
+			assert.Equal(t, tt.wantRepoURL, repoURL)
+		})
+	}
+}
+
 func TestInstallDataplaneChart(t *testing.T) {
 	tests := []struct {
 		name              string
 		namespace         string
 		releaseName       string
+		chartVersion      string
+		wantChartURL      string
+		wantChartVersion  string
 		credentials       *api.CreateDataplaneResponse
 		config            *airbox.Context
 		repoError         error
@@ -141,8 +199,32 @@ func TestInstallDataplaneChart(t *testing.T) {
 			},
 			expectedRepoEntry: repo.Entry{
 				Name: dataplaneRepoName,
-				URL:  dataplaneRepoURL,
+				URL:  common.AirbyteRepoURLv2,
 			},
+			wantChartURL:     "https://example.com/airbyte-data-plane-2.1.1.tgz",
+			wantChartVersion: "2.1.1",
+		},
+		{
+			name:         "explicit v1 version installs from the v1 repo",
+			namespace:    "test-namespace",
+			releaseName:  "test-dataplane",
+			chartVersion: "1.8.1",
+			credentials: &api.CreateDataplaneResponse{
+				DataplaneID:  "test-dataplane-id",
+				ClientID:     "test-client-id",
+				ClientSecret: "test-client-secret",
+			},
+			config: &airbox.Context{
+				AirbyteURL:    "https://test.example.com",
+				AirbyteAPIURL: "https://test.example.com/api/v1",
+				Edition:       "enterprise",
+			},
+			expectedRepoEntry: repo.Entry{
+				Name: dataplaneRepoName,
+				URL:  common.AirbyteRepoURLv1,
+			},
+			wantChartURL:     common.AirbyteRepoURLv1 + "/airbyte-data-plane-1.8.1.tgz",
+			wantChartVersion: "1.8.1",
 		},
 		{
 			name:        "repository addition fails",
@@ -160,10 +242,12 @@ func TestInstallDataplaneChart(t *testing.T) {
 			},
 			expectedRepoEntry: repo.Entry{
 				Name: dataplaneRepoName,
-				URL:  dataplaneRepoURL,
+				URL:  common.AirbyteRepoURLv2,
 			},
-			repoError:     assert.AnError,
-			expectedError: "failed to add Airbyte chart repository",
+			wantChartURL:     "https://example.com/airbyte-data-plane-2.1.1.tgz",
+			wantChartVersion: "2.1.1",
+			repoError:        assert.AnError,
+			expectedError:    "failed to add Airbyte chart repository",
 		},
 		{
 			name:        "chart installation fails",
@@ -181,10 +265,12 @@ func TestInstallDataplaneChart(t *testing.T) {
 			},
 			expectedRepoEntry: repo.Entry{
 				Name: dataplaneRepoName,
-				URL:  dataplaneRepoURL,
+				URL:  common.AirbyteRepoURLv2,
 			},
-			installError:  assert.AnError,
-			expectedError: "failed to install dataplane chart",
+			wantChartURL:     "https://example.com/airbyte-data-plane-2.1.1.tgz",
+			wantChartVersion: "2.1.1",
+			installError:     assert.AnError,
+			expectedError:    "failed to install dataplane chart",
 		},
 	}
 
@@ -204,8 +290,8 @@ func TestInstallDataplaneChart(t *testing.T) {
 					DoAndReturn(func(ctx context.Context, spec *goHelm.ChartSpec, opts *goHelm.GenericHelmOptions) (*release.Release, error) {
 						// Verify chart spec parameters
 						assert.Equal(t, tt.releaseName, spec.ReleaseName)
-						assert.Equal(t, dataplaneChartName, spec.ChartName)
-						assert.Equal(t, dataplaneChartVersion, spec.Version)
+						assert.Equal(t, tt.wantChartURL, spec.ChartName)
+						assert.Equal(t, tt.wantChartVersion, spec.Version)
 						assert.Equal(t, tt.namespace, spec.Namespace)
 						assert.True(t, spec.CreateNamespace)
 						assert.True(t, spec.Wait)
@@ -222,7 +308,7 @@ func TestInstallDataplaneChart(t *testing.T) {
 					})
 			}
 
-			err := InstallDataplaneChart(context.Background(), mockClient, tt.namespace, tt.releaseName, tt.credentials, tt.config)
+			err := InstallDataplaneChart(context.Background(), mockClient, tt.namespace, tt.releaseName, tt.wantChartURL, tt.wantChartVersion, tt.expectedRepoEntry.URL, tt.credentials, tt.config)
 
 			if tt.expectedError != "" {
 				assert.Error(t, err)

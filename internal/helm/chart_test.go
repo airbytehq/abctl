@@ -65,6 +65,25 @@ func TestChartIsV2Plus(t *testing.T) {
 	}
 }
 
+func TestChartIsV2PlusBaseVersion(t *testing.T) {
+	tests := []struct {
+		name string
+		ver  string
+		want bool
+	}{
+		{name: "empty version", ver: "", want: false},
+		{name: "v1 version", ver: "1.9.2", want: false},
+		{name: "v2 release candidate", ver: "2.0.0-rc1", want: true},
+		{name: "v2 version", ver: "2.0.0", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, ChartIsV2PlusBaseVersion(tt.ver))
+		})
+	}
+}
+
 func TestChartIsV1Dot8Plus(t *testing.T) {
 	tests := []struct {
 		name string
@@ -313,4 +332,26 @@ entries:
 			}
 		})
 	}
+}
+
+func TestGetLatestChartURLFromRepoIndex(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `apiVersion: v1
+entries:
+  airbyte-data-plane:
+    - name: "airbyte-data-plane"
+      version: "2.1.1"
+      urls: ["airbyte-data-plane-2.1.1.tgz"]
+    - name: "airbyte-data-plane"
+      version: "2.1.2-beta.1"
+      urls: ["airbyte-data-plane-2.1.2-beta.1.tgz"]
+`)
+	}))
+	defer server.Close()
+
+	url, version, err := GetLatestChartURLFromRepoIndex("airbyte", server.URL, "airbyte-data-plane")
+
+	assert.NoError(t, err)
+	assert.Equal(t, server.URL+"/airbyte-data-plane-2.1.1.tgz", url)
+	assert.Equal(t, "2.1.1", version)
 }

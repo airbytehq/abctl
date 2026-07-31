@@ -39,13 +39,19 @@ var defaultNewChartRepo newChartRepo = func(cfg *repo.Entry, getters getter.Prov
 // This variable should only be modified for testing purposes.
 var defaultLoadIndexFile loadIndexFile = repo.LoadIndexFile
 
-// GetLatestAirbyteChartUrlFromRepoIndex fetches the latest stable Airbyte Helm chart URL and version
-// from the given Helm repository index. Returns the chart download URL, the chart version, and an error if any.
-// Only stable (non-prerelease) versions are considered.
-func GetLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, string, error) {
+// GetLatestAirbyteChartUrlFromRepoIndex fetches the latest stable Airbyte chart
+// URL and version from the given Helm repository index.
+func GetLatestAirbyteChartUrlFromRepoIndex(repoName, repoURL string) (string, string, error) {
+	return GetLatestChartURLFromRepoIndex(repoName, repoURL, "airbyte")
+}
+
+// GetLatestChartURLFromRepoIndex fetches the latest stable chart URL and version
+// for chartName from the given Helm repository index. Only stable (non-prerelease)
+// versions are considered.
+func GetLatestChartURLFromRepoIndex(repoName, repoURL, chartName string) (string, string, error) {
 	chartRepository, err := defaultNewChartRepo(&repo.Entry{
 		Name: repoName,
-		URL:  repoUrl,
+		URL:  repoURL,
 	}, getter.All(cli.New()))
 	if err != nil {
 		return "", "", fmt.Errorf("unable to access repo index: %w", err)
@@ -61,9 +67,9 @@ func GetLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, st
 		return "", "", fmt.Errorf("unable to load index file (%s): %w", idxPath, err)
 	}
 
-	entries, ok := idx.Entries["airbyte"]
+	entries, ok := idx.Entries[chartName]
 	if !ok {
-		return "", "", fmt.Errorf("no entry for airbyte in repo index")
+		return "", "", fmt.Errorf("no entry for %s in repo index", chartName)
 	}
 
 	if len(entries) == 0 {
@@ -92,5 +98,5 @@ func GetLatestAirbyteChartUrlFromRepoIndex(repoName, repoUrl string) (string, st
 		return "", "", fmt.Errorf("unexpected number of URLs - %d", len(latest.URLs))
 	}
 
-	return repoUrl + "/" + latest.URLs[0], latest.Version, nil
+	return repoURL + "/" + latest.URLs[0], latest.Version, nil
 }

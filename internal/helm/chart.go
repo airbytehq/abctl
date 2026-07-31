@@ -43,6 +43,13 @@ func ChartIsV2Plus(v string) bool {
 	return ChartEqualsOrHigherVersion(v, "v2.0.0")
 }
 
+// ChartIsV2PlusBaseVersion returns true if the base version before any
+// pre-release suffix is v2.0.0 or higher.
+func ChartIsV2PlusBaseVersion(v string) bool {
+	baseVersion, _, _ := strings.Cut(v, "-")
+	return ChartIsV2Plus(baseVersion)
+}
+
 // ChartIsV1Dot8Plus returns true if the chart version is v1.8.0 or higher
 func ChartIsV1Dot8Plus(v string) bool {
 	return ChartEqualsOrHigherVersion(v, "v1.8.0")
@@ -72,10 +79,8 @@ func (r *ChartResolver) ResolveChartReference(chart, version string) (string, st
 			}
 			return chartURL, chartVersion, nil
 		} else {
-			// Extract base version without suffix (e.g., "1.8.4-rc5" -> "1.8.4")
-			// to determine which repo to use, but keep full version for URL
-			baseVersion, _, _ := strings.Cut(version, "-")
-			if ChartIsV2Plus(baseVersion) {
+			// Extract the base version to determine which repo to use, but keep the full version for URL.
+			if ChartIsV2PlusBaseVersion(version) {
 				// Construct the v2 chart URL.
 				return fmt.Sprintf("%s/airbyte-%s.tgz", r.v2RepoURL, version), version, nil
 			} else {
