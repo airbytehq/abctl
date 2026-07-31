@@ -425,3 +425,30 @@ func TestDataplaneCmd_Run(t *testing.T) {
 		})
 	}
 }
+
+func TestDataplaneCmdWarnOnChartV1(t *testing.T) {
+	tests := []struct {
+		name         string
+		chartVersion string
+		warn         bool
+	}{
+		{name: "v1 chart", chartVersion: "1.9.2", warn: true},
+		{name: "v2 prerelease chart", chartVersion: "2.0.0-rc1", warn: false},
+		{name: "empty chart version", chartVersion: "", warn: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			ui := uimock.NewMockProvider(ctrl)
+			if tt.warn {
+				ui.EXPECT().ShowInfo(gomock.Any())
+			}
+
+			cmd := &DataplaneCmd{ChartVersion: tt.chartVersion}
+			cmd.warnOnChartV1(ui)
+		})
+	}
+}

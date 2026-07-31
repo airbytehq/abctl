@@ -99,7 +99,7 @@ func (c *DataplaneCmd) Run(
 // warnOnChartV1 notifies the user when an explicitly requested chart version
 // comes from the retired V1 Helm repository.
 func (c *DataplaneCmd) warnOnChartV1(ui ui.Provider) {
-	if c.ChartVersion == "" || helm.ChartIsV2Plus(c.ChartVersion) {
+	if c.ChartVersion == "" || helm.ChartIsV2PlusBaseVersion(c.ChartVersion) {
 		return
 	}
 	ui.ShowInfo(fmt.Sprintf(

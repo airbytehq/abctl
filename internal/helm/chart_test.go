@@ -65,6 +65,25 @@ func TestChartIsV2Plus(t *testing.T) {
 	}
 }
 
+func TestChartIsV2PlusBaseVersion(t *testing.T) {
+	tests := []struct {
+		name string
+		ver  string
+		want bool
+	}{
+		{name: "empty version", ver: "", want: false},
+		{name: "v1 version", ver: "1.9.2", want: false},
+		{name: "v2 release candidate", ver: "2.0.0-rc1", want: true},
+		{name: "v2 version", ver: "2.0.0", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, ChartIsV2PlusBaseVersion(tt.ver))
+		})
+	}
+}
+
 func TestChartIsV1Dot8Plus(t *testing.T) {
 	tests := []struct {
 		name string

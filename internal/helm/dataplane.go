@@ -3,7 +3,6 @@ package helm
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/airbytehq/abctl/internal/airbox"
@@ -35,10 +34,8 @@ func ResolveDataplaneChartReference(version string) (chartURL, chartVersion, rep
 		return chartURL, chartVersion, common.AirbyteRepoURLv2, nil
 	}
 
-	// Strip any pre-release suffix (e.g. "2.1.1-rc1") when picking the repo.
-	baseVersion, _, _ := strings.Cut(version, "-")
 	repoURL = common.AirbyteRepoURLv1
-	if ChartIsV2Plus(baseVersion) {
+	if ChartIsV2PlusBaseVersion(version) {
 		repoURL = common.AirbyteRepoURLv2
 	}
 
