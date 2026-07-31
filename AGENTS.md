@@ -88,6 +88,10 @@ detector, real Kind/Helm installation, or the release platform matrix unless the
 ## Pull-request reviews
 
 - Use `.agents/skills/review-pr/SKILL.md` for PR or branch reviews.
+- Treat `.agents/skills/` as the canonical, agent-neutral skill source. Entries under
+  `.claude/skills/` are symlinks to the canonical skills; do not create divergent copies there.
+- Keep Claude-only slash commands, model choices, hooks, and settings under `.claude/` so Claude can
+  have specialized ergonomics without changing the shared skill contract.
 - Review the authoritative diff independently before reading the PR description, commits, or review
   discussion. Reconcile that metadata only after the initial bug hunt.
 - Report only concrete defects introduced by changed lines or deletions. Inspect unchanged callers
