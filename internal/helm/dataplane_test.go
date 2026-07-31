@@ -169,12 +169,6 @@ func TestResolveDataplaneChartReference(t *testing.T) {
 }
 
 func TestInstallDataplaneChart(t *testing.T) {
-	originalResolver := getLatestDataplaneChartURL
-	t.Cleanup(func() { getLatestDataplaneChartURL = originalResolver })
-	getLatestDataplaneChartURL = func(string) (string, string, error) {
-		return "https://example.com/airbyte-data-plane-2.1.1.tgz", "2.1.1", nil
-	}
-
 	tests := []struct {
 		name              string
 		namespace         string
@@ -314,7 +308,7 @@ func TestInstallDataplaneChart(t *testing.T) {
 					})
 			}
 
-			err := InstallDataplaneChart(context.Background(), mockClient, tt.namespace, tt.releaseName, tt.chartVersion, tt.credentials, tt.config)
+			err := InstallDataplaneChart(context.Background(), mockClient, tt.namespace, tt.releaseName, tt.wantChartURL, tt.wantChartVersion, tt.expectedRepoEntry.URL, tt.credentials, tt.config)
 
 			if tt.expectedError != "" {
 				assert.Error(t, err)

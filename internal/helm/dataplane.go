@@ -43,13 +43,7 @@ func ResolveDataplaneChartReference(version string) (chartURL, chartVersion, rep
 }
 
 // InstallDataplaneChart installs the official Airbyte dataplane Helm chart.
-// An empty version installs the latest stable v2 chart.
-func InstallDataplaneChart(ctx context.Context, client goHelm.Client, namespace, releaseName, version string, credentials *api.CreateDataplaneResponse, config *airbox.Context) error {
-	chartURL, chartVersion, repoURL, err := ResolveDataplaneChartReference(version)
-	if err != nil {
-		return err
-	}
-
+func InstallDataplaneChart(ctx context.Context, client goHelm.Client, namespace, releaseName, chartURL, chartVersion, repoURL string, credentials *api.CreateDataplaneResponse, config *airbox.Context) error {
 	// Add the Airbyte Helm repository
 	if err := client.AddOrUpdateChartRepo(repo.Entry{
 		Name: dataplaneRepoName,
@@ -62,7 +56,7 @@ func InstallDataplaneChart(ctx context.Context, client goHelm.Client, namespace,
 	valuesYAML := buildDataplaneValues(credentials, config)
 
 	// Install the chart with atomic flag to ensure cleanup on failure/interrupt
-	_, err = client.InstallOrUpgradeChart(ctx, &goHelm.ChartSpec{
+	_, err := client.InstallOrUpgradeChart(ctx, &goHelm.ChartSpec{
 		ReleaseName:     releaseName,
 		ChartName:       chartURL,
 		Version:         chartVersion,

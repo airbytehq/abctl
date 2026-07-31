@@ -27,6 +27,7 @@ func TestDataplaneCmd_Run(t *testing.T) {
 		name          string
 		namespace     string
 		withKind      bool
+		chartVersion  string
 		expectedError string
 		setupMocks    func(ctrl *gomock.Controller) (airbox.ConfigStore, http.HTTPDoer, airbox.APIServiceFactory, helm.Factory, k8s.ClusterFactory, *uimock.MockProvider)
 	}{
@@ -241,8 +242,9 @@ func TestDataplaneCmd_Run(t *testing.T) {
 			},
 		},
 		{
-			name:     "success flow with Kind cluster",
-			withKind: true,
+			name:         "success flow with Kind cluster",
+			withKind:     true,
+			chartVersion: "1.9.2",
 			setupMocks: func(ctrl *gomock.Controller) (airbox.ConfigStore, http.HTTPDoer, airbox.APIServiceFactory, helm.Factory, k8s.ClusterFactory, *uimock.MockProvider) {
 				mockStore := airboxmock.NewMockConfigStore(ctrl)
 				mockHTTP := httpmock.NewMockHTTPDoer(ctrl)
@@ -291,6 +293,7 @@ func TestDataplaneCmd_Run(t *testing.T) {
 					}, nil),
 					mockUI.EXPECT().FilterableSelect("Select existing region:", []string{"Test Region - US (AWS)"}).Return(0, "Test Region - US (AWS)", nil),
 					mockUI.EXPECT().TextInput("Enter dataplane name:", "my-dataplane", gomock.Any()).Return("test-dataplane", nil),
+					mockUI.EXPECT().ShowInfo(gomock.Any()),
 					mockUI.EXPECT().RunWithSpinner("Creating Kind cluster", gomock.Any()).DoAndReturn(func(msg string, fn func() error) error {
 						return fn()
 					}),
@@ -407,8 +410,14 @@ func TestDataplaneCmd_Run(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
+			chartVersion := tt.chartVersion
+			if chartVersion == "" {
+				chartVersion = "2.1.1"
+			}
+
 			cmd := &DataplaneCmd{
 				Namespace:       tt.namespace,
+				ChartVersion:    chartVersion,
 				WithKindCluster: tt.withKind,
 			}
 

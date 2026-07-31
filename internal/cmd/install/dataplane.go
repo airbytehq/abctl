@@ -63,6 +63,12 @@ func (c *DataplaneCmd) Run(
 		return err
 	}
 
+	chartURL, chartVersion, repoURL, err := helm.ResolveDataplaneChartReference(c.ChartVersion)
+	if err != nil {
+		return fmt.Errorf("failed to resolve dataplane chart: %w", err)
+	}
+	c.warnOnChartV1(ui)
+
 	// Setup Kind cluster if needed
 	var kubeconfig, kubeContext, clusterName string
 	if c.WithKindCluster {
@@ -78,8 +84,6 @@ func (c *DataplaneCmd) Run(
 		return fmt.Errorf("failed to create helm client: %w", err)
 	}
 
-	c.warnOnChartV1(ui)
-
 	// Register dataplane with API
 	creds, err := registerDataplane(ctx, ui, apiClient, name, region.ID, abContext.OrganizationID)
 	if err != nil {
@@ -87,7 +91,7 @@ func (c *DataplaneCmd) Run(
 	}
 
 	// Deploy to Kubernetes
-	if err := deployChart(ctx, ui, helmClient, c.Namespace, name, c.ChartVersion, creds, abContext); err != nil {
+	if err := deployChart(ctx, ui, helmClient, c.Namespace, name, chartURL, chartVersion, repoURL, creds, abContext); err != nil {
 		return err
 	}
 
@@ -191,9 +195,9 @@ func registerDataplane(ctx context.Context, ui ui.Provider, apiClient api.Servic
 }
 
 // deployChart installs the Helm chart
-func deployChart(ctx context.Context, ui ui.Provider, client goHelm.Client, namespace, name, chartVersion string, creds *api.CreateDataplaneResponse, context *airbox.Context) error {
+func deployChart(ctx context.Context, ui ui.Provider, client goHelm.Client, namespace, name, chartURL, chartVersion, repoURL string, creds *api.CreateDataplaneResponse, context *airbox.Context) error {
 	return ui.RunWithSpinner("Installing dataplane chart", func() error {
-		return helm.InstallDataplaneChart(ctx, client, namespace, name, chartVersion, creds, context)
+		return helm.InstallDataplaneChart(ctx, client, namespace, name, chartURL, chartVersion, repoURL, creds, context)
 	})
 }
 
