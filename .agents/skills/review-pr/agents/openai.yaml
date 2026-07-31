@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review PR"
+  short_description: "Review abctl pull requests for concrete defects"
+  default_prompt: "Use $review-pr to review this abctl pull request for concrete regressions."

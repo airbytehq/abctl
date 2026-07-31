@@ -1,0 +1,4 @@
+interface:
+  display_name: "Shared Review Harness"
+  short_description: "Validate and anchor structured review findings"
+  default_prompt: "Use $shared-review-harness to validate structured PR review findings."

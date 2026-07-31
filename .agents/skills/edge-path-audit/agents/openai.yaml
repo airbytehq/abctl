@@ -1,0 +1,4 @@
+interface:
+  display_name: "Edge Path Audit"
+  short_description: "Trace abctl failure, retry, and cleanup paths"
+  default_prompt: "Use $edge-path-audit to trace failure and retry paths in this abctl change."
