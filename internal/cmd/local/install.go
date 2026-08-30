@@ -56,6 +56,11 @@ func (i *InstallCmd) Run(ctx context.Context, provider k8s.Provider, newSvcMgrCl
 		return fmt.Errorf("unable to determine docker installation status: %w", err)
 	}
 
+	spinner.UpdateText("Checking system resources")
+	if err := systemResourcesAvailable(ctx, telClient); err != nil {
+		return err
+	}
+
 	return telClient.Wrap(ctx, telemetry.Install, func() error {
 		spinner.UpdateText(fmt.Sprintf("Checking for existing Kubernetes cluster '%s'", provider.ClusterName))
 
