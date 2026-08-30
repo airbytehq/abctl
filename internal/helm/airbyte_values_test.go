@@ -224,11 +224,13 @@ global:
         enabled: true
     env_vars:
         AIRBYTE_INSTALLATION_ID: test-user
-    jobs:
+    workloads:
         resources:
-            limits:
-                cpu: "3"
-                memory: 4Gi
+            mainContainer:
+                cpu:
+                    limit: "3"
+                memory:
+                    limit: 4Gi
 server:
     env_vars:
         WEBAPP_URL: http://airbyte-abctl-airbyte-server-svc
@@ -253,16 +255,17 @@ global:
         AIRBYTE_INSTALLATION_ID: test-user
     imagePullSecrets[0]:
         name: mysecret
-    jobs:
-        resources:
-            limits:
-                cpu: "3"
-                memory: 4Gi
-            requests:
-                cpu: "0"
-                memory: "0"
     storage:
         type: local
+    workloads:
+        resources:
+            mainContainer:
+                cpu:
+                    limit: "3"
+                    request: "0"
+                memory:
+                    limit: 4Gi
+                    request: "0"
 postgresql:
     image:
         tag: 1.7.0-17
