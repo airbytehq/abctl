@@ -17,7 +17,9 @@ controller:
     httpsPort:
       enable: false
   config:
-    proxy-body-size: 10m
+    # Discover results and connection catalogs for wide schemas can be over 10m.
+    # Match the platform API's own 50MB body limit (airbyte-platform-internal#20068).
+    proxy-body-size: 50m
     proxy-read-timeout: "600"
     proxy-send-timeout: "600"
 `))
