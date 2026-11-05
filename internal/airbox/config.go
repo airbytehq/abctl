@@ -32,11 +32,26 @@ type NamedContext struct {
 
 // Context represents a single airbox context (org/workspace combination).
 type Context struct {
-	AirbyteAPIURL  string `json:"airbyteApiUrl" yaml:"airbyteApiUrl"`
-	AirbyteURL     string `json:"airbyteUrl" yaml:"airbyteUrl"`
-	OrganizationID string `json:"organizationId" yaml:"organizationId"`
-	Edition        string `json:"edition" yaml:"edition"`
-	Auth           Auth   `json:"auth" yaml:"auth"`
+	AirbyteAPIURL          string                            `json:"airbyteApiUrl" yaml:"airbyteApiUrl"`
+	AirbyteURL             string                            `json:"airbyteUrl" yaml:"airbyteUrl"`
+	OrganizationID         string                            `json:"organizationId" yaml:"organizationId"`
+	Edition                string                            `json:"edition" yaml:"edition"`
+	Auth                   Auth                              `json:"auth" yaml:"auth"`
+	DataplaneInstallations map[string]*DataplaneInstallation `json:"dataplaneInstallations,omitempty" yaml:"dataplaneInstallations,omitempty"`
+}
+
+type DataplaneInstallation struct {
+	DataplaneID  string                      `json:"dataplaneId" yaml:"dataplaneId"`
+	ClientID     string                      `json:"clientId" yaml:"clientId"`
+	ClientSecret string                      `json:"clientSecret" yaml:"clientSecret"`
+	Clusters     map[string]ComponentCluster `json:"clusters" yaml:"clusters"`
+	Registered   map[string]string           `json:"registered" yaml:"registered"`
+}
+
+type ComponentCluster struct {
+	Context    string `json:"context" yaml:"context"`
+	Kubeconfig string `json:"kubeconfig,omitempty" yaml:"kubeconfig,omitempty"`
+	Namespace  string `json:"namespace" yaml:"namespace"`
 }
 
 // Validate ensures the context has all required fields and valid URLs.

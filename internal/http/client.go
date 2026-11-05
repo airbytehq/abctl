@@ -4,12 +4,20 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // Client handles HTTP requests with base URL resolution
 type Client struct {
-	doer    HTTPDoer
-	baseURL string
+	doer             HTTPDoer
+	baseURL          string
+	configAPIBaseURL string
+}
+
+// WithConfigAPI routes Config API requests to the control-plane origin rather than the Public API host.
+func (c *Client) WithConfigAPI(baseURL string) *Client {
+	c.configAPIBaseURL = baseURL
+	return c
 }
 
 // HTTPDoer interface for making HTTP requests
@@ -31,7 +39,11 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("nil pointer dereference: doer is nil")
 	}
 
-	fullURLStr, err := url.JoinPath(c.baseURL, req.URL.Path)
+	baseURL := c.baseURL
+	if strings.HasPrefix(req.URL.Path, "/api/v1/") && c.configAPIBaseURL != "" {
+		baseURL = c.configAPIBaseURL
+	}
+	fullURLStr, err := url.JoinPath(baseURL, req.URL.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to join API base URL with request path: %w", err)
 	}

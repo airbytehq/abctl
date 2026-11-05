@@ -9,6 +9,7 @@ import (
 	"github.com/airbytehq/abctl/internal/api"
 	"github.com/airbytehq/abctl/internal/common"
 	goHelm "github.com/mittwald/go-helm-client"
+	"gopkg.in/yaml.v3"
 	"helm.sh/helm/v3/pkg/repo"
 )
 
@@ -42,8 +43,14 @@ func ResolveDataplaneChartReference(version string) (chartURL, chartVersion, rep
 	return fmt.Sprintf("%s/%s-%s.tgz", repoURL, dataplaneChartName, version), version, repoURL, nil
 }
 
+type DataplaneChartOptions struct {
+	Values        map[string]any
+	TargetCluster string
+	DeferWait     bool
+}
+
 // InstallDataplaneChart installs the official Airbyte dataplane Helm chart.
-func InstallDataplaneChart(ctx context.Context, client goHelm.Client, namespace, releaseName, chartURL, chartVersion, repoURL string, credentials *api.CreateDataplaneResponse, config *airbox.Context) error {
+func InstallDataplaneChart(ctx context.Context, client goHelm.Client, namespace, releaseName, chartURL, chartVersion, repoURL string, credentials *api.CreateDataplaneResponse, config *airbox.Context, options ...DataplaneChartOptions) error {
 	// Add the Airbyte Helm repository
 	if err := client.AddOrUpdateChartRepo(repo.Entry{
 		Name: dataplaneRepoName,
@@ -54,16 +61,32 @@ func InstallDataplaneChart(ctx context.Context, client goHelm.Client, namespace,
 
 	// Build values for the dataplane chart
 	valuesYAML := buildDataplaneValues(credentials, config)
+	wait := true
+	if len(options) > 0 {
+		var base map[string]any
+		if err := yaml.Unmarshal([]byte(valuesYAML), &base); err != nil {
+			return fmt.Errorf("dataplane defaults are not valid YAML")
+		}
+		merged := MergeValues(base, options[0].Values)
+		// Installation identity and routing cannot be overridden by an overlay.
+		merged["dataPlane"] = base["dataPlane"]
+		merged["targetCluster"] = options[0].TargetCluster
+		data, err := yaml.Marshal(merged)
+		if err != nil {
+			return fmt.Errorf("dataplane values cannot be encoded")
+		}
+		valuesYAML = string(data)
+		wait = !options[0].DeferWait
+	}
 
-	// Install the chart with atomic flag to ensure cleanup on failure/interrupt
 	_, err := client.InstallOrUpgradeChart(ctx, &goHelm.ChartSpec{
 		ReleaseName:     releaseName,
 		ChartName:       chartURL,
 		Version:         chartVersion,
 		CreateNamespace: true,
 		Namespace:       namespace,
-		Wait:            true,
-		Atomic:          true, // Rollback on failure, including Ctrl-C
+		Wait:            wait,
+		Atomic:          wait,
 		Timeout:         10 * time.Minute,
 		ValuesYaml:      valuesYAML,
 	}, &goHelm.GenericHelmOptions{})
@@ -72,6 +95,23 @@ func InstallDataplaneChart(ctx context.Context, client goHelm.Client, namespace,
 	}
 
 	return nil
+}
+
+func MergeValues(base, overlay map[string]any) map[string]any {
+	result := make(map[string]any, len(base)+len(overlay))
+	for key, value := range base {
+		result[key] = value
+	}
+	for key, value := range overlay {
+		left, leftOK := result[key].(map[string]any)
+		right, rightOK := value.(map[string]any)
+		if leftOK && rightOK {
+			result[key] = MergeValues(left, right)
+		} else {
+			result[key] = value
+		}
+	}
+	return result
 }
 
 // buildDataplaneValues constructs the Helm values YAML for the dataplane chart

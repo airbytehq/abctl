@@ -22,6 +22,8 @@ type Service interface {
 	ListDataplanes(ctx context.Context) ([]Dataplane, error)
 	CreateDataplane(ctx context.Context, req CreateDataplaneRequest) (*CreateDataplaneResponse, error)
 	DeleteDataplane(ctx context.Context, id string) error
+	RegisterComponent(ctx context.Context, req RegisterComponentRequest) (*ComponentCredentials, error)
+	UnregisterComponent(ctx context.Context, req UnregisterComponentRequest) error
 }
 
 // Client handles Control Plane API operations

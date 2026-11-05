@@ -174,3 +174,32 @@ func (mr *MockServiceMockRecorder) ListRegions(ctx, organizationID any) *gomock.
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRegions", reflect.TypeOf((*MockService)(nil).ListRegions), ctx, organizationID)
 }
+
+// RegisterComponent mocks base method.
+func (m *MockService) RegisterComponent(ctx context.Context, req api.RegisterComponentRequest) (*api.ComponentCredentials, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RegisterComponent", ctx, req)
+	ret0, _ := ret[0].(*api.ComponentCredentials)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RegisterComponent indicates an expected call of RegisterComponent.
+func (mr *MockServiceMockRecorder) RegisterComponent(ctx, req any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterComponent", reflect.TypeOf((*MockService)(nil).RegisterComponent), ctx, req)
+}
+
+// UnregisterComponent mocks base method.
+func (m *MockService) UnregisterComponent(ctx context.Context, req api.UnregisterComponentRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnregisterComponent", ctx, req)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnregisterComponent indicates an expected call of UnregisterComponent.
+func (mr *MockServiceMockRecorder) UnregisterComponent(ctx, req any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnregisterComponent", reflect.TypeOf((*MockService)(nil).UnregisterComponent), ctx, req)
+}
