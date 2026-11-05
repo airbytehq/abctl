@@ -41,6 +41,7 @@ func NewAPIService(ctx context.Context, httpClient http.HTTPDoer, cfg ConfigStor
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
 	}
+	apiHTTPClient.WithConfigAPI(currentContext.AirbyteURL)
 
 	// Check if auth is configured
 	if currentContext.Auth.provider == nil {

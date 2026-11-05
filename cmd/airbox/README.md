@@ -100,6 +100,66 @@ This interactive command will:
 5. Deploy the dataplane using Helm with the provided credentials
 6. Configure the dataplane to connect to your Airbyte control plane
 
+### Install components on one or more clusters
+
+Pass repeatable Helm overlays and map each component's `cluster` to a kubeconfig
+context. Later files override earlier files; maps merge recursively and lists
+replace earlier lists:
+
+```bash
+airbox install dataplane -n airbyte \
+  --values components.values.yaml --values production.values.yaml \
+  --cluster-context primary=gke-production \
+  --cluster-context agents=gke-agents
+```
+
+Airbox performs one Helm install/upgrade per enabled component cluster or previously used cluster,
+using the dataplane name as the release name and setting `targetCluster` for each
+release. Unused context mappings do not cause additional deployments. Keep related
+`egress.allowComponents` peers in the same cluster. Set
+`componentsNamespace` in the overlays if the default `airbyte-agents` namespace is
+not suitable. Explicit context mappings use existing clusters rather than creating
+Kind. Without mappings, a single-cluster installation uses Kind by default, or the
+current kubeconfig context with `--with-kind-cluster=false`.
+
+After all Helm operations succeed, enabled components with a `publicIngress.host`
+are registered at `https://<host>` according to this mapping:
+
+| Chart component | Control-plane component |
+| --- | --- |
+| `cloudMcp` | `cloud_mcp` |
+| `mtxApi` | `mtx_api` |
+| `aguiFrontend` | `agui` |
+
+All other components, including `aguiBackend`, `directConnect` and `sourceConnect`,
+are installed without registration, with one informational line per component.
+Configure `AGUI_BASE_URL` on the frontend to point at its backend's public URL.
+
+For Cloud MCP, Airbox writes the registration response to `cloud-mcp-oidc` in the
+components namespace, with `clientId` and `clientSecret` keys, and restarts the
+release's Cloud MCP deployment. Cloud MCP's Helm operation does not wait for
+readiness or use atomic rollback: the pod cannot start until registration creates
+the Secret. Other clusters retain the normal Helm wait and atomic behavior. A
+registration or Secret-write failure is reported; rerunning the same installation
+retries registration and rotates the Cloud MCP secret again.
+
+To upgrade, select the same organization, dataplane name and namespace and supply
+the desired overlays again. Airbox retains the dataplane identity, cluster mappings
+and registration intents in `AIRBOXCONFIG`. The file contains dataplane client
+credentials in addition to the existing login credentials and is written with
+mode `0600`; do not share or commit it. Saved cluster mappings are reused unless
+explicitly supplied; changing a saved context or release namespace requires manual
+uninstallation first.
+
+Set a component's `enabled` to `false`, remove it from the overlays, or remove its
+public host to unregister it on the next successful install. Previously used
+clusters are upgraded too, removing their disabled component resources. Omitting
+all overlays on a saved component installation disables all its components.
+Cleanup is checkpointed so an API failure can be retried. Multi-cluster operations
+are not transactional: a failure can leave earlier clusters upgraded; rerun with
+the same values to reconcile them. Use a chart release containing the component
+framework; `--chart-version` can pin that release.
+
 ### Get Resources
 
 List dataplanes:

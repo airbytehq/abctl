@@ -17,8 +17,11 @@ import (
 
 // DataplaneCmd handles dataplane installation
 type DataplaneCmd struct {
-	Namespace    string `short:"n" help:"Target namespace (default: 'default' for Kind clusters, current kubeconfig context for existing clusters)."`
-	ChartVersion string `help:"Version of the airbyte-data-plane chart to install (default: latest chart V2 release)."`
+	Namespace              string            `short:"n" help:"Target namespace (default: 'default' for Kind clusters, current kubeconfig context for existing clusters)."`
+	ChartVersion           string            `help:"Version of the airbyte-data-plane chart to install (default: latest chart V2 release)."`
+	Values                 []string          `short:"f" type:"existingfile" help:"Helm values overlay; repeat for later-file precedence."`
+	ClusterContext         map[string]string `help:"Component cluster to kubeconfig context, e.g. primary=prod; repeat for multiple clusters."`
+	componentClientFactory func(string, string) (k8s.ComponentClient, error)
 	// Hide flag for now.
 	WithKindCluster bool `default:"true" help:"Create a Kind cluster for the dataplane and set it as current context." hidden:""`
 }
@@ -61,6 +64,9 @@ func (c *DataplaneCmd) Run(
 	name, err := getDataplaneName(ui)
 	if err != nil {
 		return err
+	}
+	if len(c.Values) > 0 || len(c.ClusterContext) > 0 || abContext.DataplaneInstallations[installationKey(abContext.OrganizationID, name)] != nil {
+		return c.installComponents(ctx, cfg, apiClient, helmFactory, clusterFactory, ui, abContext, name, region.ID)
 	}
 
 	chartURL, chartVersion, repoURL, err := helm.ResolveDataplaneChartReference(c.ChartVersion)
